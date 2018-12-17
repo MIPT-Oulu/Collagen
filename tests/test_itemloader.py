@@ -1,7 +1,6 @@
-from ..collagen.data._itemloader import ItemLoader
-from ..collagen.data._dataset import DataFrameDataset
+from collagen.data._itemloader import ItemLoader
+from collagen.data._dataset import DataFrameDataset
 from .fixtures import *
-from PIL import Image
 import os
 from shutil import rmtree
 import torch
@@ -46,8 +45,7 @@ def test_loader_same_shape_sampler_k_1_batch_3():
         img = np.zeros((2, 9), dtype=int)
         img[:,i] = 1
         list_imgs.append(np.copy(img))
-        pil_img = Image.fromarray(img)
-        pil_img.save(file_fullname)
+        cv2.imwrite(file_fullname, img)
     
     itermloader = ItemLoader(root, meta_data=md_1_df_9_row_y_class(), batch_size=batch_size, parse_item_cb=md_1_parse_item)
     samples = itermloader.sampler(1)

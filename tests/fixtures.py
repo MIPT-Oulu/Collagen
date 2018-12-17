@@ -1,7 +1,9 @@
 import pytest
 import pandas as pd 
 import numpy as np 
-
+import os
+import cv2
+import torch 
 
 @pytest.fixture
 def md_1_dict_6_row_y_class():
@@ -74,7 +76,7 @@ def md_1_dict_retrieved_batch_3_iter_1():
     return [{'file_name': ['img1.png', 'img2.png', 'img3.png'], 'class': ['A', 'B', 'C']}, {'file_name': ['img4.png', 'img5.png', 'img6.png'], 'class': ['D', 'E', 'F']}]
 
 @pytest.fixture
-def md_1_parse_item(entry):
+def md_1_parse_item(root, entry):
     classes = ["A", "B", "C", "D", "E", "F"]
     num_cls = len(classes)
     one_hot = np.array([0]*num_cls).astype(np.float)
@@ -82,11 +84,18 @@ def md_1_parse_item(entry):
     for i, l in enumerate(classes):
         clas_to_ind[l] = i
 
+    file_fullname = os.path.join(root, entry["file_name"])
+    assert os.path.exists(file_fullname)
+
+    img = cv2.imread(file_fullname, cv2.IMREAD_GRAYSCALE)
+
+    pt_tensor_img = torch.from_numpy(img.astype(np.int32))
+
     one_hot[clas_to_ind[entry["class"]]] = 1.0
     
-    processed_entry = {"target": one_hot}
+    processed_entry = {"target": one_hot, "img": pt_tensor_img}
     for key in entry:
-        if key != "class":
+        if key not in ["class", "img"]:
             processed_entry[key] = entry[key]
     return processed_entry
     
