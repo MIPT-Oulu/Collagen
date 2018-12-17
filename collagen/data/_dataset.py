@@ -50,7 +50,8 @@ class DataFrameDataset(Dataset):
         """
         entry = self.meta_data.iloc[index]
         entry = self.parse_item_cb(self.root, entry.to_dict())
-        assert(isinstance(entry, dict))
+        if not isinstance(entry, dict):
+            raise TypeError("Output of `parse_item_cb` must be `dict`, but found {}".format(type(entry)))
         return entry
 
     def __len__(self):

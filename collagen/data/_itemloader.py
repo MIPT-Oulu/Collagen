@@ -38,7 +38,7 @@ class ItemLoader(object):
     sampler : Sampler, optional
         Defines the strategy to draw samples from
         the dataset. If specified, ``shuffle`` must be False. (the default is None)
-    batch_sampler : [type], optional
+    batch_sampler : callable, optional
         like sampler, but returns a batch of
         indices at a time. Mutually exclusive with :attr:`batch_size`,
         :attr:`shuffle`, :attr:`sampler`, and :attr:`drop_last`. (the default is None)
