@@ -1,46 +1,71 @@
 import torch
-from torch.optim import Optimizer
 
 from ..logging import KVS
-from ._model import CModule
-from ..data import DataProvider
+from ._model import Module
+
+
+from typing import Tuple, Any
 
 
 class Session(object):
     """Session class, which implements the basic logic of the training loop.
 
+    Current implementation allows to easily set-up gradient accumulation
+    and other strategies.
+
     Parameters
     ----------
-    module : CModule
+    module : Module
         Instantiated collagen module with trainable parameters.
+    optimizer : torch.Optimizer
+        Optimizer to train teh model
+    loss : torch.nn.Module
+        Loss used in the session
 
     """
-    def __init__(self, module: CModule, optimizer: Optimizer,
-                 loss: torch.nn.Module, data_provider: DataProvider,
-                 loader_id: str):
+    def __init__(self, module: Module, optimizer: torch.optim.Optimizer,
+                 loss: torch.nn.Module, param_groups: str or Tuple[str]):
 
-        self.__module = module
-        self.__optimizer = optimizer
-        self.__data_provider = data_provider
-        self.__loss = loss
-        self.__loader_id = loader_id
-        self.__kvs = KVS()
+        self.__module: Module = module
+        self.__optimizer: torch.optim.Optimizer = optimizer
+        self.__loss: torch.nn.Module = loss
+        self.__kvs: KVS = KVS()
+        self.__param_groups: str or Tuple[str]= param_groups
 
-        self.__optimizer.add_param_group(self.__module.parameters())
+        if isinstance(param_groups, tuple):
+            for group_name in param_groups:
+                self.add_param_group(group_name)
 
-    def train_step(self, batch, with_backward=True, zero_grad=True):
+    @property
+    def loss(self):
+        return self.__loss
+
+    @loss.setter
+    def loss(self, new_loss: torch.nn.Module):
+        self.__loss: torch.nn.Module = new_loss
+
+    def add_param_group(self, group_name: str):
+        self.__optimizer.add_param_group(self.__module.parameters(group_name))
+
+    def train_step(self, batch: torch.Tensor, with_backward: bool = True,
+                   zero_grad: bool = True) -> Tuple[float, Any] or float:
+
         if zero_grad:
             self.__optimizer.zero_grad()
-        return self.batch_step(batch, with_grad=True,
-                               with_backward=with_backward)
 
-    def eval_step(self, batch, return_out=False):
+        return self.batch_step(batch, with_grad=True, with_backward=with_backward)
+
+    def eval_step(self, batch: torch.Tensor, return_out=False) -> Tuple[float, torch.Tensor or tuple] or float:
+
         return self.batch_step(batch, with_grad=False,
                                with_backward=False,
                                eval_mode=True,
                                return_out=return_out)
 
-    def batch_step(self, batch, with_grad=True, with_backward=True, eval_mode=False, return_out=False):
+    def batch_step(self, batch: torch.Tensor, with_grad: bool = True,
+                   with_backward: bool = True, eval_mode: bool = False,
+                   return_out: bool = False) -> Tuple[float, Any] or float:
+
         if eval_mode:
             with_backward = False
             with_grad = False
@@ -60,9 +85,9 @@ class Session(object):
             loss.backward()
             self.__optimizer.step()
         if not return_out:
-            return loss
+            return loss.item()
         else:
-            return loss, return_out
+            return loss.item(), return_out
 
 
 

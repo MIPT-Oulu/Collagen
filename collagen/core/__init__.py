@@ -1,2 +1,2 @@
-from ._model import CModule
+from ._model import Module
 from ._session import Session
