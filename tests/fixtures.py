@@ -14,7 +14,10 @@ def md_1_dict_6_row_y_class():
     -------
     out : dict
     """
-    return {'file_name': {0: 'img1.png', 1: 'img2.png', 2: 'img3.png', 3: 'img4.png', 4: 'img5.png', 5: 'img6.png', 6: 'img5.png'}, 'class': {0: 'A', 1: 'B', 2: 'C', 3: 'D', 4: 'E', 5: 'F'}}
+    return {'file_name': {0: 'img1.png', 1: 'img2.png', 2: 'img3.png',
+                          3: 'img4.png', 4: 'img5.png', 5: 'img6.png', 6: 'img5.png'},
+            'class': {0: 'A', 1: 'B', 2: 'C',
+                      3: 'D', 4: 'E', 5: 'F'}}
 
 
 @pytest.fixture
@@ -25,7 +28,9 @@ def md_1_dict_9_row_y_class():
     -------
     out : dict
     """
-    return {'file_name': {0: 'img1.png', 1: 'img2.png', 2: 'img3.png', 3: 'img4.png', 4: 'img5.png', 5: 'img6.png', 6: 'img5.png', 7: 'img4.png' , 8: 'img3.png'}, 'class': {0: 'A', 1: 'B', 2: 'C', 3: 'D', 4: 'E', 5: 'F', 6: 'E', 7: 'D', 8: 'C'}}
+    return {'file_name': {0: 'img1.png', 1: 'img2.png', 2: 'img3.png', 3: 'img4.png',
+                          4: 'img5.png', 5: 'img6.png', 6: 'img5.png', 7: 'img4.png' , 8: 'img3.png'},
+            'class': {0: 'A', 1: 'B', 2: 'C', 3: 'D', 4: 'E', 5: 'F', 6: 'E', 7: 'D', 8: 'C'}}
 
 
 @pytest.fixture
@@ -80,7 +85,9 @@ def md_1_dict_retrieved_batch_3_iter_1():
     -------
     out : dict
     """
-    return [{'file_name': ['img1.png', 'img2.png', 'img3.png'], 'class': ['A', 'B', 'C']}, {'file_name': ['img4.png', 'img5.png', 'img6.png'], 'class': ['D', 'E', 'F']}]
+    return [{'file_name': ['img1.png', 'img2.png', 'img3.png'],
+             'class': ['A', 'B', 'C']},
+            {'file_name': ['img4.png', 'img5.png', 'img6.png'], 'class': ['D', 'E', 'F']}]
 
 
 @pytest.fixture
