@@ -1,63 +1,52 @@
 from collagen.data._itemloader import ItemLoader
 from collagen.data._dataset import DataFrameDataset
-from .fixtures import *
-import os
-from shutil import rmtree
+
+from .fixtures import md_1_dict_6_row_y_class, md_1_df_9_row_y_class, \
+    md_1_parse_item, target_parser, md_1_df_6_row_y_class
+
+
 import torch
 import pytest
+import numpy as np
 
-def test_valid_type_root_int():
-    with pytest.raises(TypeError):
-        ItemLoader(1, md_1_df_6_row_y_class())
 
-def test_valid_type_root_list():
+def test_valid_type_root_int(md_1_df_6_row_y_class):
     with pytest.raises(TypeError):
-        ItemLoader([], md_1_df_6_row_y_class())
+        ItemLoader(1, md_1_df_6_row_y_class)
+
+
+def test_valid_type_root_list(md_1_df_6_row_y_class):
+    with pytest.raises(TypeError):
+        ItemLoader([], md_1_df_6_row_y_class)
+
 
 def test_valid_type_metadata_1():
-    df = md_1_df_6_row_y_class()
-    root = "."
     with pytest.raises(TypeError):
-        ItemLoader(root, 1)    
+        ItemLoader(".", 1)
+
 
 def test_not_enough_arg_input_0_arg():
-    df = md_1_df_6_row_y_class()
-    root = "."
     with pytest.raises(TypeError):
         ItemLoader()
 
-def test_not_enough_arg_input_1_arg():
-    df = md_1_df_6_row_y_class()
-    root = "."
-    with pytest.raises(TypeError):
-        ItemLoader(root)
 
-def test_loader_same_shape_sampler_k_1_batch_3():
+def test_not_enough_arg_input_1_arg():
+    with pytest.raises(TypeError):
+        ItemLoader(".")
+
+"""
+def test_loader_same_shape_sampler_k_1_batch_3(md_1_df_9_row_y_class, md_1_parse_item, img_list):
     root = "./imgs_test_loader_sampler_k_1_batch_3"
     batch_size = 3
-#     if os.path.exists(root):
-        # rmtree(root)
-#     os.makedirs(root)
-    list_imgs = []
-    for i in range(9):
-        # file_name = "img" + str(i+1) + ".png"
-        # file_fullname = os.path.join(root, file_name)
-        img = np.zeros((2, 9), dtype=int)
-        img[:,i] = 1
-        list_imgs.append(np.copy(img))
-        # cv2.imwrite(file_fullname, img)
-    
-    itermloader = ItemLoader(root, meta_data=md_1_df_9_row_y_class(), batch_size=batch_size, parse_item_cb=md_1_parse_item)
+    img_list
+    itermloader = ItemLoader(root, meta_data=md_1_df_9_row_y_class,
+                             batch_size=batch_size, parse_item_cb=md_1_parse_item)
     samples = itermloader.sampler(1)
 
-    # Prepare result
-    # X
-    # batched_imgs = np.stack(list_imgs[:batch_size], axis=0).astype(np.int32)
-    # y
     batched_labels = np.zeros((3, 6), dtype=np.float)
-    batched_labels[0,0] = 1
-    batched_labels[1,1] = 1
-    batched_labels[2,2] = 1
+    batched_labels[0, 0] = 1
+    batched_labels[1, 1] = 1
+    batched_labels[2, 2] = 1
 
     # expected_tensor = torch.from_numpy(batched_imgs)
     expected_target = torch.from_numpy(batched_labels)
@@ -70,3 +59,4 @@ def test_loader_same_shape_sampler_k_1_batch_3():
 
     # print("Diff img: {}, diff target: {}".format(diff_img, diff_target))
     assert(diff_target == 0)
+"""
