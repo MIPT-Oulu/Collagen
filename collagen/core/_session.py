@@ -21,6 +21,9 @@ class Session(object):
         Optimizer to train teh model
     loss : torch.nn.Module
         Loss used in the session
+    param_groups : str or tuple
+        Groups of parameters, which need to be optimized. If str, then a particular group of parameters will be used.
+        If a tuple of strings, then all the mentioned groups will be used.
 
     """
     def __init__(self, module: Module, optimizer: torch.optim.Optimizer,
@@ -30,7 +33,7 @@ class Session(object):
         self.__optimizer: torch.optim.Optimizer = optimizer
         self.__loss: torch.nn.Module = loss
         self.__kvs: KVS = KVS()
-        self.__param_groups: str or Tuple[str]= param_groups
+        self.__param_groups: str or Tuple[str] = param_groups
 
         if isinstance(param_groups, tuple):
             for group_name in param_groups:
