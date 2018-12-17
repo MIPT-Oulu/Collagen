@@ -1,34 +1,25 @@
 import torch
 
 
-class CModule(object):
-    def __init__(self, module: torch.nn.Module, param_getter, param_init):
-        self.__module = module
-        self.__param_getter = param_getter
-        self.__param_init = param_init
+class Module(torch.nn.Module):
+    def __init__(self):
+        super(Module, self).__init__()
+        self.__param_groups = dict()
 
-    def parameters(self):
-        self.__param_getter(self.__module)
+    def parameters(self, group_name=None, name=None):
+        if group_name is None:
+            return super(Module, self).parameters()
+        else:
+            if name is None:
+                return self.__param_groups[group_name]
+            else:
+                return self.__param_groups[group_name][name]
 
-    @property
-    def param_getter(self):
-        return self.__param_getter
+    def _add_to(self, layer, name, group_name):
+        if group_name not in self.__param_groups:
+            self.__param_groups[group_name] = {}
 
-    @param_getter.setter
-    def param_getter(self, new_param_getter):
-        self.__param_getter = new_param_getter
+        self.__param_groups[group_name][name] = layer.parameters()
 
-    @property
-    def param_init_cb(self):
-        return self.__param_init
-
-    @param_init_cb.setter
-    def param_init_cb(self, new_param_init_cb):
-        self.__param_init = new_param_init_cb
-
-    def train(self, state):
-        self.__module.train(state)
-
-    def __call__(self, *args, **kwargs):
-        return self.__module(args, kwargs)
-
+    def forward(self, *input):
+        raise NotImplementedError
