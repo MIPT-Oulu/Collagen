@@ -1,8 +1,6 @@
 from torch.utils.data import Dataset
 import pandas as pd
-import numpy as np 
-import torch
-import os
+
 
 class DataFrameDataset(Dataset):
     """Dataset based on ``pandas.DataFrame``
@@ -34,6 +32,7 @@ class DataFrameDataset(Dataset):
         self.root = root
         self.meta_data = meta_data
         self.parse_item_cb = parse_item_cb
+        self.transform = transform
 
     def __getitem__(self, index):
         """Get ``index``-th parsed item of :attr:`meta_data`
@@ -49,7 +48,7 @@ class DataFrameDataset(Dataset):
             dictionary of `index`-th parsed item
         """
         entry = self.meta_data.iloc[index]
-        entry = self.parse_item_cb(self.root, entry.to_dict())
+        entry = self.parse_item_cb(self.root, entry, self.transform)
         if not isinstance(entry, dict):
             raise TypeError("Output of `parse_item_cb` must be `dict`, but found {}".format(type(entry)))
         return entry

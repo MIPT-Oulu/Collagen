@@ -1,12 +1,9 @@
-import sys
-import os
-import numpy as numpy
 import pandas as pd
-import torchvision
 import torch
-from torch.utils.data.sampler import SequentialSampler, RandomSampler, BatchSampler
-from torchvision.datasets import DatasetFolder
-from torch.utils.data import Dataset
+from torch.utils.data.sampler import SequentialSampler
+
+from torch.utils.data.dataloader import default_collate
+
 from ._dataset import DataFrameDataset
 import numpy as np
 
@@ -55,8 +52,8 @@ class ItemLoader(object):
     """
 
     def __init__(self, root: str, meta_data: pd.DataFrame, parse_item_cb: callable, batch_size: int = 1,
-                 num_workers: int = 0, shuffle: bool = False, pin_memory: bool = False, collate_fn: callable = None,
-                 transform: callable or None = None,
+                 num_workers: int = 0, shuffle: bool = False, pin_memory: bool = False,
+                 collate_fn: callable = default_collate, transform: callable or None = None,
                  sampler: torch.utils.data.sampler.Sampler or None = None,
                  batch_sampler=None, drop_last: bool = True, timeout: int = 0):
 
@@ -74,7 +71,6 @@ class ItemLoader(object):
                                                        worker_init_fn=lambda wid: np.random.seed(np.uint32(
                                                            torch.initial_seed() + wid)))
 
-        self.iter_batch_sampler = iter(self.data_loader)
         self.drop_last = drop_last
         self.batch_size = batch_size
         
@@ -84,7 +80,7 @@ class ItemLoader(object):
         return len(self.dataset)
 
     def sample(self, k=1):
-        """Sample oen or more mini-batches
+        """Sample one or more mini-batches
         
         Parameters
         ----------
@@ -99,12 +95,9 @@ class ItemLoader(object):
         samples = []
         for i in range(k):
             try:
-                batch = next(self.iter_batch_sampler)
+                batch = next(iter(self.data_loader))
             except StopIteration:
-                self.iter_batch_sampler = iter(self.data_loader)
                 continue
-            
-            if not self.drop_last or batch["img"].shape[0] == self.batch_size:
-                samples.append(batch)
+            samples.append(batch)
             
         return samples

@@ -6,6 +6,13 @@ import cv2
 import torch 
 
 
+@pytest.fixture(scope='module', params=[500, 1000, 10000])
+def metadata_fname_target_5_classes(request):
+    np.random.seed(42)
+    return pd.DataFrame(data={'fname': [f'img_{i}.png' for i in range(request.param)],
+                              'target': np.random.choice(5, request.param, replace=True)})
+
+
 @pytest.fixture
 def md_1_dict_6_row_y_class():
     """
@@ -118,10 +125,19 @@ def md_1_parse_item():
 
 
 @pytest.fixture
-def target_parser():
-    def parser(data_dir, entry):
-        return {'img': np.ones((9, 9), dtype=np.uint8), 'target': entry.target, 'fname': entry.fname}
+def ones_image_parser():
+    def parser(data_dir, entry, transforms):
+        img = np.ones((9, 9))
+        target = entry.target
+
+        img, target = transforms(img, target)
+
+        return {'img': img, 'target': target, 'fname': entry.fname}
     return parser
 
 
-
+@pytest.fixture
+def img_target_transformer():
+    def empty_transform(img, target):
+        return torch.from_numpy(img.astype(np.float32)).unsqueeze(0), target
+    return empty_transform
