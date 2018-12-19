@@ -6,10 +6,10 @@ from torch.utils.data.dataloader import default_collate
 
 from ._dataset import DataFrameDataset
 import numpy as np
-import gc
+
 
 class ItemLoader(object):
-    """ItemLoader. Combines DataFrameDataset and DataLoader, and provides single- or multi-process iterators over the dataset.
+    """Combines DataFrameDataset and DataLoader, and provides single- or multi-process iterators over the dataset.
         
     Parameters
     ----------
