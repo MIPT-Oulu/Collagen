@@ -9,7 +9,7 @@ import numpy as np
 
 
 class ItemLoader(object):
-    """ItemLoader. Combines DataFrameDataset and DataLoader, and provides single- or multi-process iterators over the dataset.
+    """Combines DataFrameDataset and DataLoader, and provides single- or multi-process iterators over the dataset.
         
     Parameters
     ----------
@@ -73,14 +73,18 @@ class ItemLoader(object):
 
         self.drop_last = drop_last
         self.batch_size = batch_size
+        self.__iter_loader = iter(self.data_loader)
         
     def __len__(self):
-        """ Get length of dataset
+        """ Get length of teh dataloader
+
         """
-        return len(self.dataset)
+        return len(self.data_loader)
 
     def sample(self, k=1):
-        """Sample one or more mini-batches
+        """Sample one or more mini-batches.
+
+        if not
         
         Parameters
         ----------
@@ -95,9 +99,12 @@ class ItemLoader(object):
         samples = []
         for i in range(k):
             try:
-                batch = next(iter(self.data_loader))
+                batch = next(self.__iter_loader)
             except StopIteration:
-                continue
+                del self.__iter_loader
+                self.__iter_loader = iter(self.data_loader)
+                batch = next(self.__iter_loader)
+
             samples.append(batch)
             
         return samples
