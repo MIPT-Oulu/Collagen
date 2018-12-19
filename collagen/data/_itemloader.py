@@ -48,7 +48,7 @@ class ItemLoader(object):
         will be smaller. (the default is True)
     timeout : int, optional
         if positive, the timeout value for collecting a batch
-        from workers. Should always be non-negative. (the default is 0)
+        from workers. If ``0``, ignore ``timeout`` notion. Should always be non-negative. (the default is 0)
     """
 
     def __init__(self, root: str, meta_data: pd.DataFrame, parse_item_cb: callable, batch_size: int = 1,
