@@ -1,72 +1,42 @@
 from collagen.data._itemloader import ItemLoader
+import itertools
 from collagen.data._dataset import DataFrameDataset
-from .fixtures import *
-import os
-from shutil import rmtree
+
+from .fixtures import img_target_transformer, ones_image_parser, img_target_transformer, \
+    metadata_fname_target_5_classes
+
+
 import torch
 import pytest
+import numpy as np
 
-def test_valid_type_root_int():
-    with pytest.raises(TypeError):
-        ItemLoader(1, md_1_df_6_row_y_class())
 
-def test_valid_type_root_list():
-    with pytest.raises(TypeError):
-        ItemLoader([], md_1_df_6_row_y_class())
+@pytest.mark.parametrize('batch_size, n_samples', itertools.product([32, 11, 3], [1, 3, 6]))
+def test_loader_samples_batches(batch_size, n_samples, metadata_fname_target_5_classes,
+                                ones_image_parser, img_target_transformer):
 
-def test_valid_type_metadata_1():
-    df = md_1_df_6_row_y_class()
-    root = "."
-    with pytest.raises(TypeError):
-        ItemLoader(root, 1)    
+    itermloader = ItemLoader('/tmp/', meta_data=metadata_fname_target_5_classes,
+                             batch_size=batch_size, parse_item_cb=ones_image_parser,
+                             transform=img_target_transformer, shuffle=True)
 
-def test_not_enough_arg_input_0_arg():
-    df = md_1_df_6_row_y_class()
-    root = "."
-    with pytest.raises(TypeError):
-        ItemLoader()
+    samples = itermloader.sample(n_samples)
 
-def test_not_enough_arg_input_1_arg():
-    df = md_1_df_6_row_y_class()
-    root = "."
-    with pytest.raises(TypeError):
-        ItemLoader(root)
+    assert len(samples) == n_samples
+    assert samples[0]['img'].size(0) == batch_size
+    assert samples[0]['target'].size(0) == batch_size
 
-def test_loader_same_shape_sampler_k_1_batch_3():
-    root = "./imgs_test_loader_sampler_k_1_batch_3"
-    batch_size = 3
-#     if os.path.exists(root):
-        # rmtree(root)
-#     os.makedirs(root)
-    list_imgs = []
-    for i in range(9):
-        # file_name = "img" + str(i+1) + ".png"
-        # file_fullname = os.path.join(root, file_name)
-        img = np.zeros((2, 9), dtype=int)
-        img[:,i] = 1
-        list_imgs.append(np.copy(img))
-        # cv2.imwrite(file_fullname, img)
-    
-    itermloader = ItemLoader(root, meta_data=md_1_df_9_row_y_class(), batch_size=batch_size, parse_item_cb=md_1_parse_item)
-    samples = itermloader.sampler(1)
 
-    # Prepare result
-    # X
-    # batched_imgs = np.stack(list_imgs[:batch_size], axis=0).astype(np.int32)
-    # y
-    batched_labels = np.zeros((3, 6), dtype=np.float)
-    batched_labels[0,0] = 1
-    batched_labels[1,1] = 1
-    batched_labels[2,2] = 1
+@pytest.mark.parametrize('batch_size, n_samples', itertools.product([32], [20, 100]))
+def test_loader_endless_sampling_works(batch_size, n_samples, metadata_fname_target_5_classes,
+                                ones_image_parser, img_target_transformer):
 
-    # expected_tensor = torch.from_numpy(batched_imgs)
-    expected_target = torch.from_numpy(batched_labels)
+    itermloader = ItemLoader('/tmp/', meta_data=metadata_fname_target_5_classes,
+                             batch_size=batch_size, parse_item_cb=ones_image_parser,
+                             transform=img_target_transformer, shuffle=True)
 
-    expected_output = {'target': expected_target}
-    # print("Predicted:\n{}\nGroundtruth:\n{}".format(samples[0], expected_output))
-    
-    # diff_img = torch.sum(torch.abs(samples[0]['img'] - expected_output['img']))
-    diff_target = torch.sum(torch.abs(samples[0]['target'] - expected_output['target']))
+    for i in range(2*len(itermloader)):
+        samples = itermloader.sample(n_samples)
 
-    # print("Diff img: {}, diff target: {}".format(diff_img, diff_target))
-    assert(diff_target == 0)
+        assert len(samples) == n_samples
+        assert samples[0]['img'].size(0) == batch_size
+        assert samples[0]['target'].size(0) == batch_size
