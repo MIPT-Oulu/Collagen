@@ -3,25 +3,25 @@ import pandas as pd
 
 
 class DataFrameDataset(Dataset):
-    """Dataset based on ``pandas.DataFrame``
+    """Dataset based on ``pandas.DataFrame``.
         
     Parameters
     ----------
     root : str
-        Path to root directory of input data
+        Path to root directory of input data.
     meta_data : pandas.DataFrame
-        Meta data of data and labels
+        Meta data of data and labels.
     parse_item_cb : callable
-        Callback function to parse each row of :attr:`meta_data`
+        Callback function to parse each row of :attr:`meta_data`.
     transform : callable, optional
-        Transformation applied to row of :attr:`meta_data` (the default is None, which means to do nothing)        
+        Transformation applied to row of :attr:`meta_data` (the default is None, which means to do nothing).
     
     Raises
     ------
     TypeError
-        `root` must be `str`
+        `root` must be `str`.
     TypeError
-        `meta_data` must be `pandas.DataFrame`
+        `meta_data` must be `pandas.DataFrame`.
     
     """
     def __init__(self, root, meta_data, parse_item_cb, transform=None):
@@ -35,17 +35,17 @@ class DataFrameDataset(Dataset):
         self.transform = transform
 
     def __getitem__(self, index):
-        """Get ``index``-th parsed item of :attr:`meta_data`
+        """Get ``index``-th parsed item of :attr:`meta_data`.
         
         Parameters
         ----------
         index : int
-            Index of row
+            Index of row.
         
         Returns
         -------
-        dict
-            dictionary of `index`-th parsed item
+        entry : dict
+            dictionary of `index`-th parsed item.
         """
         entry = self.meta_data.iloc[index]
         entry = self.parse_item_cb(self.root, entry, self.transform)
@@ -54,6 +54,6 @@ class DataFrameDataset(Dataset):
         return entry
 
     def __len__(self):
-        """Get length of `meta_data`
+        """Get length of `meta_data`.
         """
         return len(self.meta_data.index)
