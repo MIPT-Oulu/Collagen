@@ -50,24 +50,77 @@ class Session(object):
     def add_param_group(self, group_name: str):
         self.__optimizer.add_param_group(self.__module.parameters(group_name))
 
-    def train_step(self, batch: torch.Tensor, with_backward: bool = True,
-                   zero_grad: bool = True) -> Tuple[float, Any] or float:
+    def train_step(self, batch: torch.Tensor, accumulate_grad: bool = False) -> float:
+        """
+        Performs one training iteration using the given mini-batch.
 
-        if zero_grad:
+        Parameters
+        ----------
+        batch : torch.Tensor
+            Mini-batch
+        accumulate_grad : bool
+            Whether to zero grad before computing the new gradients.
+            False by default, but if True, then the gradients can be accumulated.
+            Useful if the batch size are too small because of the input size.
+
+        Returns
+        -------
+        out : float
+            Value of the loss
+
+        """
+
+        if not accumulate_grad:
             self.__optimizer.zero_grad()
 
-        return self.batch_step(batch, with_grad=True, with_backward=with_backward)
+        return self.__batch_step(batch, with_grad=True, with_backward=True, return_out=False)
 
     def eval_step(self, batch: torch.Tensor, return_out=False) -> Tuple[float, torch.Tensor or tuple] or float:
+        """
+        Performs evaluation of the given mini-batch. If needed, also returns the results.
 
-        return self.batch_step(batch, with_grad=False,
-                               with_backward=False,
-                               eval_mode=True,
-                               return_out=return_out)
+        Parameters
+        ----------
+        batch : torch.Tensor
+            Mini-batch
+        return_out : bool
+            Whether to return the output of the network
 
-    def batch_step(self, batch: torch.Tensor, with_grad: bool = True,
-                   with_backward: bool = True, eval_mode: bool = False,
-                   return_out: bool = False) -> Tuple[float, Any] or float:
+        Returns
+        -------
+        out : Tuple[float, torch.Tensor or tuple] or float
+            Result of the evaluation
+        """
+
+        return self.__batch_step(batch, with_grad=False,
+                                 with_backward=False,
+                                 eval_mode=True,
+                                 return_out=return_out)
+
+    def __batch_step(self, batch: torch.Tensor, with_grad: bool = True,
+                     with_backward: bool = True, eval_mode: bool = False,
+                     return_out: bool = False) -> Tuple[float, Any] or float:
+        """
+        Private method, which handles the logic for training and evaluation for 1 mini-batch.
+
+        Parameters
+        ----------
+        batch : torch.Tensor
+            Mini-batch
+        with_grad : bool
+            Whether to evaluate the given batch with gradient
+        with_backward : bool
+            Whether to perform a backward pass
+        eval_mode : bool
+            Whether to switch the trained module to the evaluation mode
+        return_out : bool
+            Whether to return the output
+
+        Returns
+        -------
+            out : Tuple[float, torch.Tensor or tuple] or float
+                Loss value and possibly the output of the model.
+        """
 
         if eval_mode:
             with_backward = False
