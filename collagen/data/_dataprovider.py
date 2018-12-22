@@ -4,22 +4,17 @@ from multiprocessing.pool import Pool
 
 
 class DataProvider(object):
-    """ Class provider data from single or multiple ``ItemLoader``s
+    """ Provide data from single or multiple ``ItemLoader``s
     """
-    def __init__(self, item_loaders: dict, num_workers: int = 0):
+    def __init__(self, item_loaders: dict):
         """
         Parameters
         ----------
-        item_loaders : ``collagen.data._itemloader.Itemloader``
+        item_loaders : ``collagen.data._itemloader.ItemLoader``
             Dictionary that maps names to ``ItemLoader`` objects
-        num_workers : int, optional
-            The number of workers for sampling data asynchronously
         """
         self.__loaders = item_loaders
         self.__state_dict = {}
-        self.__num_workers = num_workers
-        if self.__num_workers < 0:
-            raise ValueError("num_workers must non-negative, but found {}".format(num_workers))
 
         for il_name in self.__loaders:
             len_il = self.__loaders[il_name].__len__()
@@ -34,7 +29,8 @@ class DataProvider(object):
         Parameters
         ----------
         kwargs : dict
-            Dictionary of itemloader names and the number sample k
+            Dictionary of the names, corresponding to the itemloaders stored in ``DataProvider``, and the number of batches,
+            which needs to be drawn from each of them.
         Returns
         -------
         list_samples : list
@@ -43,21 +39,15 @@ class DataProvider(object):
         """
         list_samples = []
 
-        # self.__requested_itemloader_names = [il_name for il_name,k in kwargs.items() if il_name in self.__loaders]
         sampling_args = []
         for itemloader_name, k in kwargs.items():
             if itemloader_name in self.__loaders:
                 sampling_args.append((itemloader_name, k))
             else:
-                # TODO: Warning here
-                pass
+                raise ValueError("Not found argument {} in itemloader list".format(itemloader_name))
 
-        if self.__num_workers == 0:
-            for il_name, k in sampling_args:
-                list_samples.append(self.__sample(il_name, k))
-        else:
-            with Pool(processes=self.__num_workers) as pool:
-                list_samples = pool.starmap_async(self.__sample, sampling_args)
+        for il_name, k in sampling_args:
+            list_samples.append(self.__sample(il_name, k))
 
         return list_samples
 
@@ -69,7 +59,7 @@ class DataProvider(object):
         itemloader_name : str
             ``ItemLoader`` name
         k : int
-            The number of sample
+            The number of samples
 
         Returns
         -------
@@ -79,23 +69,23 @@ class DataProvider(object):
 
         samples = []
 
-        try:
-            samples = self.__loaders[itemloader_name].sample(k)
-            num_sample = len(samples)
-            # Update state_dict
+        samples = self.__loaders[itemloader_name].sample(k)
+        num_sample = len(samples)
+        self.__state_dict[itemloader_name]["samples"] = samples
+
+        # Update state_dict
+        if self.__state_dict[itemloader_name]["num_sampled_data"] + num_sample > self.__state_dict[itemloader_name]["total"]:
+            self.__state_dict[itemloader_name]["loop"] += 1
+            self.__state_dict[itemloader_name]["num_sampled_data"] = num_sample
+            self.__state_dict[itemloader_name]["num_available_data"] = self.__state_dict[itemloader_name]["total"]
+        else:
             self.__state_dict[itemloader_name]["num_sampled_data"] += num_sample
             self.__state_dict[itemloader_name]["num_available_data"] -= num_sample
-            self.__state_dict[itemloader_name]["samples"] = samples
-        except StopIteration:
-            self.__state_dict[itemloader_name]["loop"] += 1
-            self.__state_dict[itemloader_name]["num_sampled_data"] = 0
-            self.__state_dict[itemloader_name]["num_available_data"] = self.__state_dict[itemloader_name]["total"]
-        # TODO: handle drop_last==False
 
         return samples
 
     def state_dict(self):
-        """ Get :attr:__state_dict
+        """ Return :attr:__state_dict
         """
         return self.__state_dict
 
