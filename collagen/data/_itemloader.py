@@ -74,7 +74,7 @@ class ItemLoader(object):
         self.__iter_loader = iter(self.data_loader)
         
     def __len__(self):
-        """ Get length of teh dataloader.
+        """ Get length of the dataloader.
         """
         return len(self.data_loader)
 

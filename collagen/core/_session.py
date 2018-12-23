@@ -84,7 +84,7 @@ class Session(object):
         """
         self.__optimizer.add_param_group(self.__module.parameters(group_name))
 
-    def train_step(self, batch: torch.Tensor, accumulate_grad: bool = False) -> float:
+    def train_step(self, batch: torch.Tensor, accumulate_grad: bool = False, return_out=False) -> float:
         """
         Performs one training iteration using the given mini-batch.
 
@@ -107,7 +107,7 @@ class Session(object):
         if not accumulate_grad:
             self.__optimizer.zero_grad()
 
-        return self.__batch_step(batch, with_grad=True, with_backward=True, return_out=False)
+        return self.__batch_step(batch, with_grad=True, with_backward=True, return_out=return_out)
 
     def eval_step(self, batch: torch.Tensor, return_out=False) -> Tuple[float, torch.Tensor or tuple] or float:
         """
