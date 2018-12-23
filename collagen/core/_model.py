@@ -46,7 +46,7 @@ class Module(torch.nn.Module):
             else:
                 if not isinstance(group_names, str):
                     raise ValueError
-                yield self.__param_groups[group_names][name]
+                yield {'params': self.__param_groups[group_names][name], 'name': name}
 
     def add_to(self, layer: torch.nn.Module, name: str, group_names: str or Tuple[str]):
         """
