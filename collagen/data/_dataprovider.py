@@ -4,21 +4,20 @@ from multiprocessing.pool import Pool
 
 
 class DataProvider(object):
-    """ Provide data from single or multiple ``ItemLoader``s
+    """ Provides data from single or multiple ``ItemLoader``s
+    Parameters
+    ----------
+    item_loaders : ``collagen.data._itemloader.ItemLoader``
+        Dictionary that maps names to ``ItemLoader`` objects
     """
     def __init__(self, item_loaders: dict):
-        """
-        Parameters
-        ----------
-        item_loaders : ``collagen.data._itemloader.ItemLoader``
-            Dictionary that maps names to ``ItemLoader`` objects
-        """
         self.__loaders = item_loaders
         self.__state_dict = {}
 
         for il_name in self.__loaders:
             len_il = self.__loaders[il_name].__len__()
             self.__state_dict[il_name] = {"total": len_il,
+                                          "samples": None,
                                           "num_sampled_data": 0,
                                           "num_available_data": len_il,
                                           "loop": 0}
