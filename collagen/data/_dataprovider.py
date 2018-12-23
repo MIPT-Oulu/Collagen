@@ -18,8 +18,8 @@ class DataProvider(object):
             len_il = self.__loaders[il_name].__len__()
             self.__state_dict[il_name] = {"total": len_il,
                                           "samples": None,
-                                          "num_sampled_data": 0,
-                                          "num_available_data": len_il,
+                                          "sampled": 0,
+                                          "left": len_il,
                                           "loop": 0}
 
     def sample(self, **kwargs):
@@ -73,13 +73,13 @@ class DataProvider(object):
         self.__state_dict[itemloader_name]["samples"] = samples
 
         # Update state_dict
-        if self.__state_dict[itemloader_name]["num_sampled_data"] + num_sample > self.__state_dict[itemloader_name]["total"]:
+        if self.__state_dict[itemloader_name]["sampled"] + num_sample > self.__state_dict[itemloader_name]["total"]:
             self.__state_dict[itemloader_name]["loop"] += 1
-            self.__state_dict[itemloader_name]["num_sampled_data"] = num_sample
-            self.__state_dict[itemloader_name]["num_available_data"] = self.__state_dict[itemloader_name]["total"]
+            self.__state_dict[itemloader_name]["sampled"] = num_sample
+            self.__state_dict[itemloader_name]["left"] = self.__state_dict[itemloader_name]["total"] - num_sample
         else:
-            self.__state_dict[itemloader_name]["num_sampled_data"] += num_sample
-            self.__state_dict[itemloader_name]["num_available_data"] -= num_sample
+            self.__state_dict[itemloader_name]["sampled"] += num_sample
+            self.__state_dict[itemloader_name]["left"] -= num_sample
 
         return samples
 
