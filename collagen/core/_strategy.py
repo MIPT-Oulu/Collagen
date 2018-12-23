@@ -1,6 +1,6 @@
 from ..data import DataProvider
 from ._session import Session
-from typing import Tuple, Dict
+from typing import Tuple
 from ..metrics._meters import BaseMeter, RunningAverageMeter
 
 
@@ -15,7 +15,7 @@ class BaseScheduler(object):
         raise NotImplementedError
 
 
-class BaseTrainStrategy(object):
+class TrainValStrategy(object):
     """
     Implements a part of the training loop by passing the available batches through the model.
 
