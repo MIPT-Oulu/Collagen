@@ -51,7 +51,7 @@ class DataProvider(object):
         return list_samples
 
     def __sample(self, itemloader_name : str, k : int):
-        """ Internal function to sample a single ``ItemLoader`` by name with k samples
+        """Get `k` samples from the itemloader specified by `itemloader_name`.
 
         Parameters
         ----------
