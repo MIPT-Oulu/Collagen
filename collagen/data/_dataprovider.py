@@ -1,35 +1,36 @@
 import gc
 from ._itemloader import ItemLoader
-from multiprocessing.pool import Pool
 
 
 class DataProvider(object):
     """ Provides data from single or multiple ``ItemLoader``s
+
     Parameters
     ----------
-    item_loaders : ``collagen.data._itemloader.ItemLoader``
+    item_loaders : ``collagen.data.ItemLoader``
         Dictionary that maps names to ``ItemLoader`` objects
     """
     def __init__(self, item_loaders: dict):
         self.__loaders = item_loaders
         self.__state_dict = {}
 
-        for il_name in self.__loaders:
-            len_il = self.__loaders[il_name].__len__()
-            self.__state_dict[il_name] = {"total": len_il,
+        for itemloader_name in self.__loaders:
+            itemloader_len = self.__loaders[itemloader_name].__len__()
+            self.__state_dict[itemloader_name] = {"total": itemloader_len,
                                           "samples": None,
-                                          "sampled": 0,
-                                          "left": len_il,
-                                          "loop": 0}
+                                          "num_sampled": 0,
+                                          "num_left": itemloader_len,
+                                          "num_loops": 0}
 
     def sample(self, **kwargs):
-        """ Sample :attr:__loaders with specified number of data
+        """ Samples :attr:__loaders with specified number of data
 
         Parameters
         ----------
         kwargs : dict
             Dictionary of the names, corresponding to the itemloaders stored in ``DataProvider``, and the number of batches,
             which needs to be drawn from each of them.
+
         Returns
         -------
         list_samples : list
@@ -51,7 +52,7 @@ class DataProvider(object):
         return list_samples
 
     def __sample(self, itemloader_name : str, k : int):
-        """Get `k` samples from the itemloader specified by `itemloader_name`.
+        """Gets `k` samples from the itemloader specified by `itemloader_name`.
 
         Parameters
         ----------
@@ -66,30 +67,28 @@ class DataProvider(object):
             List of sampled data
         """
 
-        samples = []
-
         samples = self.__loaders[itemloader_name].sample(k)
-        num_sample = len(samples)
+        num_samples = len(samples)
         self.__state_dict[itemloader_name]["samples"] = samples
 
         # Update state_dict
-        if self.__state_dict[itemloader_name]["sampled"] + num_sample > self.__state_dict[itemloader_name]["total"]:
-            self.__state_dict[itemloader_name]["loop"] += 1
-            self.__state_dict[itemloader_name]["sampled"] = num_sample
-            self.__state_dict[itemloader_name]["left"] = self.__state_dict[itemloader_name]["total"] - num_sample
+        if self.__state_dict[itemloader_name]["num_sampled"] + num_samples > self.__state_dict[itemloader_name]["total"]:
+            self.__state_dict[itemloader_name]["num_loops"] += 1
+            self.__state_dict[itemloader_name]["num_sampled"] = num_samples
+            self.__state_dict[itemloader_name]["num_left"] = self.__state_dict[itemloader_name]["total"] - num_samples
         else:
-            self.__state_dict[itemloader_name]["sampled"] += num_sample
-            self.__state_dict[itemloader_name]["left"] -= num_sample
+            self.__state_dict[itemloader_name]["num_sampled"] += num_samples
+            self.__state_dict[itemloader_name]["num_left"] -= num_samples
 
         return samples
 
     def state_dict(self):
-        """ Return :attr:__state_dict
+        """ Returns :attr:__state_dict
         """
         return self.__state_dict
 
     def empty_state(self):
-        """ Clean :attr:__state_dict
+        """ Cleans :attr:__state_dict
         """
         del self.__state_dict
         gc.collect()
