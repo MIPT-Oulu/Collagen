@@ -10,6 +10,7 @@ class DataProvider(object):
     item_loaders : ``collagen.data.ItemLoader``
         Dictionary that maps names to ``ItemLoader`` objects
     """
+
     def __init__(self, item_loaders: dict):
         self.__loaders = item_loaders
         self.__state_dict = {}
