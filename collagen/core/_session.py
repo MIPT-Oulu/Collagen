@@ -60,10 +60,10 @@ class Session(object):
         Parameters
         ----------
         param_name : str
-            Name of the optimizer's parameters, e.g. `lr`, `weight_decay` etc.
+            Name of the optimizer's parameters, e.g. `lr`, `weight_decay` `momentum` etc.
         new_value : Tuple[str, float] or float
-            Value of the new learning rate. If Tuple, then the first value int specifies the parameters group,
-            and the secon specifies the actual value.
+            Value of the new parameter. If Tuple, then the first value int specifies the parameters group,
+            and the second specifies the actual value.
 
         """
         for group in self.__optimizer.param_groups:

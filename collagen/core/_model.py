@@ -1,5 +1,5 @@
 import torch
-from typing import Tuple
+from typing import Tuple, Dict
 from abc import abstractmethod
 
 
@@ -14,8 +14,8 @@ class Module(torch.nn.Module):
         super(Module, self).__init__()
         self.__param_groups = dict()
 
-    def parameters(self, group_names: str or Tuple[str] or None = None,
-                   name: str or None = None):
+    def parameters(self, group: str or Tuple[str] or None = None,
+                   name: str or None = None) -> Dict[str, torch.nn.Parameter or str]:
         """
         Returns an iterator through the parameters of the module from one or many groups.
 
@@ -23,30 +23,41 @@ class Module(torch.nn.Module):
 
         Parameters
         ----------
-        group_names: str or Tuple[str] or None
+        group: str or Tuple[str] or None
             Parameter group names.
-        name: str or None
-            Name of the layer from the group to be returned. Should be set to None
-            if all the parameters from the group are needed.
+        name: str or Tuple[str] or None
+            Name of the module from the group to be returned. Should be set to None
+            if all the parameters from the group are needed. Alternatively, multiple modules
+            from the group can be returned if it is a Tuple[str].
 
         Yields
         -------
-        Parameter: torch.nn.Parameter
-            Module parameter
+        Parameters: Dict[str, torch.nn.Parameter or str]
+            Dictionary of parameters. Allows to get all the parameters of submodules from multiple groups,
+            or particular submodules' parameters from the given group. The returned dict has always three keys:
+            params (used by optimizer), name (module name) and group name (name of the parameter groups). If name is not
+            specified, it will be None.
 
         """
-        if group_names is None:
+        if group is None:
             return super(Module, self).parameters()
         else:
             if name is None:
-                if isinstance(group_names, str):
-                    group_names = (group_names, str)
-                for group_name in group_names:
-                    yield self.__param_groups[group_name]
+                if isinstance(group, str):
+                    group = (group, )
+                for group_name in group:
+                    yield {'params': self.__param_groups[group_name],
+                           'name': None,
+                           'group_name': group_name}
             else:
-                if not isinstance(group_names, str):
+                if not isinstance(group, str):
                     raise ValueError
-                yield {'params': self.__param_groups[group_names][name], 'name': name}
+
+                if isinstance(name, str):
+                    name = (name, )
+
+                for module_name in name:
+                    yield {'params': self.__param_groups[group][module_name], 'name': module_name, 'group_name': group}
 
     def add_to(self, layer: torch.nn.Module, name: str, group_names: str or Tuple[str]):
         """
