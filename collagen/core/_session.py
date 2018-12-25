@@ -84,14 +84,18 @@ class Session(object):
         """
         self.__optimizer.add_param_group(self.__module.parameters(group_name))
 
-    def train_step(self, batch: torch.Tensor, accumulate_grad: bool = False, return_out=False) -> float:
+    def train_step(self, batch: torch.Tensor or Tuple[torch.Tensor],
+                   target: torch.Tensor or Tuple[torch.Tensor],
+                   accumulate_grad: bool = False, return_out=False) -> float:
         """
         Performs one training iteration using the given mini-batch.
 
         Parameters
         ----------
-        batch : torch.Tensor
+        batch : torch.Tensor or Tuple[torch.Tensor]
             Mini-batch
+        target : torch.Tensor or Tuple[torch.Tensor]
+            One or multiple targets
         accumulate_grad : bool
             Whether to zero grad before computing the new gradients.
             False by default, but if True, then the gradients can be accumulated.
@@ -109,16 +113,20 @@ class Session(object):
         if not accumulate_grad:
             self.__optimizer.zero_grad()
 
-        return self.__batch_step(batch, with_grad=True, with_backward=True, return_out=return_out)
+        return self.__batch_step(batch, target, with_grad=True, with_backward=True, return_out=return_out)
 
-    def eval_step(self, batch: torch.Tensor, return_out=False) -> Tuple[float, torch.Tensor or tuple] or float:
+    def eval_step(self, batch: torch.Tensor or Tuple[torch.Tensor],
+                  target: torch.Tensor or Tuple[torch.Tensor],
+                  return_out=False) -> Tuple[float, torch.Tensor or tuple] or float:
         """
         Performs evaluation of the given mini-batch. If needed, also returns the results.
 
         Parameters
         ----------
-        batch : torch.Tensor
+        batch : torch.Tensor or Tuple[torch.Tensor]
             Mini-batch
+        target : torch.Tensor or Tuple[torch.Tensor]
+            One or multiple targets
         return_out : bool
             Whether to return the output of the network
 
@@ -128,12 +136,13 @@ class Session(object):
             Result of the evaluation
         """
 
-        return self.__batch_step(batch, with_grad=False,
+        return self.__batch_step(batch, target, with_grad=False,
                                  with_backward=False,
                                  eval_mode=True,
                                  return_out=return_out)
 
-    def __batch_step(self, batch: torch.Tensor, with_grad: bool = True,
+    def __batch_step(self, batch: torch.Tensor or Tuple[torch.Tensor],
+                     target: torch.Tensor or Tuple[torch.Tensor],  with_grad: bool = True,
                      with_backward: bool = True, eval_mode: bool = False,
                      return_out: bool = False) -> Tuple[float, Any] or float:
         """
@@ -143,6 +152,8 @@ class Session(object):
         ----------
         batch : torch.Tensor
             Mini-batch
+        target : torch.Tensor or Tuple[torch.Tensor]
+            One or multiple targets
         with_grad : bool
             Whether to evaluate the given batch with gradient
         with_backward : bool
@@ -171,7 +182,7 @@ class Session(object):
 
         with torch.set_grad_enabled(with_grad):
             out = self.__module(batch)
-            loss = self.__loss(out)
+            loss = self.__loss(out, target)
 
         if with_backward:
             loss.backward()

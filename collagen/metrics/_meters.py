@@ -11,8 +11,8 @@ class RunningAverageMeter(Callback):
         self.__value = 0
         self.__count = 0
 
-    def on_batch_end(self, value):
-        self.__value += value
+    def on_batch_end(self, loss, **kwargs):
+        self.__value += loss
         self.__count += 1
 
     def current(self):

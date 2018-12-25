@@ -1,1 +1,1 @@
-from ._meters import AverageMeter
+from ._meters import RunningAverageMeter
