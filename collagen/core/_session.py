@@ -96,6 +96,8 @@ class Session(object):
             Whether to zero grad before computing the new gradients.
             False by default, but if True, then the gradients can be accumulated.
             Useful if the batch size are too small because of the input size.
+        return_out : bool
+            Whether to return output
 
         Returns
         -------
