@@ -69,12 +69,12 @@ class ItemLoader(object):
                                                        worker_init_fn=lambda wid: np.random.seed(np.uint32(
                                                            torch.initial_seed() + wid)))
 
-        self.drop_last = drop_last
-        self.batch_size = batch_size
+        self.drop_last: bool = drop_last
+        self.batch_size: int = batch_size
         self.__iter_loader = iter(self.data_loader)
         
     def __len__(self):
-        """ Get length of teh dataloader.
+        """ Get length of the dataloader.
         """
         return len(self.data_loader)
 

@@ -29,15 +29,17 @@ class Session(object):
     def __init__(self, module: Module, optimizer: torch.optim.Optimizer,
                  loss: torch.nn.Module, param_groups: str or Tuple[str]):
 
+        if isinstance(param_groups, str):
+            param_groups = (param_groups, )
+
         self.__module: Module = module
         self.__optimizer: torch.optim.Optimizer = optimizer
         self.__loss: torch.nn.Module = loss
         self.__kvs: KVS = KVS()
-        self.__param_groups: str or Tuple[str] = param_groups
+        self.__param_groups: Tuple[str] = param_groups
 
-        if isinstance(param_groups, tuple):
-            for group_name in param_groups:
-                self.add_param_group(group_name)
+        for group_name in param_groups:
+            self.add_param_group(group_name)
 
     @property
     def loss(self):
@@ -47,21 +49,59 @@ class Session(object):
     def loss(self, new_loss: torch.nn.Module):
         self.__loss: torch.nn.Module = new_loss
 
+    def optimizer_params(self, param_name):
+        """Returns the value of optimizer parameter for every group of trainable parameters.
+        """
+        return [(group['name'], group[param_name]) for group in self.__optimizer.param_groups]
+
+    def set_optimizer_param(self, param_name: str, new_value: Tuple[str, float] or float):
+        """Sets a parameter of the optimizer for a particular group of trainable parameters or all groups.
+
+        Parameters
+        ----------
+        param_name : str
+            Name of the optimizer's parameters, e.g. `lr`, `weight_decay` `momentum` etc.
+        new_value : Tuple[str, float] or float
+            Value of the new parameter. If Tuple, then the first value int specifies the parameters group,
+            and the second specifies the actual value.
+
+        """
+        for group in self.__optimizer.param_groups:
+            if isinstance(new_value, float):
+                group[param_name] = new_value[1]
+            else:
+                if new_value[0] == group['name']:
+                    group[param_name] = new_value[1]
+
     def add_param_group(self, group_name: str):
+        """Adds parameter group to the optimizer.
+
+        Parameters
+        ----------
+        group_name : str
+            Name of the group, which needs to be added from model.
+
+        """
         self.__optimizer.add_param_group(self.__module.parameters(group_name))
 
-    def train_step(self, batch: torch.Tensor, accumulate_grad: bool = False) -> float:
+    def train_step(self, batch: torch.Tensor or Tuple[torch.Tensor],
+                   target: torch.Tensor or Tuple[torch.Tensor],
+                   accumulate_grad: bool = False, return_out=False) -> float:
         """
         Performs one training iteration using the given mini-batch.
 
         Parameters
         ----------
-        batch : torch.Tensor
+        batch : torch.Tensor or Tuple[torch.Tensor]
             Mini-batch
+        target : torch.Tensor or Tuple[torch.Tensor]
+            One or multiple targets
         accumulate_grad : bool
             Whether to zero grad before computing the new gradients.
             False by default, but if True, then the gradients can be accumulated.
             Useful if the batch size are too small because of the input size.
+        return_out : bool
+            Whether to return output
 
         Returns
         -------
@@ -73,16 +113,20 @@ class Session(object):
         if not accumulate_grad:
             self.__optimizer.zero_grad()
 
-        return self.__batch_step(batch, with_grad=True, with_backward=True, return_out=False)
+        return self.__batch_step(batch, target, with_grad=True, with_backward=True, return_out=return_out)
 
-    def eval_step(self, batch: torch.Tensor, return_out=False) -> Tuple[float, torch.Tensor or tuple] or float:
+    def eval_step(self, batch: torch.Tensor or Tuple[torch.Tensor],
+                  target: torch.Tensor or Tuple[torch.Tensor],
+                  return_out=False) -> Tuple[float, torch.Tensor or tuple] or float:
         """
         Performs evaluation of the given mini-batch. If needed, also returns the results.
 
         Parameters
         ----------
-        batch : torch.Tensor
+        batch : torch.Tensor or Tuple[torch.Tensor]
             Mini-batch
+        target : torch.Tensor or Tuple[torch.Tensor]
+            One or multiple targets
         return_out : bool
             Whether to return the output of the network
 
@@ -92,12 +136,13 @@ class Session(object):
             Result of the evaluation
         """
 
-        return self.__batch_step(batch, with_grad=False,
+        return self.__batch_step(batch, target, with_grad=False,
                                  with_backward=False,
                                  eval_mode=True,
                                  return_out=return_out)
 
-    def __batch_step(self, batch: torch.Tensor, with_grad: bool = True,
+    def __batch_step(self, batch: torch.Tensor or Tuple[torch.Tensor],
+                     target: torch.Tensor or Tuple[torch.Tensor],  with_grad: bool = True,
                      with_backward: bool = True, eval_mode: bool = False,
                      return_out: bool = False) -> Tuple[float, Any] or float:
         """
@@ -107,6 +152,8 @@ class Session(object):
         ----------
         batch : torch.Tensor
             Mini-batch
+        target : torch.Tensor or Tuple[torch.Tensor]
+            One or multiple targets
         with_grad : bool
             Whether to evaluate the given batch with gradient
         with_backward : bool
@@ -135,7 +182,7 @@ class Session(object):
 
         with torch.set_grad_enabled(with_grad):
             out = self.__module(batch)
-            loss = self.__loss(out)
+            loss = self.__loss(out, target)
 
         if with_backward:
             loss.backward()
