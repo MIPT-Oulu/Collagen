@@ -4,6 +4,7 @@ from sklearn.model_selection import StratifiedShuffleSplit
 from tqdm import tqdm
 
 from collagen.data import DataProvider, ItemLoader
+from collagen.data.utils import FoldSplit
 from collagen.core import Session, TrainValStrategy
 
 
@@ -18,24 +19,16 @@ def parse_item_mnist(root, entry, trf):
 if __name__ == "__main__":
     args = init_args()
 
-    # Initializing the dataframes
     train_ds, classes = get_mnist(data_folder=args.save_mnist, train=True)
     test_ds, _ = get_mnist(data_folder=args.save_mnist, train=False)
 
-    train_trf, test_trf = init_mnist_transforms()
-
-
-    for fold_id, (train_idx, val_idx) in enumerate(cv_folds):
+    for fold_id, (x_train, x_val) in enumerate(FoldSplit(train_ds, random_state=args.seed)):
         item_loaders = dict()
 
-        item_loaders[f'{fold_id}_train'] = ItemLoader(root='', meta_data=train_ds.iloc[train_idx],
-                                                      transform=train_trf, parse_item_cb=parse_item_mnist,
-                                                      batch_size=args.bs, num_workers=args.num_threads)
-
-        item_loaders[f'{fold_id}_val'] = ItemLoader(root='', meta_data=train_ds.iloc[val_idx],
-                                                    transform=test_trf, parse_item_cb=parse_item_mnist,
-                                                    batch_size=args.val_bs, num_workers=args.num_threads,
-                                                    drop_last=False)
+        for stage, ds, trf in zip(['train', 'val'], [x_train, x_val], init_mnist_transforms()):
+            item_loaders[f'{fold_id}_{stage}'] = ItemLoader(meta_data=ds,
+                                                            transform=trf, parse_item_cb=parse_item_mnist,
+                                                            batch_size=args.bs, num_workers=args.num_threads)
 
         data_provider = DataProvider(item_loaders)
 
@@ -47,7 +40,9 @@ if __name__ == "__main__":
 
         for epoch in range(args.n_epochs):
             for stage in ['train', 'val']:
-                for batch_i in tqdm(range(len(item_loaders[f'{fold_id}_{stage}'])), desc=f'{stage}::'):
+                n_batches = len(item_loaders[f'{fold_id}_{stage}'])
+                for batch_i in tqdm(range(n_batches),
+                                    desc=f'Fold [{fold_id}] | Epoch [{epoch}] | {stage}::'):
                     data_provider.sample(**{f'{fold_id}_train': 1})
                     st.train(data_key='img', target_key='target')
 

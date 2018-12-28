@@ -12,14 +12,14 @@ class ItemLoader(object):
         
     Parameters
     ----------
-    root : str
-        Path to root directory of input data.
     meta_data : pandas.DataFrame
         Meta data of data and labels.
     parse_item_cb : callable
         Parses each row of :attr:meta_data`.
     batch_size : int, optional
         How many data per batch to load. (the default is 1)
+    root : str
+        Path to root directory of input data. Default is None (empty)
     num_workers : int, optional
         How many subprocesses to use for data loading. If equals to 0, 
         the data will be loaded in the main process. (the default is 0)
@@ -49,11 +49,13 @@ class ItemLoader(object):
         If ``0``, ignores ``timeout`` notion. Must be non-negative. (the default is 0)
     """
 
-    def __init__(self, root: str, meta_data: pd.DataFrame, parse_item_cb: callable, batch_size: int = 1,
+    def __init__(self, meta_data: pd.DataFrame, parse_item_cb: callable, root: str or None = None, batch_size: int = 1,
                  num_workers: int = 0, shuffle: bool = False, pin_memory: bool = False,
                  collate_fn: callable = default_collate, transform: callable or None = None,
                  sampler: torch.utils.data.sampler.Sampler or None = None,
                  batch_sampler=None, drop_last: bool = True, timeout: int = 0):
+        if root is None:
+            root = ''
 
         self.dataset = DataFrameDataset(root, meta_data=meta_data, parse_item_cb=parse_item_cb, transform=transform)
         self.data_loader = torch.utils.data.DataLoader(self.dataset,
