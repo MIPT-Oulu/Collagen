@@ -140,6 +140,12 @@ class TrainValStrategy(object):
             raise ValueError(f"Number of validation batches drawn from DataProvider must be 1, "
                              f"but found {n_iter}")
 
+        if isinstance(data_key, str):
+            data_key = (data_key, )
+
+        if isinstance(target_key, str):
+            target_key = (target_key, )
+
         batch = cur_loader_state["samples"][0]
         for cb in self.__val_callbacks:
             cb.on_batch_begin(batches_count=self.__eval_batches_count, batch=batch,

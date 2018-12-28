@@ -25,7 +25,7 @@ if __name__ == "__main__":
     for fold_id, (x_train, x_val) in enumerate(FoldSplit(train_ds, random_state=args.seed)):
         item_loaders = dict()
 
-        for stage, ds, trf in zip(['train', 'val'], [x_train, x_val], init_mnist_transforms()):
+        for stage, ds, trf in zip(['train', 'eval'], [x_train, x_val], init_mnist_transforms()):
             item_loaders[f'{fold_id}_{stage}'] = ItemLoader(meta_data=ds,
                                                             transform=trf, parse_item_cb=parse_item_mnist,
                                                             batch_size=args.bs, num_workers=args.num_threads)
@@ -35,20 +35,20 @@ if __name__ == "__main__":
         model = SimpleConvNet(bw=args.bw, drop=args.dropout, n_cls=len(classes))
         optimizer = torch.optim.Adam(params=model.parameters(), lr=args.lr, weight_decay=args.wd)
         criterion = torch.nn.CrossEntropyLoss()
+
         se = Session(module=model, optimizer=optimizer, loss=criterion)
-        st = TrainValStrategy(data_provider, f'{fold_id}_train', f'{fold_id}_val', se)
+        st = TrainValStrategy(data_provider, f'{fold_id}_train', f'{fold_id}_eval', se)
 
         for epoch in range(args.n_epochs):
-            for stage in ['train', 'val']:
+            for stage in ['train', 'eval']:
                 n_batches = len(item_loaders[f'{fold_id}_{stage}'])
-                for batch_i in tqdm(range(n_batches),
-                                    desc=f'Fold [{fold_id}] | Epoch [{epoch}] | {stage}::'):
-                    data_provider.sample(**{f'{fold_id}_train': 1})
-                    st.train(data_key='img', target_key='target')
+                for batch_i in tqdm(range(n_batches), desc=f'Fold [{fold_id}] | Epoch [{epoch}] | {stage}::'):
+                    data_provider.sample(**{f'{fold_id}_{stage}': 1})
+                    getattr(st, stage)(data_key='img', target_key='target')
 
     item_loaders = dict()
     item_loaders['test'] = ItemLoader(root='', meta_data=test_ds,
-                                      transform=test_trf, parse_item_cb=parse_item_mnist,
+                                      transform=init_mnist_transforms()[1], parse_item_cb=parse_item_mnist,
                                       batch_size=args.val_bs, num_workers=args.num_threads,
                                       drop_last=False)
 
