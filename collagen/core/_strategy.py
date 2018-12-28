@@ -32,8 +32,13 @@ class TrainValStrategy(object):
                  train_loader_name: str,
                  val_loader_name: str,
                  session: Session,
-                 train_callbacks: Tuple[Callback] or Callback,
-                 val_callbacks: Tuple[Callback] or Callback):
+                 train_callbacks: Tuple[Callback] or Callback = None,
+                 val_callbacks: Tuple[Callback] or Callback = None):
+
+        if train_callbacks is None:
+            train_callbacks = ()
+        if val_callbacks is None:
+            val_callbacks = ()
 
         self.__data_provider: DataProvider = data_provider
         self.__session: Session = session

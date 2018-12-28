@@ -40,7 +40,7 @@ class Module(torch.nn.Module):
 
         """
         if group is None:
-            return super(Module, self).parameters()
+            yield {'params': super(Module, self).parameters(), 'name': None, 'group_name': None}
         else:
             if name is None:
                 if isinstance(group, str):
