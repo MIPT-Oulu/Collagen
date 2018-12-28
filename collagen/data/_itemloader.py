@@ -73,7 +73,7 @@ class ItemLoader(object):
 
         self.drop_last: bool = drop_last
         self.batch_size: int = batch_size
-        self.__iter_loader = iter(self.data_loader)
+        self.__iter_loader = None
         
     def __len__(self):
         """ Get length of the dataloader.
@@ -96,6 +96,8 @@ class ItemLoader(object):
         samples = []
         for i in range(k):
             try:
+                if self.__iter_loader is None:
+                    self.__iter_loader = iter(self.data_loader)
                 batch = next(self.__iter_loader)
             except StopIteration:
                 del self.__iter_loader

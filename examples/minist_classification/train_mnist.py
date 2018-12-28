@@ -39,8 +39,8 @@ if __name__ == "__main__":
         model = SimpleConvNet(bw=args.bw, drop=args.dropout, n_cls=len(classes)).to(device)
         optimizer = torch.optim.Adam(params=model.parameters(), lr=args.lr, weight_decay=args.wd)
         criterion = torch.nn.CrossEntropyLoss().to(device)
-
         se = Session(module=model, optimizer=optimizer, loss=criterion)
+
         st = TrainValStrategy(data_provider, f'{fold_id}_train', f'{fold_id}_eval', se)
 
         for epoch in range(args.n_epochs):
