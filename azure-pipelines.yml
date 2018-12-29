@@ -31,7 +31,7 @@ jobs:
   - bash: conda install -y -n collagen_test_env torch torchvision
     displayName: 'Installing CV dependencies'
 
-  - bash: conda install -y -n collagen_test_env torch torchvision
+  - bash: conda install -y -n collagen_test_env torch torchvision -c pytorch
     displayName: 'Installing CV dependencies from conda'
 
   - bash: |
