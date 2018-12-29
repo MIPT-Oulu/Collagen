@@ -28,9 +28,6 @@ jobs:
   - bash: conda install -y -n collagen_test_env numpy scipy pandoc
     displayName: 'Installing basic dependencies'
 
-  - bash: conda install -y -n collagen_test_env torch torchvision
-    displayName: 'Installing CV dependencies'
-
   - bash: conda install -y -n collagen_test_env torch torchvision -c pytorch
     displayName: 'Installing CV dependencies from conda'
 
