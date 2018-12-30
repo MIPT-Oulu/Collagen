@@ -21,25 +21,15 @@ class Session(object):
         Optimizer to train teh model
     loss : torch.nn.Module
         Loss used in the session
-    param_groups : str or tuple
-        Groups of parameters, which need to be optimized. If str, then a particular group of parameters will be used.
-        If a tuple of strings, then all the mentioned groups will be used.
 
     """
     def __init__(self, module: Module, optimizer: torch.optim.Optimizer,
-                 loss: torch.nn.Module, param_groups: str or Tuple[str]):
-
-        if isinstance(param_groups, str):
-            param_groups = (param_groups, )
+                 loss: torch.nn.Module):
 
         self.__module: Module = module
         self.__optimizer: torch.optim.Optimizer = optimizer
         self.__loss: torch.nn.Module = loss
         self.__kvs: KVS = KVS()
-        self.__param_groups: Tuple[str] = param_groups
-
-        for group_name in param_groups:
-            self.add_param_group(group_name)
 
     @property
     def loss(self):
@@ -181,12 +171,21 @@ class Session(object):
                 raise ValueError
 
         with torch.set_grad_enabled(with_grad):
-            out = self.__module(batch)
-            loss = self.__loss(out, target)
+            if isinstance(batch, tuple) and len(batch) == 1:
+                batch = batch[0]
+            if isinstance(target, tuple) and len(target) == 1:
+                target = target[0]
 
-        if with_backward:
-            loss.backward()
-            self.__optimizer.step()
+            # out = self.__module(batch)
+            # loss = self.__loss(out, target)
+            if eval_mode:
+                out, loss = self.__module.run(batch, target, with_backward, with_grad)
+            else:
+                self.__module.optimize_cb(batch, target)
+
+        # if with_backward:
+        #     loss.backward()
+        #     self.__optimizer.step()
         if not return_out:
             return loss.item()
         else:

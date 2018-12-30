@@ -29,11 +29,17 @@ class TrainValStrategy(object):
          the callbacks can also be meters batch-wise, which compute metrics.
     """
     def __init__(self, data_provider: DataProvider,
+                 # TODO: Support multiple loader names
                  train_loader_name: str,
                  val_loader_name: str,
                  session: Session,
-                 train_callbacks: Tuple[Callback] or Callback,
-                 val_callbacks: Tuple[Callback] or Callback):
+                 train_callbacks: Tuple[Callback] or Callback = None,
+                 val_callbacks: Tuple[Callback] or Callback = None):
+
+        if train_callbacks is None:
+            train_callbacks = ()
+        if val_callbacks is None:
+            val_callbacks = ()
 
         self.__data_provider: DataProvider = data_provider
         self.__session: Session = session
@@ -134,6 +140,12 @@ class TrainValStrategy(object):
         if n_iter != 1:
             raise ValueError(f"Number of validation batches drawn from DataProvider must be 1, "
                              f"but found {n_iter}")
+
+        if isinstance(data_key, str):
+            data_key = (data_key, )
+
+        if isinstance(target_key, str):
+            target_key = (target_key, )
 
         batch = cur_loader_state["samples"][0]
         for cb in self.__val_callbacks:

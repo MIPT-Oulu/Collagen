@@ -13,6 +13,7 @@ class Module(torch.nn.Module):
     def __init__(self):
         super(Module, self).__init__()
         self.__param_groups = dict()
+        self.optimize_cb = None
 
     def parameters(self, group: str or Tuple[str] or None = None,
                    name: str or None = None) -> Dict[str, torch.nn.Parameter or str]:
@@ -40,7 +41,7 @@ class Module(torch.nn.Module):
 
         """
         if group is None:
-            return super(Module, self).parameters()
+            yield {'params': super(Module, self).parameters(), 'name': None, 'group_name': None}
         else:
             if name is None:
                 if isinstance(group, str):
@@ -82,5 +83,9 @@ class Module(torch.nn.Module):
             self.__param_groups[group_name][name] = layer.parameters()
 
     @abstractmethod
-    def forward(self, *input):
+    def forward(self, input):
         raise NotImplementedError
+
+    @abstractmethod
+    def run(self, input, labels=None, with_backward: bool or None = None, accumulate_grade: bool or None = None):
+        raise  NotImplementedError
