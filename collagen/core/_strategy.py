@@ -29,6 +29,7 @@ class TrainValStrategy(object):
          the callbacks can also be meters batch-wise, which compute metrics.
     """
     def __init__(self, data_provider: DataProvider,
+                 # TODO: Support multiple loader names
                  train_loader_name: str,
                  val_loader_name: str,
                  session: Session,

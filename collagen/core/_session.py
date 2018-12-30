@@ -176,12 +176,16 @@ class Session(object):
             if isinstance(target, tuple) and len(target) == 1:
                 target = target[0]
 
-            out = self.__module(batch)
-            loss = self.__loss(out, target)
+            # out = self.__module(batch)
+            # loss = self.__loss(out, target)
+            if eval_mode:
+                out, loss = self.__module.run(batch, target, with_backward, with_grad)
+            else:
+                self.__module.optimize_cb(batch, target)
 
-        if with_backward:
-            loss.backward()
-            self.__optimizer.step()
+        # if with_backward:
+        #     loss.backward()
+        #     self.__optimizer.step()
         if not return_out:
             return loss.item()
         else:
