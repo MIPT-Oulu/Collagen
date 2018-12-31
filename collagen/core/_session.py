@@ -100,7 +100,7 @@ class Session(object):
 
         """
 
-        if not accumulate_grad:
+        if not accumulate_grad and self.__optimizer is not None:
             self.__optimizer.zero_grad()
 
         return self.__batch_step(batch, target, with_grad=True, with_backward=True, return_out=return_out)
@@ -176,20 +176,15 @@ class Session(object):
             if isinstance(target, tuple) and len(target) == 1:
                 target = target[0]
 
-            # out = self.__module(batch)
-            # loss = self.__loss(out, target)
             if eval_mode:
-                out, loss = self.__module.run(batch, target, with_backward, with_grad)
+                outputs, losses = self.__module.run(batch, target, with_backward, with_grad)
             else:
-                self.__module.optimize_cb(batch, target)
+                outputs, losses = self.__module.optimize_cb.on_optimize(batch, target)
 
-        # if with_backward:
-        #     loss.backward()
-        #     self.__optimizer.step()
         if not return_out:
-            return loss.item()
+            return losses
         else:
-            return loss.item(), return_out
+            return losses, outputs
 
 
 
