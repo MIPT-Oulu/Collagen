@@ -4,7 +4,7 @@ from ..logging import KVS
 from ._model import Module
 
 
-from typing import Tuple, Any
+from typing import Tuple, Any, List
 
 
 class Session(object):
@@ -76,7 +76,8 @@ class Session(object):
 
     def train_step(self, batch: torch.Tensor or Tuple[torch.Tensor],
                    target: torch.Tensor or Tuple[torch.Tensor],
-                   accumulate_grad: bool = False, return_out=False) -> float:
+                   accumulate_grad: bool = False, return_out=False,
+                   callbacks=Tuple[callable] or List[callable] or None) -> float:
         """
         Performs one training iteration using the given mini-batch.
 
@@ -92,7 +93,8 @@ class Session(object):
             Useful if the batch size are too small because of the input size.
         return_out : bool
             Whether to return output
-
+        callbacks : Tuple[callable] or List [callable] or None
+            Callbacks to be used during the training.
         Returns
         -------
         out : float
@@ -103,11 +105,14 @@ class Session(object):
         if not accumulate_grad and self.__optimizer is not None:
             self.__optimizer.zero_grad()
 
-        return self.__batch_step(batch, target, with_grad=True, with_backward=True, return_out=return_out)
+        return self.__batch_step(batch=batch, target=target, with_grad=True,
+                                 with_backward=True,
+                                 return_out=return_out, callbacks=callbacks)
 
     def eval_step(self, batch: torch.Tensor or Tuple[torch.Tensor],
                   target: torch.Tensor or Tuple[torch.Tensor],
-                  return_out=False) -> Tuple[float, torch.Tensor or tuple] or float:
+                  return_out=False,
+                  callbacks=Tuple[callable] or List[callable] or None) -> Tuple[float, torch.Tensor or tuple] or float:
         """
         Performs evaluation of the given mini-batch. If needed, also returns the results.
 
@@ -119,7 +124,8 @@ class Session(object):
             One or multiple targets
         return_out : bool
             Whether to return the output of the network
-
+        callbacks : Tuple[callable] or List [callable] or None
+            Callbacks to be used during the training.
         Returns
         -------
         out : Tuple[float, torch.Tensor or tuple] or float
@@ -129,12 +135,13 @@ class Session(object):
         return self.__batch_step(batch, target, with_grad=False,
                                  with_backward=False,
                                  eval_mode=True,
-                                 return_out=return_out)
+                                 return_out=return_out, callbacks=callbacks)
 
     def __batch_step(self, batch: torch.Tensor or Tuple[torch.Tensor],
                      target: torch.Tensor or Tuple[torch.Tensor],  with_grad: bool = True,
                      with_backward: bool = True, eval_mode: bool = False,
-                     return_out: bool = False) -> Tuple[float, Any] or float:
+                     return_out: bool = False,
+                     callbacks=Tuple[callable] or List[callable] or None) -> Tuple[float, Any] or float:
         """
         Private method, which handles the logic for training and evaluation for 1 mini-batch.
 
@@ -152,6 +159,8 @@ class Session(object):
             Whether to switch the trained module to the evaluation mode
         return_out : bool
             Whether to return the output
+        callbacks : Tuple[callable] or List [callable] or None
+            Callbacks to be used during the batch step.
 
         Returns
         -------
@@ -176,15 +185,22 @@ class Session(object):
             if isinstance(target, tuple) and len(target) == 1:
                 target = target[0]
 
-            if eval_mode:
-                outputs, losses = self.__module.run(batch, target, with_backward, with_grad)
-            else:
-                outputs, losses = self.__module.optimize_cb.on_optimize(batch, target)
+            out = self.__module(batch)
+            loss = self.__loss(out, target)
 
-        if not return_out:
-            return losses
-        else:
-            return losses, outputs
+            if with_backward:
+                for cb in callbacks:
+                    cb.on_backward(module=self.__module, loss=loss)
+                loss.backward()
+
+                for cb in callbacks:
+                    cb.on_optimizer_step(module=self.__module, loss=loss, optimizer=self.__optimizer)
+
+                self.__optimizer.step()
+            if not return_out:
+                return loss.item()
+            else:
+                return loss.item(), return_out
 
 
 

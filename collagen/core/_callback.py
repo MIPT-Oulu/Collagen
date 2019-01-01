@@ -14,5 +14,5 @@ class Callback(object):
     def on_batch_end(self, *args, **kwargs):
         raise NotImplementedError
 
-    def on_optimize(self, *args, **kwargs):
+    def on_backward(self, *args, **kwargs):
         raise NotImplementedError
