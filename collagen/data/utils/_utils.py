@@ -2,6 +2,7 @@ import copy
 from sklearn import model_selection
 import pandas as pd
 
+
 class ApplyTransform(object):
     """Applies a callable transform to certain objects in iterable using given indices.
 
@@ -84,10 +85,10 @@ class Normalize(object):
 
 class Compose(object):
     def __init__(self, transforms: list or tuple):
-        self.__transfroms = transforms
+        self.__transforms = transforms
 
     def __call__(self, x):
-        for trf in self.__transfroms:
+        for trf in self.__transforms:
             x = trf(x)
 
         return x

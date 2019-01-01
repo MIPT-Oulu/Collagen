@@ -12,9 +12,9 @@ class ItemLoader(object):
         
     Parameters
     ----------
-    meta_data : pandas.DataFrame
+    meta_data : pandas.DataFrame or None
         Meta data of data and labels.
-    parse_item_cb : callable
+    parse_item_cb : callable or None
         Parses each row of :attr:meta_data`.
     batch_size : int, optional
         How many data per batch to load. (the default is 1)
@@ -49,7 +49,8 @@ class ItemLoader(object):
         If ``0``, ignores ``timeout`` notion. Must be non-negative. (the default is 0)
     """
 
-    def __init__(self, meta_data: pd.DataFrame, parse_item_cb: callable, root: str or None = None, batch_size: int = 1,
+    def __init__(self, meta_data: pd.DataFrame or None = None, parse_item_cb: callable or None = None,
+                 root: str or None = None, batch_size: int = 1,
                  num_workers: int = 0, shuffle: bool = False, pin_memory: bool = False,
                  collate_fn: callable = default_collate, transform: callable or None = None,
                  sampler: torch.utils.data.sampler.Sampler or None = None,
@@ -57,19 +58,26 @@ class ItemLoader(object):
         if root is None:
             root = ''
 
-        self.dataset = DataFrameDataset(root, meta_data=meta_data, parse_item_cb=parse_item_cb, transform=transform)
-        self.data_loader = torch.utils.data.DataLoader(self.dataset,
-                                                       batch_size=batch_size,
-                                                       shuffle=shuffle,
-                                                       sampler=sampler,
-                                                       batch_sampler=batch_sampler,
-                                                       num_workers=num_workers,
-                                                       collate_fn=collate_fn,
-                                                       pin_memory=pin_memory,
-                                                       drop_last=drop_last,
-                                                       timeout=timeout,
-                                                       worker_init_fn=lambda wid: np.random.seed(np.uint32(
-                                                           torch.initial_seed() + wid)))
+        if meta_data is None:
+            self.__dataset = None
+        else:
+            self.__dataset = DataFrameDataset(root, meta_data=meta_data,
+                                              parse_item_cb=parse_item_cb, transform=transform)
+        if self.__dataset is None:
+            self.__data_loader = None
+        else:
+            self.__data_loader = torch.utils.data.DataLoader(self.__dataset,
+                                                             batch_size=batch_size,
+                                                             shuffle=shuffle,
+                                                             sampler=sampler,
+                                                             batch_sampler=batch_sampler,
+                                                             num_workers=num_workers,
+                                                             collate_fn=collate_fn,
+                                                             pin_memory=pin_memory,
+                                                             drop_last=drop_last,
+                                                             timeout=timeout,
+                                                             worker_init_fn=lambda wid: np.random.seed(np.uint32(
+                                                                 torch.initial_seed() + wid)))
 
         self.drop_last: bool = drop_last
         self.batch_size: int = batch_size
@@ -78,7 +86,7 @@ class ItemLoader(object):
     def __len__(self):
         """ Get length of the dataloader.
         """
-        return len(self.data_loader)
+        return len(self.__data_loader)
 
     def sample(self, k=1):
         """Sample one or more mini-batches.
@@ -97,13 +105,36 @@ class ItemLoader(object):
         for i in range(k):
             try:
                 if self.__iter_loader is None:
-                    self.__iter_loader = iter(self.data_loader)
+                    self.__iter_loader = iter(self.__data_loader)
                 batch = next(self.__iter_loader)
             except StopIteration:
                 del self.__iter_loader
-                self.__iter_loader = iter(self.data_loader)
+                self.__iter_loader = iter(self.__data_loader)
                 batch = next(self.__iter_loader)
 
             samples.append(batch)
 
         return samples
+
+
+class GANFakeSampler(ItemLoader):
+    def __init__(self, g_network, batch_size, latent_size):
+        super(GANFakeSampler, self).__init__(meta_data=None, parse_item_cb=None)
+        self.__latent_size = latent_size
+        self.__batch_size = batch_size
+        self.__g_network = g_network
+
+    def sample(self, k=1, noise_fixed=None):
+        samples = []
+        for _ in range(k):
+            if noise_fixed is None:
+                noise = torch.randn(self.__batch_size, self.__latent_size, 1, 1)
+            else:
+                noise = noise_fixed
+            fake = self.__g_network(noise)
+            samples.append({'img': fake, 'target': 0})
+
+        return samples
+
+    def __len__(self):
+        return 1

@@ -26,3 +26,6 @@ class RunningAverageMeter(Callback):
     def on_epoch_end(self):
         pass
 
+    def on_optimize(self, *args, **kwargs):
+        pass
+

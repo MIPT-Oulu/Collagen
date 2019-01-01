@@ -85,7 +85,3 @@ class Module(torch.nn.Module):
     @abstractmethod
     def forward(self, input):
         raise NotImplementedError
-
-    @abstractmethod
-    def run(self, input, labels=None, with_backward: bool or None = None, accumulate_grade: bool or None = None):
-        raise  NotImplementedError

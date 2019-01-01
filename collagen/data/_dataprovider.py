@@ -16,7 +16,7 @@ class DataProvider(object):
         self.__state_dict = {}
 
         for itemloader_name in self.__loaders:
-            itemloader_len = self.__loaders[itemloader_name].__len__()
+            itemloader_len = len(self.__loaders[itemloader_name])
             self.__state_dict[itemloader_name] = {"total": itemloader_len,
                                           "samples": None,
                                           "num_sampled": 0,
