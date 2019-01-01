@@ -16,3 +16,6 @@ class Callback(object):
 
     def on_backward(self, *args, **kwargs):
         raise NotImplementedError
+
+    def on_optimizer_step(self, *args, **kwargs):
+        raise NotImplementedError
