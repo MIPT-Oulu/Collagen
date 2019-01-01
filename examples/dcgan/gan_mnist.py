@@ -4,9 +4,9 @@ from torch import optim
 from tqdm import tqdm
 
 from collagen.data import DataProvider, ItemLoader, GANFakeSampler
-from collagen.core import Session
+from collagen.core import Session, GANStrategy
 from collagen.data.utils import get_mnist
-from ex_utils import init_args, parse_item_mnist, init_mnist_transforms
+from ex_utils import init_args, parse_item_mnist_gan, init_mnist_transforms
 from ex_utils import Discriminator, Generator
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -19,7 +19,7 @@ class GeneratorLoss(torch.nn.Module):
         self.__d_loss = d_loss
 
     def forward(self, img: torch.Tensor, target: torch.Tensor):
-        output = self.__d_network(img.to)
+        output = self.__d_network(img)
         loss = self.__d_loss(output, target)
         return loss
 
@@ -46,7 +46,7 @@ if __name__ == "__main__":
 
     item_loaders['real'] = ItemLoader(meta_data=train_ds,
                                       transform=init_mnist_transforms()[1],
-                                      parse_item_cb=parse_item_mnist,
+                                      parse_item_cb=parse_item_mnist_gan,
                                       batch_size=args.bs, num_workers=args.num_threads)
 
     item_loaders['fake'] = GANFakeSampler(g_network=g_network,
@@ -54,7 +54,10 @@ if __name__ == "__main__":
                                           latent_size=args.latent_size)
 
     data_provider = DataProvider(item_loaders)
+    dcgan = GANStrategy(data_provider, 'real', 'fake', g_session, d_session)
 
-    for epoch in tqdm(range(args.n_epochs), total=args.n_epochs):
-        data_provider.sample(**{'real': 1, 'fake': 1})
-
+    for epoch in range(args.n_epochs):
+        n_batches = len(item_loaders['real'])
+        for i in tqdm(range(n_batches), total=n_batches):
+            data_provider.sample(**{'real': 1, 'fake': 1})
+            dcgan.train('img', 'target', cast_target='float')

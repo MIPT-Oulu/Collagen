@@ -125,3 +125,14 @@ class FoldSplit(object):
         return self.__cv_folds_idx
 
 
+def cast_tensor(x, to='float'):
+    if to is None:
+        return x
+    if to == 'float':
+        return x.float()
+    elif to == 'double':
+        return x.double()
+    elif to == 'long':
+        return x.long()
+    else:
+        raise NotImplementedError

@@ -124,17 +124,16 @@ class GANFakeSampler(ItemLoader):
         self.__batch_size = batch_size
         self.__g_network = g_network
 
-    def sample(self, k=1, noise_fixed=None):
+    def sample(self, k=1):
         samples = []
         for _ in range(k):
-            if noise_fixed is None:
-                noise = torch.randn(self.__batch_size, self.__latent_size, 1, 1)
-            else:
-                noise = noise_fixed
-            fake = self.__g_network(noise)
-            samples.append({'img': fake, 'target': 0})
+            noise = torch.randn(self.__batch_size, self.__latent_size)
+            fake: torch.Tensor = self.__g_network(noise)
+            samples.append({'img': fake, 'target': torch.zeros(self.__batch_size).to(fake.device), 'latent': noise})
 
         return samples
 
     def __len__(self):
         return 1
+
+

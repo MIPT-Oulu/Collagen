@@ -17,7 +17,7 @@ def wrap2solt(inp):
 def unpack_solt(dc: sld.DataContainer):
     img, target = dc.data
     img, target = torch.from_numpy(img).permute(2, 0, 1).float(), target
-    return img, target
+    return img, np.float32(target)
 
 
 def init_mnist_transforms():
@@ -38,7 +38,8 @@ def init_mnist_transforms():
         wrap2solt,
         slt.PadTransform(pad_to=32),
         unpack_solt,
-        ApplyTransform(Normalize((0.5,), (0.5,)))
+        ApplyTransform(Normalize((0.5,), (0.5,))),
+
     ])
 
     return train_trf, test_trf
@@ -101,16 +102,17 @@ class Generator(nn.Module):
         self.apply(weights_init)
 
     def forward(self, x):
-        o1 = self.layer1(x)
+        assert len(x.size()) == 2
+        o1 = self.layer1(x.view(x.size(0), x.size(1), 1, 1))
         o2 = self.layer2(o1)
         o3 = self.layer3(o2)
 
         return self.out(o3)
 
 
-def parse_item_mnist(root, entry, trf):
+def parse_item_mnist_gan(root, entry, trf):
     img, target = trf((entry.img, entry.target))
-    return {'img': img, 'target': target}
+    return {'img': img, 'target': 1, 'class': target}
 
 
 def init_args():
