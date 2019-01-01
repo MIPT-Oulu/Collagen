@@ -25,7 +25,7 @@ jobs:
   - bash: conda create --yes --quiet --name collagen_test_env python=$PYTHON_VERSION 
     displayName: Creating Anaconda environment
 
-  - bash: conda install -y -n collagen_test_env numpy scipy pandoc
+  - bash: conda install -y -n collagen_test_env numpy scipy pandoc pandas
     displayName: 'Installing basic dependencies'
 
   - bash: conda install -y -n collagen_test_env pytorch-cpu torchvision-cpu -c pytorch
@@ -33,7 +33,7 @@ jobs:
 
   - bash: |
       source activate collagen_test_env
-      pip install solt pytest pytest-flake8 ipykernel codecov pytest-pep8 coverage pytest-cov sphinx
+      pip install solt pytest pytest-flake8 ipykernel codecov pytest-pep8 coverage pytest-cov sphinx tqdm
     displayName: 'Installing testing and docs building dependencies'
 
   - bash: |
