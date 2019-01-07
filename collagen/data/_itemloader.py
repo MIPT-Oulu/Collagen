@@ -82,6 +82,7 @@ class ItemLoader(object):
         self.drop_last: bool = drop_last
         self.batch_size: int = batch_size
         self.__iter_loader = None
+        self.parse_item = parse_item_cb
         
     def __len__(self):
         """ Get length of the dataloader.
