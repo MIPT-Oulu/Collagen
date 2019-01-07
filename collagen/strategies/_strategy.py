@@ -3,8 +3,9 @@ from collagen.data import DataProvider, ItemLoader, Splitter
 import torch.nn as nn
 from torch.optim import Optimizer
 import pandas as pd
+from typing import Tuple
 import torch
-import tqdm
+from tqdm import tqdm
 
 
 class Strategy(object):
@@ -42,7 +43,7 @@ class Strategy(object):
                  parse_item_cb,
                  train_callbacks: Tuple[Callback] or Callback = None,
                  val_callbacks: Tuple[Callback] or Callback = None,
-                 device: str = "cuda"):
+                 device: str or None = "cuda"):
         self.__data_frame: pd.DataFrame = data_frame
         self.__splitter: Splitter = splitter
         self.__loss: nn.Module = loss
@@ -51,17 +52,19 @@ class Strategy(object):
 
         self.__train_callbacks: Tuple[Callback] or Callback = train_callbacks
         self.__val_callbacks: Tuple[Callback] or Callback = val_callbacks
-        if not isinstance(val_callbacks, tuple):
+        if not isinstance(val_callbacks, Tuple):
             self.__val_callbacks: Tuple[Callback] or Callback = (val_callbacks, )
 
-        if not isinstance(train_callbacks, tuple):
+        if not isinstance(train_callbacks, Tuple):
             self.__train_callbacks: Tuple[Callback] = (train_callbacks, )
 
         self.__args: dict = args
 
-        self.__parse_item_callback = parse_item_cb
+        self.__parse_item = parse_item_cb
         self.__transform = transform
-        self.__device = torch.device("cuda" if torch.cuda.is_available() and device == "cuda" else "cpu")
+
+        self.__use_cuda = torch.cuda.is_available() and device == "cuda"
+        self.__device = torch.device("cuda" if self.__use_cuda else "cpu")
 
         self.__model.to(self.__device)
         self.__loss.to(self.__device)
@@ -69,7 +72,6 @@ class Strategy(object):
     def run(self):
         splitter_kwargs = self.__args["splitter"]
         itemloader_kwargs = self.__args["itemloader"]
-        # model_kwargs = self.__args["model"]
         train_kwargs = self.__args["train"]
         data_kwargs = self.__args["data"]
 
@@ -85,7 +87,7 @@ class Strategy(object):
 
                 item_loaders[f'{fold_id}_{stage}'] = ItemLoader(meta_data=df,
                                                                 transform=self.__transform,
-                                                                parse_item_cb=self.__parse_item_callback.on_parse_item,
+                                                                parse_item_cb=self.__parse_item,
                                                                 **itemloader_kwargs)
 
                 if isinstance(cbs, Callback):
@@ -100,14 +102,15 @@ class Strategy(object):
 
             trainer = Trainer(data_provider, f'{fold_id}_train', f'{fold_id}_eval', se)
 
-            for epoch in range(train_kwargs.n_epochs):
+            for epoch in range(train_kwargs["n_epochs"]):
                 for stage in ['train', 'eval']:
                     n_batches = len(item_loaders[f'{fold_id}_{stage}'])
-                    for batch_i in tqdm(range(n_batches), desc=f'Fold [{fold_id}] | Epoch [{epoch}] | {stage}::'):
+
+                    for batch_i in tqdm(range(n_batches), total=n_batches, desc=f'Fold [{fold_id}] | Epoch [{epoch}] | {stage}::'):
                         for cb in self.__train_callbacks:
                             cb.on_sample_begin()
-                        data_provider.sample(**{f'{fold_id}_{stage}': 1})
+                        data_provider.sample(**{f"{fold_id}_{stage}": 1})
                         for cb in self.__train_callbacks:
                             cb.on_sample_end()
-                        getattr(trainer, stage)(data_key=data_kwargs["input_tag"], target_key=data_kwargs["target_tag"])
+                        getattr(trainer, stage)(data_key=data_kwargs["data_col"], target_key=data_kwargs["target_col"])
 

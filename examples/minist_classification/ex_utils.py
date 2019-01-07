@@ -24,9 +24,10 @@ def init_args():
     parser.add_argument('--n_folds', type=int, default=5, help='Number of cross-validation folds')
     parser.add_argument('--bw', type=int, default=8, help='Base width of the model')
     parser.add_argument('--dropout', type=float, default=0.5, help='Dropout rate')
-    parser.add_argument('--num_threads', type=int, default=0, help='Number of threads for data loader')
+    parser.add_argument('--num_workers', type=int, default=0, help='Number of workers for data loader')
     parser.add_argument('--save_mnist', default='data', help='Where to save downloaded MNIST data')
     parser.add_argument('--seed', type=int, default=12345, help='Random seed')
+    parser.add_argument('--device', type=str, default="cpu", help='Use `cuda` or `cpu`')
     args = parser.parse_args()
 
     torch.manual_seed(args.seed)

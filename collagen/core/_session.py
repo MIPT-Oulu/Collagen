@@ -185,7 +185,16 @@ class Session(object):
             if isinstance(target, tuple) and len(target) == 1:
                 target = target[0]
 
+            for cb in callbacks:
+                cb.on_forward_begin()
+
+            # TODO: Fix crash when using cuda
+            batch = batch.to(next(self.__module.parameters()).device)
             out = self.__module(batch)
+            for cb in callbacks:
+                cb.on_forward_end()
+
+
             loss = self.__loss(out, target)
 
             if with_backward:

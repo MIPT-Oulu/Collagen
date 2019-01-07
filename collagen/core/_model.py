@@ -15,7 +15,8 @@ class Module(torch.nn.Module):
         self.__param_groups = dict()
         self.optimize_cb = None
 
-    def parameters(self, group: str or Tuple[str] or None = None,
+    # Should not overwrite parameters() because it eliminates some useful params of nn.Module such as device, requires_grad, etc.
+    def _parameters(self, group: str or Tuple[str] or None = None,
                    name: str or None = None) -> Dict[str, torch.nn.Parameter or str]:
         """
         Returns an iterator through the parameters of the module from one or many groups.

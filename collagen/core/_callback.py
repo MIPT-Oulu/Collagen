@@ -46,3 +46,9 @@ class Callback(object):
 
     def on_parse_item(self, *args, **kwargs):
         pass
+
+    def on_forward_begin(self, *args, **kwargs):
+        pass
+
+    def on_forward_end(self, *args, **kwargs):
+        pass
