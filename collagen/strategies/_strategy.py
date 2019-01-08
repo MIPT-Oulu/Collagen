@@ -93,9 +93,16 @@ class Strategy(object):
 
             data_provider = DataProvider(item_loaders)
 
-            se = Session(module=self.__model, optimizer=self.__optimizer, loss=self.__loss)
+            se = Session(module=self.__model,
+                         optimizer=self.__optimizer,
+                         loss=self.__loss)
 
-            trainer = Trainer(data_provider, f'{fold_id}_train', f'{fold_id}_eval', se)
+            trainer = Trainer(data_provider=data_provider,
+                              train_loader_names=f'{fold_id}_train',
+                              val_loader_names=f'{fold_id}_eval',
+                              session=se,
+                              train_callbacks=self.__train_callbacks,
+                              val_callbacks=self.__val_callbacks)
 
             for epoch in range(train_kwargs["n_epochs"]):
                 for stage in ['train', 'eval']:

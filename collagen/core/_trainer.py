@@ -122,7 +122,7 @@ class Trainer(object):
             batch = cur_loader_state["samples"][i]
             for cb in self.__train_callbacks:
                 cb.on_batch_begin(batch)
-            train_result = self.__session.train_step(tuple([batch[key_i] for key_i in data_key]),
+            loss, train_result = self.__session.train_step(tuple([batch[key_i] for key_i in data_key]),
                                                      tuple([cast_tensor(batch[key_i], cast_target)
                                                             for key_i in target_key]),
                                                      accumulate_grad=False,
@@ -130,8 +130,12 @@ class Trainer(object):
             self.__train_batches_count += 1
             for cb in self.__train_callbacks:
                 cb.on_batch_end(loader_name=loader_name,
-                                batches_count=self.__train_batches_count, result=train_result, batch=batch,
-                                data_key=data_key, target_key=target_key,
+                                batches_count=self.__train_batches_count,
+                                loss=loss,
+                                output=train_result,
+                                input=batch,
+                                data_key=data_key,
+                                target_key=target_key,
                                 session=self.__session)
 
     def eval(self, data_key: Tuple[str] or str = 'img',
@@ -172,20 +176,37 @@ class Trainer(object):
                 target_key = (target_key, )
 
             batch = cur_loader_state["samples"][0]
+
+            if len(data_key) == 1:
+                input = batch[data_key[0]]
+            else:
+                input = tuple([batch[key_i] for key_i in data_key])
+
+            if len(target_key) == 1:
+                target = cast_tensor(batch[target_key[0]], cast_target)
+            else:
+                target = tuple([cast_tensor(batch[key_i], cast_target) for key_i in target_key])
             for cb in self.__val_callbacks:
-                cb.on_batch_begin(loader_name=cur_loader_name, batches_count=self.__eval_batches_count,
-                                  batch=batch, data_key=data_key, target_key=target_key,
+                cb.on_batch_begin(loader_name=cur_loader_name,
+                                  batches_count=self.__eval_batches_count,
+                                  input=batch,
+                                  data_key=data_key, target_key=target_key,
                                   session=self.__session)
 
-            eval_result = self.__session.eval_step(tuple([batch[key_i] for key_i in data_key]),
-                                                   tuple([cast_tensor(batch[key_i], cast_target)
-                                                          for key_i in target_key]),
-                                                   return_out=True, callbacks=self.__val_callbacks)
+
+            loss, eval_result = self.__session.eval_step(input, target,
+                                                         return_out=True,
+                                                         callbacks=self.__val_callbacks)
 
             self.__eval_batches_count += 1
 
             for cb in self.__val_callbacks:
-                cb.on_batch_end(loader_name=cur_loader_name, batches_count=self.__eval_batches_count,
-                                result=eval_result, batch=batch,
+                cb.on_batch_end(loader_name=cur_loader_name,
+                                batches_count=self.__eval_batches_count,
+                                result=eval_result,
+                                input=batch,
+                                output=eval_result,
+                                target=target,
+                                loss=loss,
                                 data_key=data_key, target_key=target_key,
                                 session=self.__session)

@@ -1,1 +1,1 @@
-from ._meters import RunningAverageMeter
+from ._meters import RunningAverageMeter, AccuracyMeter

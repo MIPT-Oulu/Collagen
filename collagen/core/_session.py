@@ -186,30 +186,95 @@ class Session(object):
             if isinstance(target, tuple) and len(target) == 1:
                 target = target[0]
 
-            for cb in callbacks:
-                cb.on_forward_begin()
-
+            # Transfer input and target into proper device
             batch_on_device = batch.to(module_device)
-            out = self.__module(batch_on_device)
-            for cb in callbacks:
-                cb.on_forward_end()
-
             target_on_device = target.to(module_device)
+
+            # Forward
+            for cb in callbacks:
+                cb.on_forward_begin(module=self.__module,
+                                    input=batch_on_device,
+                                    target=target_on_device,
+                                    optimizer=self.__optimizer,
+                                    criterion=self.__loss)
+
+            out = self.__module(batch_on_device)
+
+            for cb in callbacks:
+                cb.on_forward_end(module=self.__module,
+                                  input=batch_on_device,
+                                  target=target_on_device,
+                                  output=out,
+                                  optimizer=self.__optimizer,
+                                  criterion=self.__loss)
+
+            # Compute loss
+            for cb in callbacks:
+                cb.on_loss_begin(module=self.__module,
+                                 input=batch_on_device,
+                                 target=target_on_device,
+                                 output=out,
+                                 optimizer=self.__optimizer,
+                                 criterion=self.__loss)
+
             loss = self.__loss(out, target_on_device)
 
+            for cb in callbacks:
+                cb.on_loss_end(module=self.__module,
+                               loss=loss,
+                               input=batch_on_device,
+                               target=target_on_device,
+                               output=out,
+                               optimizer=self.__optimizer,
+                               criterion=self.__loss)
+
             if with_backward:
+                # Backward
                 for cb in callbacks:
-                    cb.on_backward(module=self.__module, loss=loss)
+                    cb.on_backward_begin(module=self.__module,
+                                         loss=loss,
+                                         input=batch_on_device,
+                                         target=target_on_device,
+                                         output=out,
+                                         optimizer=self.__optimizer,
+                                         criterion=self.__loss)
+
                 loss.backward()
 
                 for cb in callbacks:
-                    cb.on_optimizer_step(module=self.__module, loss=loss, optimizer=self.__optimizer)
+                    cb.on_backward_end(module=self.__module,
+                                       loss=loss,
+                                       input=batch_on_device,
+                                       target=target_on_device,
+                                       output=out,
+                                       optimizer=self.__optimizer,
+                                       criterion=self.__loss)
+
+                # Optimizer step
+                for cb in callbacks:
+                    cb.on_optimizer_step_begin(module=self.__module,
+                                               loss=loss,
+                                               input=batch_on_device,
+                                               target=target_on_device,
+                                               output=out,
+                                               optimizer=self.__optimizer,
+                                               criterion=self.__loss)
 
                 self.__optimizer.step()
+
+                for cb in callbacks:
+                    cb.on_optimizer_step_begin(module=self.__module,
+                                               loss=loss,
+                                               input=batch_on_device,
+                                               target=target_on_device,
+                                               output=out,
+                                               optimizer=self.__optimizer,
+                                               criterion=self.__loss)
+
             if not return_out:
                 return loss.item()
             else:
-                return loss.item(), return_out
+                return loss.item(), out
 
 
 

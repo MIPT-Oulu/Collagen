@@ -52,3 +52,9 @@ class Callback(object):
 
     def on_forward_end(self, *args, **kwargs):
         pass
+
+    def on_loss_begin(self, *args, **kwargs):
+        pass
+
+    def on_loss_end(self, *args, **kwargs):
+        pass

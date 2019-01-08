@@ -1,5 +1,5 @@
 import copy
-
+import torch
 
 class ApplyTransform(object):
     """Applies a callable transform to certain objects in iterable using given indices.
@@ -90,6 +90,17 @@ class Compose(object):
             x = trf(x)
 
         return x
+
+
+def to_cpu(x, use_numpy=True):
+    x_cpu = x
+    if isinstance(x, torch.Tensor) and x.is_cuda:
+        if use_numpy:
+            x_cpu = x.cpu().data.numpy()
+        else:
+            x_cpu = x.cpu().data
+
+    return x_cpu
 
 
 def cast_tensor(x, to='float'):
