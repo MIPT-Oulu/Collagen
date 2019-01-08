@@ -168,6 +168,7 @@ class Session(object):
                 Loss value and possibly the output of the model.
         """
 
+        module_device = next(self.__module.parameters()).device
         if eval_mode:
             with_backward = False
             with_grad = False
@@ -188,14 +189,13 @@ class Session(object):
             for cb in callbacks:
                 cb.on_forward_begin()
 
-            # TODO: Fix crash when using cuda
-            batch = batch.to(next(self.__module.parameters()).device)
-            out = self.__module(batch)
+            batch_on_device = batch.to(module_device)
+            out = self.__module(batch_on_device)
             for cb in callbacks:
                 cb.on_forward_end()
 
-
-            loss = self.__loss(out, target)
+            target_on_device = target.to(module_device)
+            loss = self.__loss(out, target_on_device)
 
             if with_backward:
                 for cb in callbacks:

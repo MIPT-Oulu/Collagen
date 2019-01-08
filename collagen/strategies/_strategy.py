@@ -79,22 +79,17 @@ class Strategy(object):
             item_loaders = dict()
 
             for stage, df, cbs in zip(['train', 'eval'], [df_train, df_val], [self.__train_callbacks, self.__val_callbacks]):
-                if isinstance(cbs, Callback):
-                    cbs.on_itemloader_begin()
-                else:
-                    for cb in cbs:
-                        cb.on_itemloader_begin()
+
+                for cb in cbs:
+                    cb.on_itemloader_begin()
 
                 item_loaders[f'{fold_id}_{stage}'] = ItemLoader(meta_data=df,
                                                                 transform=self.__transform,
                                                                 parse_item_cb=self.__parse_item,
                                                                 **itemloader_kwargs)
 
-                if isinstance(cbs, Callback):
-                    cbs.on_itemloader_end()
-                else:
-                    for cb in cbs:
-                        cb.on_itemloader_end()
+                for cb in cbs:
+                    cb.on_itemloader_end()
 
             data_provider = DataProvider(item_loaders)
 
