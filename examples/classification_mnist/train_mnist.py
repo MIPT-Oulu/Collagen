@@ -1,9 +1,8 @@
 import torch
 
-from collagen.data import ItemLoader
+from collagen.data import ItemLoader, DataProvider
 from collagen.data import FoldSplit
 from collagen.strategies import Strategy
-from collagen.core import Callback
 from collagen.metrics import RunningAverageMeter, AccuracyMeter
 from ex_utils import get_mnist, init_mnist_transforms, init_args
 from ex_utils import SimpleConvNet
@@ -37,19 +36,31 @@ if __name__ == "__main__":
     train_cbs = (RunningAverageMeter(), )
     val_cbs = (AccuracyMeter(), )
 
-    strategy = Strategy(data_frame=train_ds,
-                        args=args,
-                        splitter=FoldSplit,
-                        loss=criterion,
-                        model=model,
-                        optimizer=optimizer,
-                        transform=init_mnist_transforms()[0],
-                        parse_item_cb=parse_item_mnist,
-                        train_callbacks=train_cbs,
-                        val_callbacks=val_cbs,
-                        device=input_args.device)
+    for fold_id, (df_train, df_val) in enumerate(FoldSplit(train_ds, **args["splitter"])):
+        item_loaders = dict()
 
-    strategy.run()
+        for stage, df in zip(['train', 'eval'], [df_train, df_val]):
+            item_loaders[f'{fold_id}_{stage}'] = ItemLoader(meta_data=df,
+                                                            transform=init_mnist_transforms()[0],
+                                                            parse_item_cb=parse_item_mnist,
+                                                            **args["itemloader"])
+
+        data_provider = DataProvider(item_loaders)
+
+        strategy = Strategy(data_provider=data_provider,
+                            train_loader_names=f'{fold_id}_train',
+                            val_loader_names=f'{fold_id}_eval',
+                            data_key="img",
+                            target_key="target",
+                            loss=criterion,
+                            model=model,
+                            n_epochs=args["train"]["n_epochs"],
+                            optimizer=optimizer,
+                            train_callbacks=train_cbs,
+                            val_callbacks=val_cbs,
+                            device=input_args.device)
+
+        strategy.run()
 
     item_loaders = dict()
     item_loaders['test'] = ItemLoader(root='', meta_data=test_ds,

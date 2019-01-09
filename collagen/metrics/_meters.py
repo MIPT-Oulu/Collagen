@@ -37,17 +37,8 @@ class AccuracyMeter(Callback):
         output = output.argmax(dim=-1).view(n, -1)
         target = target.view(n, -1)
 
-        acc = (output == target).float().sum()
-        print("acc : {}".format(acc))
-        return acc
-
-    def update_metrics(self, target_on_cpu, pred_on_cpu):
-        if pred_on_cpu.shape != target_on_cpu.shape:
-            raise ValueError("Target shape ({}) and prediction ({}) shape mismatched.".format(target_on_cpu.shape, pred_on_cpu.shape))
-
-        mask_matched = np.abs(target_on_cpu-pred_on_cpu) < self.__accuracy_threshold
-        self.__correct_count += np.sum(mask_matched)
-        self.__data_count += target_on_cpu.shape[0]
+        self.__correct_count += (output == target).float().sum()
+        self.__data_count += n
 
     def get_metrics(self):
         if self.__data_count > 0:

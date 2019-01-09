@@ -33,86 +33,115 @@ class Strategy(object):
              the callbacks can also be meters batch-wise, which compute metrics.
         """
 
-    def __init__(self, data_frame: pd.DataFrame,
-                 args: dict,
-                 splitter: Splitter,
+    def __init__(self, data_provider: DataProvider,
+                 train_loader_names: Tuple[str] or str,
+                 val_loader_names: Tuple[str] or str,
+                 data_key: str, target_key: str,
                  loss: nn.Module,
                  model: Module,
                  optimizer: Optimizer,
-                 transform,
-                 parse_item_cb,
+                 n_epochs: int or None = 100,
+                 train_num_samples: Tuple[int] or int or None = None,
+                 val_num_samples: Tuple[int] or int or None = None,
                  train_callbacks: Tuple[Callback] or Callback = None,
                  val_callbacks: Tuple[Callback] or Callback = None,
                  device: str or None = "cuda"):
-        self.__data_frame: pd.DataFrame = data_frame
-        self.__splitter: Splitter = splitter
+        self.__data_provider: DataProvider = data_provider
         self.__loss: nn.Module = loss
         self.__optimizer: Optimizer = optimizer
         self.__model: Module = model
 
+        self.__train_loader_names: Tuple[str] or str = train_loader_names
+        self.__val_loader_names: Tuple[str] or str = val_loader_names
+
+        self.__train_num_samples: Tuple[int] or int = train_num_samples
+        self.__val_num_samples: Tuple[int] or int = val_num_samples
+
+        self.__n_epochs: int = n_epochs
+
+        self.__data_key = data_key
+        self.__target_key = target_key
+
         self.__train_callbacks: Tuple[Callback] or Callback = train_callbacks
         self.__val_callbacks: Tuple[Callback] or Callback = val_callbacks
+
+        if not isinstance(train_loader_names, Tuple):
+            self.__train_loader_names: Tuple[str] = (train_loader_names, )
+
+        if not isinstance(val_loader_names, Tuple):
+            self.__val_loader_names: Tuple[str] = (val_loader_names, )
+
         if not isinstance(val_callbacks, Tuple):
             self.__val_callbacks: Tuple[Callback] or Callback = (val_callbacks, )
 
         if not isinstance(train_callbacks, Tuple):
             self.__train_callbacks: Tuple[Callback] = (train_callbacks, )
 
-        self.__args: dict = args
+        if train_num_samples is None:
+            self.__train_num_samples: Tuple[int] = tuple([1]*len(self.__train_loader_names))
+        else:
+            if not isinstance(train_num_samples, Tuple):
+                self.__train_num_samples: Tuple[int] = (train_num_samples, )
 
-        self.__parse_item = parse_item_cb
-        self.__transform = transform
+        if val_num_samples is None:
+            self.__val_num_samples: Tuple[int] = tuple([1]*len(self.__val_loader_names))
+        else:
+            if not isinstance(val_num_samples, Tuple):
+                self.__val_num_samples: Tuple[int] = (val_num_samples, )
+
+        if len(self.__train_loader_names) != len(self.__train_num_samples) or \
+                len(self.__val_loader_names) != len(self.__val_num_samples):
+            raise ValueError("The number of loaders and the number of sample quantities must be matched. "
+                             "Train ({} vs {}), validation ({} vs {})".format(len(self.__train_loader_names),
+                                                                       len(self.__train_num_samples),
+                                                                       len(self.__val_loader_names),
+                                                                       len(self.__val_num_samples)))
+
+        self.__sampling_kwargs = dict()
+        self.__num_batches = 0
+        for i, num_samples in enumerate(range(len(self.__train_num_samples))):
+            self.__sampling_kwargs[self.__train_loader_names[i]] = num_samples
+            self.__num_batches = max(len(self.__data_provider.state_dict()[self.__train_loader_names[i]]), self.__num_batches)
+
+
 
         self.__use_cuda = torch.cuda.is_available() and device == "cuda"
-        self.__device = torch.device("cuda" if self.__use_cuda else "cpu")
+        self.__device = torch.device("cuda" if self.__use_cuda and torch.cuda.is_available() else "cpu")
 
         self.__model.to(self.__device)
         self.__loss.to(self.__device)
 
     def run(self):
-        splitter_kwargs = self.__args["splitter"]
-        itemloader_kwargs = self.__args["itemloader"]
-        train_kwargs = self.__args["train"]
-        data_kwargs = self.__args["data"]
+        se = Session(module=self.__model,
+                     optimizer=self.__optimizer,
+                     loss=self.__loss)
 
-        for fold_id, (df_train, df_val) in enumerate(self.__splitter(self.__data_frame, **splitter_kwargs)):
-            item_loaders = dict()
+        trainer = Trainer(data_provider=self.__data_provider,
+                          train_loader_names=self.__train_loader_names,
+                          val_loader_names=self.__val_loader_names,
+                          session=se,
+                          train_callbacks=self.__train_callbacks,
+                          val_callbacks=self.__val_callbacks)
 
-            for stage, df, cbs in zip(['train', 'eval'], [df_train, df_val], [self.__train_callbacks, self.__val_callbacks]):
-
-                for cb in cbs:
-                    cb.on_itemloader_begin()
-
-                item_loaders[f'{fold_id}_{stage}'] = ItemLoader(meta_data=df,
-                                                                transform=self.__transform,
-                                                                parse_item_cb=self.__parse_item,
-                                                                **itemloader_kwargs)
-
-                for cb in cbs:
-                    cb.on_itemloader_end()
-
-            data_provider = DataProvider(item_loaders)
-
-            se = Session(module=self.__model,
-                         optimizer=self.__optimizer,
-                         loss=self.__loss)
-
-            trainer = Trainer(data_provider=data_provider,
-                              train_loader_names=f'{fold_id}_train',
-                              val_loader_names=f'{fold_id}_eval',
-                              session=se,
-                              train_callbacks=self.__train_callbacks,
-                              val_callbacks=self.__val_callbacks)
-
-            for epoch in range(train_kwargs["n_epochs"]):
-                for stage in ['train', 'eval']:
-                    n_batches = len(item_loaders[f'{fold_id}_{stage}'])
-
-                    for batch_i in tqdm(range(n_batches), total=n_batches, desc=f'Fold [{fold_id}] | Epoch [{epoch}] | {stage}::'):
-                        for cb in self.__train_callbacks:
-                            cb.on_sample_begin()
-                        data_provider.sample(**{f"{fold_id}_{stage}": 1})
-                        for cb in self.__train_callbacks:
-                            cb.on_sample_end()
-                        getattr(trainer, stage)(data_key=data_kwargs["data_col"], target_key=data_kwargs["target_col"])
+        for epoch in range(self.__n_epochs):
+            for stage in ['train', 'eval']:
+                for batch_i in tqdm(range(self.__num_batches), total=self.__num_batches, desc=f'Epoch [{epoch}] | {stage}::'):
+                    for cb in self.__train_callbacks:
+                        cb.on_sample_begin(epoch=epoch,
+                                           stage=stage,
+                                           batch_index=batch_i,
+                                           data_provider=self.__data_provider,
+                                           data_key=self.__data_key,
+                                           target_key=self.__target_key,
+                                           session=se)
+                    self.__data_provider.sample(**self.__sampling_kwargs)
+                    for cb in self.__train_callbacks:
+                        cb.on_sample_end(epoch=epoch,
+                                         stage=stage,
+                                         batch_index=batch_i,
+                                         data_provider=self.__data_provider,
+                                         data_key=self.__data_key,
+                                         target_key=self.__target_key,
+                                         session=se)
+                    getattr(trainer, stage)(data_key=self.__data_key, target_key=self.__target_key)
 
