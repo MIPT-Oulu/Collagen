@@ -1,5 +1,5 @@
 import torch
-
+import numpy as np
 from collagen.data import ItemLoader, DataProvider
 from collagen.data import FoldSplit
 from collagen.strategies import Strategy
@@ -19,22 +19,24 @@ if __name__ == "__main__":
     train_ds, classes = get_mnist(data_folder=input_args.save_mnist, train=True)
     test_ds, _ = get_mnist(data_folder=input_args.save_mnist, train=False)
 
-    model = SimpleConvNet(bw=input_args.bw, drop=input_args.dropout, n_cls=len(classes))
     criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(params=model.parameters(), lr=input_args.lr, weight_decay=input_args.wd)
 
     if not torch.cuda.is_available() and input_args.device == "cuda":
         raise ValueError("CUDA not found")
 
     args = {
-        "splitter": {"n_folds": 5, "target_col": "target"},
+        "splitter": {"n_folds": 2, "target_col": "target"},
         "itemloader": {"batch_size": input_args.bs, "num_workers": input_args.num_workers, "drop_last": False},
         "train": {"n_epochs": input_args.n_epochs},
         "data": {"data_col": "img", "target_col": "target"}
     }
 
     train_cbs = (RunningAverageMeter(), )
-    val_cbs = (AccuracyMeter(), )
+    val_cbs = (RunningAverageMeter(), AccuracyMeter(), )
+
+    kfold_train_losses = []
+    kfold_val_losses = []
+    kfold__val_accuracies = []
 
     for fold_id, (df_train, df_val) in enumerate(FoldSplit(train_ds, **args["splitter"])):
         item_loaders = dict()
@@ -45,6 +47,8 @@ if __name__ == "__main__":
                                                             parse_item_cb=parse_item_mnist,
                                                             **args["itemloader"])
 
+        model = SimpleConvNet(bw=input_args.bw, drop=input_args.dropout, n_cls=len(classes))
+        optimizer = torch.optim.Adam(params=model.parameters(), lr=input_args.lr, weight_decay=input_args.wd)
         data_provider = DataProvider(item_loaders)
 
         strategy = Strategy(data_provider=data_provider,
@@ -61,6 +65,13 @@ if __name__ == "__main__":
                             device=input_args.device)
 
         strategy.run()
+        kfold_train_losses.append(train_cbs[0].current())
+        kfold_val_losses.append(val_cbs[0].current())
+        kfold__val_accuracies.append(val_cbs[1].current())
+
+    print("k-fold training loss: {}".format(np.asarray(kfold_train_losses).mean()))
+    print("k-fold validation loss: {}".format(np.asarray(kfold_val_losses).mean()))
+    print("k-fold validation accuracy: {}".format(np.asarray(kfold__val_accuracies).mean()))
 
     item_loaders = dict()
     item_loaders['test'] = ItemLoader(root='', meta_data=test_ds,

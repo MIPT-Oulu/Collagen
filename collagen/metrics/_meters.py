@@ -1,5 +1,5 @@
 from ..core import Callback
-
+from collagen.data.utils import to_cpu
 
 class RunningAverageMeter(Callback):
     def __init__(self):
@@ -52,7 +52,7 @@ class AccuracyMeter(Callback):
         self.__data_count += n
 
     def on_epoch_end(self, *args, **kwargs):
-        self.__accuracy = self.current()
+        self.__accuracy = to_cpu(self.current(), use_numpy=True)
         # print("Accuracy: {}".format(acc))
 
     def current(self):

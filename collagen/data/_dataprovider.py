@@ -94,3 +94,9 @@ class DataProvider(object):
         del self.__state_dict
         gc.collect()
         self.__state_dict = {}
+
+    def get_loader_by_name(self, name):
+        if name in self.__loaders:
+            return self.__loaders[name]
+        else:
+            raise ValueError("`{}` not found in list of loader names".format(name))
