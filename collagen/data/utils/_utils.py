@@ -92,16 +92,18 @@ class Compose(object):
         return x
 
 
-def to_cpu(x, use_numpy=True):
+def to_cpu(x: torch.Tensor or torch.cuda.FloatTensor, use_numpy=True):
     x_cpu = x
-    if isinstance(x, torch.Tensor) and x.is_cuda:
+
+    if x.is_cuda:
         if use_numpy:
             x_cpu = x.cpu().data.numpy()
         else:
             x_cpu = x.cpu().data
+    elif use_numpy:
+        x_cpu = x.numpy()
 
     return x_cpu
-
 
 def cast_tensor(x, to='float'):
     if to is None:

@@ -18,7 +18,7 @@ from collagen.core import Module, Callback
 
 def init_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--n_epochs', type=int, default=10, help='Number of epochs')
+    parser.add_argument('--n_epochs', type=int, default=500, help='Number of epochs')
     parser.add_argument('--bs', type=int, default=32, help='Batch size')
     parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
     parser.add_argument('--wd', type=float, default=1e-4, help='Weight decay')

@@ -45,7 +45,7 @@ class DataProvider(object):
             if itemloader_name in self.__loaders:
                 sampling_args.append((itemloader_name, k))
             else:
-                raise ValueError("Not found argument {} in itemloader list".format(itemloader_name))
+                raise ValueError("Not found argument `{}` in itemloader list".format(itemloader_name))
 
         for il_name, k in sampling_args:
             list_samples.append(self.__sample(il_name, k))

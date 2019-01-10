@@ -27,7 +27,7 @@ if __name__ == "__main__":
         raise ValueError("CUDA not found")
 
     args = {
-        "splitter": {"n_folds": 2, "target_col": "target"},
+        "splitter": {"n_folds": 5, "target_col": "target"},
         "itemloader": {"batch_size": input_args.bs, "num_workers": input_args.num_workers, "drop_last": False},
         "train": {"n_epochs": input_args.n_epochs},
         "data": {"data_col": "img", "target_col": "target"}

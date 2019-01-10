@@ -97,13 +97,18 @@ class Strategy(object):
                                                                        len(self.__val_loader_names),
                                                                        len(self.__val_num_samples)))
 
-        self.__sampling_kwargs = dict()
-        self.__num_batches = 0
-        for i, num_samples in enumerate(range(len(self.__train_num_samples))):
-            self.__sampling_kwargs[self.__train_loader_names[i]] = num_samples
-            self.__num_batches = max(len(self.__data_provider.state_dict()[self.__train_loader_names[i]]), self.__num_batches)
-
-
+        self.__sampling_kwargs = {"train": dict(), "eval": dict()}
+        self.__num_batches_by_stage = {"train": 0, "eval": 0}
+        for stage in ['train', 'eval']:
+            for i, num_samples in enumerate(self.__train_num_samples):
+                if stage == "train":
+                    self.__sampling_kwargs[stage][self.__train_loader_names[i]] = num_samples
+                    self.__num_batches_by_stage[stage] = max(len(self.__data_provider.state_dict()[self.__train_loader_names[i]]), self.__num_batches_by_stage[stage])
+                elif stage == "eval":
+                    self.__sampling_kwargs[stage][self.__val_loader_names[i]] = num_samples
+                    self.__num_batches_by_stage[stage] = max(len(self.__data_provider.state_dict()[self.__val_loader_names[i]]), self.__num_batches_by_stage[stage])
+                else:
+                    raise ValueError("Stage can only be `train` either `eval`, but found {}".format(stage))
 
         self.__use_cuda = torch.cuda.is_available() and device == "cuda"
         self.__device = torch.device("cuda" if self.__use_cuda and torch.cuda.is_available() else "cpu")
@@ -123,9 +128,23 @@ class Strategy(object):
                           train_callbacks=self.__train_callbacks,
                           val_callbacks=self.__val_callbacks)
 
+        for cb in self.__train_callbacks:
+            cb.on_epoch_begin(stage="train",
+                              data_provider=self.__data_provider,
+                              data_key=self.__data_key,
+                              target_key=self.__target_key,
+                              session=se)
+
+        for cb in self.__val_callbacks:
+            cb.on_epoch_begin(stage="eval",
+                              data_provider=self.__data_provider,
+                              data_key=self.__data_key,
+                              target_key=self.__target_key,
+                              session=se)
+
         for epoch in range(self.__n_epochs):
             for stage in ['train', 'eval']:
-                for batch_i in tqdm(range(self.__num_batches), total=self.__num_batches, desc=f'Epoch [{epoch}] | {stage}::'):
+                for batch_i in tqdm(range(self.__num_batches_by_stage[stage]), total=self.__num_batches_by_stage[stage], desc=f'Epoch [{epoch}] | {stage}::'):
                     for cb in self.__train_callbacks:
                         cb.on_sample_begin(epoch=epoch,
                                            stage=stage,
@@ -134,7 +153,7 @@ class Strategy(object):
                                            data_key=self.__data_key,
                                            target_key=self.__target_key,
                                            session=se)
-                    self.__data_provider.sample(**self.__sampling_kwargs)
+                    self.__data_provider.sample(**self.__sampling_kwargs[stage])
                     for cb in self.__train_callbacks:
                         cb.on_sample_end(epoch=epoch,
                                          stage=stage,
@@ -145,3 +164,16 @@ class Strategy(object):
                                          session=se)
                     getattr(trainer, stage)(data_key=self.__data_key, target_key=self.__target_key)
 
+        for cb in self.__train_callbacks:
+            cb.on_epoch_end(stage="train",
+                            data_provider=self.__data_provider,
+                            data_key=self.__data_key,
+                            target_key=self.__target_key,
+                            session=se)
+
+        for cb in self.__val_callbacks:
+            cb.on_epoch_end(stage="eval",
+                            data_provider=self.__data_provider,
+                            data_key=self.__data_key,
+                            target_key=self.__target_key,
+                            session=se)
