@@ -130,6 +130,7 @@ def init_args():
     parser.add_argument('--num_threads', type=int, default=0, help='Number of threads for data loader')
     parser.add_argument('--save_data', default='data', help='Where to save downloaded dataset')
     parser.add_argument('--seed', type=int, default=12345, help='Random seed')
+    parser.add_argument('--device', type=str, default="cpu", help='Use `cuda` or `cpu`')
     args = parser.parse_args()
 
     torch.manual_seed(args.seed)

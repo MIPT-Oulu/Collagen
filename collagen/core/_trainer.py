@@ -33,8 +33,8 @@ class Trainer(object):
     """
     def __init__(self, data_provider: DataProvider,
                  train_loader_names: str or Tuple[str] or None,
-                 val_loader_names:  str or Tuple[str] or None,
                  session: Session,
+                 val_loader_names: str or Tuple[str] = None,
                  train_callbacks: Tuple[Callback] or Callback = None,
                  val_callbacks: Tuple[Callback] or Callback = None):
 

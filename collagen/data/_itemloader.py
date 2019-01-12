@@ -138,3 +138,18 @@ class GANFakeSampler(ItemLoader):
         return 1
 
 
+class GaussianNoiseSampler(ItemLoader):
+    def __init__(self, batch_size, latent_size):
+        super(GaussianNoiseSampler, self).__init__(meta_data=None, parse_item_cb=None)
+        self.__latent_size = latent_size
+        self.__batch_size = batch_size
+
+    def sample(self, k=1):
+        samples = []
+        for _ in range(k):
+            noise = torch.randn(self.__batch_size, self.__latent_size)
+            samples.append({'latent': noise, 'target': torch.zeros(self.__batch_size)})
+        return samples
+
+    def __len__(self):
+        return 1

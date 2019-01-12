@@ -105,6 +105,12 @@ def to_cpu(x: torch.Tensor or torch.cuda.FloatTensor, use_numpy=True):
 
     return x_cpu
 
+def unify_tuple(x):
+    if not isinstance(x, tuple):
+        return (x, )
+    else:
+        return x
+
 def cast_tensor(x, to='float'):
     if to is None:
         return x
