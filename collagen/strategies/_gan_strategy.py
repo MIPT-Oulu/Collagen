@@ -124,76 +124,76 @@ class GANStrategy(object):
         for cb in self.__generator["callbacks"]:
             cb.on_epoch_begin(epoch=epoch,
                               stage="generate",
-                              data_provider=self.__data_provider,
-                              data_key=self.__data_key,
-                              target_key=self.__target_key,
-                              session=self.__session)
+                              data_provider=self.__generator["data_provider"],
+                              data_key=self.__generator["data_key"],
+                              target_key=self.__generator["target_key"],
+                              session=self.__generator["session"])
 
         for cb in self.__discriminator["callbacks"]:
             cb.on_epoch_begin(epoch=epoch,
                               stage="discriminate",
-                              data_provider=self.__data_provider,
-                              data_key=self.__data_key,
-                              target_key=self.__target_key,
-                              session=self.__session)
+                              data_provider=self.__discriminator["data_provider"],
+                              data_key=self.__discriminator["data_key"],
+                              target_key=self.__discriminator["target_key"],
+                              session=self.__discriminator["session"])
 
     def _on_epoch_end_callbacks(self, epoch):
         for cb in self.__generator["callbacks"]:
             cb.on_epoch_end(stage="generate",
-                            data_provider=self.__data_provider,
-                            data_key=self.__data_key,
-                            target_key=self.__target_key,
-                            session=self.__session)
+                            data_provider=self.__generator["data_provider"],
+                            data_key=self.__generator["data_key"],
+                            target_key=self.__generator["target_key"],
+                            session=self.__generator["session"])
 
         for cb in self.__discriminator["callbacks"]:
             cb.on_epoch_end(stage="discriminate",
-                            data_provider=self.__data_provider,
-                            data_key=self.__data_key,
-                            target_key=self.__target_key,
-                            session=self.__session)
+                            data_provider=self.__discriminator["data_provider"],
+                            data_key=self.__discriminator["data_key"],
+                            target_key=self.__discriminator["target_key"],
+                            session=self.__discriminator["session"])
 
     def _on_sample_begin_callbacks(self, epoch, stage, batch_i):
         for cb in self.__discriminator["callbacks"]:
             cb.on_sample_begin(epoch=epoch,
                                stage=stage,
                                batch_index=batch_i,
-                               data_provider=self.__data_provider,
-                               data_key=self.__data_key,
-                               target_key=self.__target_key,
-                               session=self.__session)
+                               data_provider=self.__discriminator["data_provider"],
+                               data_key=self.__discriminator["data_key"],
+                               target_key=self.__discriminator["target_key"],
+                               session=self.__discriminator["session"])
         for cb in self.__generator["callbacks"]:
             cb.on_sample_begin(epoch=epoch,
                                stage=stage,
                                batch_index=batch_i,
-                               data_provider=self.__data_provider,
-                               data_key=self.__data_key,
-                               target_key=self.__target_key,
-                               session=self.__session)
+                               data_provider=self.__generator["data_provider"],
+                               data_key=self.__generator["data_key"],
+                               target_key=self.__generator["target_key"],
+                               session=self.__generator["session"])
 
     def _on_sample_end_callbacks(self,epoch, stage, batch_i):
         for cb in self.__discriminator["callbacks"]:
             cb.on_sample_end(epoch=epoch,
                              stage=stage,
                              batch_index=batch_i,
-                             data_provider=self.__data_provider,
-                             data_key=self.__data_key,
-                             target_key=self.__target_key,
-                             session=self.__session)
+                             data_provider=self.__discriminator["data_provider"],
+                             data_key=self.__discriminator["data_key"],
+                             target_key=self.__discriminator["target_key"],
+                             session=self.__discriminator["session"])
 
         for cb in self.__generator["callbacks"]:
             cb.on_sample_end(epoch=epoch,
                              stage=stage,
                              batch_index=batch_i,
-                             data_provider=self.__data_provider,
-                             data_key=self.__data_key,
-                             target_key=self.__target_key,
-                             session=self.__session)
+                             data_provider=self.__generator["data_provider"],
+                             data_key=self.__generator["data_key"],
+                             target_key=self.__generator["target_key"],
+                             session=self.__generator["session"])
 
     def run(self):
         stage = "train"
         for epoch in range(self.__n_epochs):
             self._on_epoch_begin_callbacks(epoch=epoch)
-            for batch_i in tqdm(range(self.__num_batches), total=self.__num_batches, desc=f'Epoch [{epoch}] ::'):
+            for batch_i in tqdm(range(self.__num_batches), total=self.__num_batches, desc=f'Epoch [{epoch}] ::'): #range(self.__num_batches):
                 self._on_sample_begin_callbacks(epoch=epoch, stage="train", batch_i=batch_i)
                 self.__generator["data_provider"].sample(**self.__generator["sampling_kwargs"])
                 self.__discriminator["data_provider"].sample(**self.__discriminator["sampling_kwargs"])

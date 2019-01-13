@@ -5,7 +5,8 @@ from tqdm import tqdm
 
 from collagen.data import DataProvider, ItemLoader, GANFakeSampler, GaussianNoiseSampler
 from collagen.core import Session
-from collagen.strategies import Strategy, GANStrategy
+from collagen.strategies import GANStrategy
+from collagen.metrics import RunningAverageMeter, AccuracyMeter, AccuracyThresholdMeter
 from collagen.data.utils import get_mnist
 from examples.dcgan.ex_utils import init_args, parse_item_mnist_gan, init_mnist_transforms
 from examples.dcgan.ex_utils import Discriminator, Generator
@@ -62,6 +63,8 @@ if __name__ == "__main__":
     d_data_provider = DataProvider(d_item_loaders)
 
     # Callbacks
+    g_callbacks = (RunningAverageMeter(), )
+    d_callbacks = (RunningAverageMeter(), AccuracyThresholdMeter(threshold=0.5, sigmoid=False))
 
     # Strategy
     dcgan = GANStrategy(g_data_provider=g_data_provider, d_data_provider=d_data_provider,
@@ -72,7 +75,8 @@ if __name__ == "__main__":
                         g_data_key=('data'), d_data_key=('data'),
                         g_target_key=('target'), d_target_key=('target'),
                         g_num_samples=(1), d_num_samples=(1, 1),
-                        # g_callbacks=None, d_callbacks=None,
+                        g_callbacks=g_callbacks, d_callbacks=d_callbacks,
                         n_epochs=args.n_epochs, device=args.device)
 
     dcgan.run()
+

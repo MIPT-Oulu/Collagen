@@ -103,8 +103,11 @@ class Trainer(object):
             for i in range(n_iter - 1):
                 batch = cur_loader_state["samples"][i]
                 for cb in self.__train_callbacks:
-                    cb.on_batch_begin(loader_name=loader_name, batches_count=self.__train_batches_count, batch=batch,
-                                      data_key=data_key, target_key=target_key,
+                    cb.on_batch_begin(loader_name=loader_name,
+                                      batches_count=self.__train_batches_count,
+                                      batch=batch,
+                                      data_key=data_key,
+                                      target_key=target_key,
                                       session=self.__session)
 
                 train_result = self.__session.train_step(tuple([batch[key_i] for key_i in data_key]),
@@ -124,19 +127,23 @@ class Trainer(object):
             for cb in self.__train_callbacks:
                 cb.on_batch_begin(batch)
 
-            loss, train_result = self.__session.train_step(tuple([batch[key_i] for key_i in data_key]),
-                                                           tuple([cast_tensor(batch[key_i], cast_target)
-                                                                  for key_i in target_key]),
+            input = tuple([batch[key_i] for key_i in data_key])
+            target = tuple([cast_tensor(batch[key_i], cast_target) for key_i in target_key])
+
+            loss, train_result = self.__session.train_step(input,
+                                                           target,
                                                            accumulate_grad=accumulate_grad,
                                                            return_out=True,
                                                            callbacks=self.__train_callbacks)
             self.__train_batches_count += 1
+            # TODO: support tuple of inputs and targets
             for cb in self.__train_callbacks:
                 cb.on_batch_end(loader_name=loader_name,
                                 batches_count=self.__train_batches_count,
                                 loss=loss,
+                                input=input[0],
                                 output=train_result,
-                                input=batch,
+                                target=target[0],
                                 data_key=data_key,
                                 target_key=target_key,
                                 session=self.__session)
