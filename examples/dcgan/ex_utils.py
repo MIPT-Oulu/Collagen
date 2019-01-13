@@ -102,7 +102,9 @@ class Generator(nn.Module):
         self.apply(weights_init)
 
     def forward(self, x):
-        assert len(x.size()) == 2
+        if len(x.size()) != 2:
+            raise ValueError("Input must have 2 dim but found {}".format(x.shape))
+
         o1 = self.layer1(x.view(x.size(0), x.size(1), 1, 1))
         o2 = self.layer2(o1)
         o3 = self.layer3(o2)
@@ -112,7 +114,7 @@ class Generator(nn.Module):
 
 def parse_item_mnist_gan(root, entry, trf):
     img, target = trf((entry.img, entry.target))
-    return {'img': img, 'target': 1, 'class': target}
+    return {'data': img, 'target': np.float32(1.0), 'class': target}
 
 
 def init_args():
@@ -130,7 +132,7 @@ def init_args():
     parser.add_argument('--num_threads', type=int, default=0, help='Number of threads for data loader')
     parser.add_argument('--save_data', default='data', help='Where to save downloaded dataset')
     parser.add_argument('--seed', type=int, default=12345, help='Random seed')
-    parser.add_argument('--device', type=str, default="cpu", help='Use `cuda` or `cpu`')
+    parser.add_argument('--device', type=str, default="cuda", help='Use `cuda` or `cpu`')
     args = parser.parse_args()
 
     torch.manual_seed(args.seed)

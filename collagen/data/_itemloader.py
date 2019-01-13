@@ -129,8 +129,9 @@ class GANFakeSampler(ItemLoader):
         samples = []
         for _ in range(k):
             noise = torch.randn(self.__batch_size, self.__latent_size)
-            fake: torch.Tensor = self.__g_network(noise)
-            samples.append({'img': fake, 'target': torch.zeros(self.__batch_size).to(fake.device), 'latent': noise})
+            noise_on_device = noise.to(next(self.__g_network.parameters()).device)
+            fake: torch.Tensor = self.__g_network(noise_on_device)
+            samples.append({'data': fake, 'target': torch.zeros(self.__batch_size).to(fake.device), 'latent': noise})
 
         return samples
 
@@ -148,7 +149,7 @@ class GaussianNoiseSampler(ItemLoader):
         samples = []
         for _ in range(k):
             noise = torch.randn(self.__batch_size, self.__latent_size)
-            samples.append({'latent': noise, 'target': torch.zeros(self.__batch_size)})
+            samples.append({'data': noise, 'target': torch.zeros(self.__batch_size)})
         return samples
 
     def __len__(self):

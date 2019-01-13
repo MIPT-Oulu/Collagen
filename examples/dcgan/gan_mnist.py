@@ -7,8 +7,8 @@ from collagen.data import DataProvider, ItemLoader, GANFakeSampler, GaussianNois
 from collagen.core import Session
 from collagen.strategies import Strategy, GANStrategy
 from collagen.data.utils import get_mnist
-from ex_utils import init_args, parse_item_mnist_gan, init_mnist_transforms
-from ex_utils import Discriminator, Generator
+from examples.dcgan.ex_utils import init_args, parse_item_mnist_gan, init_mnist_transforms
+from examples.dcgan.ex_utils import Discriminator, Generator
 
 # from . import init_args, parse_item_mnist_gan, init_mnist_transforms
 # from . import Discriminator, Generator
@@ -31,6 +31,7 @@ class GeneratorLoss(torch.nn.Module):
 if __name__ == "__main__":
     args = init_args()
 
+    # Data
     train_ds, classes = get_mnist(data_folder=args.save_data, train=True)
 
     # Initializing Discriminator
@@ -43,9 +44,7 @@ if __name__ == "__main__":
     g_optim = optim.Adam(g_network.parameters(), lr=args.g_lr, weight_decay=args.g_wd, betas=(args.beta1, 0.999))
     g_crit = GeneratorLoss(d_network=d_network, d_loss=d_crit)
 
-    d_session = Session(module=d_network, optimizer=d_optim, loss=d_crit)
-    g_session = Session(module=g_network, optimizer=g_optim, loss=g_crit)
-
+    # Data provider
     d_item_loaders = dict()
     g_item_loaders = dict()
     g_item_loaders['fake'] = GaussianNoiseSampler(batch_size=args.bs, latent_size=args.latent_size)
@@ -61,13 +60,17 @@ if __name__ == "__main__":
 
     g_data_provider = DataProvider(g_item_loaders)
     d_data_provider = DataProvider(d_item_loaders)
+
+    # Callbacks
+
+    # Strategy
     dcgan = GANStrategy(g_data_provider=g_data_provider, d_data_provider=d_data_provider,
                         g_loader_names=('fake'), d_loader_names=('real', 'fake'),
                         g_criterion=g_crit, d_criterion=d_crit,
-                        g_model=g_network, d_model=g_network,
+                        g_model=g_network, d_model=d_network,
                         g_optimizer=g_optim, d_optimizer=d_optim,
-                        g_data_key=('img'), d_data_key=('img', ''),
-                        g_target_key=('img'), d_target_key=(),
+                        g_data_key=('data'), d_data_key=('data'),
+                        g_target_key=('target'), d_target_key=('target'),
                         g_num_samples=(1), d_num_samples=(1, 1),
                         # g_callbacks=None, d_callbacks=None,
                         n_epochs=args.n_epochs, device=args.device)

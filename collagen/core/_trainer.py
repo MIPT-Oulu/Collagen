@@ -31,6 +31,7 @@ class Trainer(object):
         learning rate schedulers (E.g. reduce on plateau-like things). On the other hand,
          the callbacks can also be meters batch-wise, which compute metrics.
     """
+
     def __init__(self, data_provider: DataProvider,
                  train_loader_names: str or Tuple[str] or None,
                  session: Session,
@@ -48,20 +49,20 @@ class Trainer(object):
 
         self.__train_loader_names: str or Tuple[str] = train_loader_names
         if isinstance(self.__train_loader_names, str):
-            self.__train_loader_names = (self.__train_loader_names, )
+            self.__train_loader_names = (self.__train_loader_names,)
 
         self.__val_loader_names: str or Tuple[str] = val_loader_names
         if isinstance(self.__val_loader_names, str):
-            self.__val_loader_names = (self.__val_loader_names, )
+            self.__val_loader_names = (self.__val_loader_names,)
 
         self.__train_callbacks: Tuple[Callback] or Callback = train_callbacks
         self.__val_callbacks: Tuple[Callback] or Callback = val_callbacks
 
         if not isinstance(val_callbacks, tuple):
-            self.__val_callbacks: Tuple[Callback] or Callback = (val_callbacks, )
+            self.__val_callbacks: Tuple[Callback] or Callback = (val_callbacks,)
 
         if not isinstance(train_callbacks, tuple):
-            self.__train_callbacks: Tuple[Callback] = (train_callbacks, )
+            self.__train_callbacks: Tuple[Callback] = (train_callbacks,)
 
         self.__train_batches_count = 0
         self.__eval_batches_count = 0
@@ -88,18 +89,18 @@ class Trainer(object):
             Performs type casting for target
 
         """
-        for loader_name in self.__train_loader_names:
+        for ind, loader_name in enumerate(self.__train_loader_names):
             cur_loader_state = self.__data_provider.state_dict()[loader_name]
             n_iter = len(cur_loader_state["samples"])
 
             if isinstance(data_key, str):
-                data_key = (data_key, )
+                data_key = (data_key,)
 
             if isinstance(target_key, str):
-                target_key = (target_key, )
+                target_key = (target_key,)
 
             i = 0
-            for i in range(n_iter-1):
+            for i in range(n_iter - 1):
                 batch = cur_loader_state["samples"][i]
                 for cb in self.__train_callbacks:
                     cb.on_batch_begin(loader_name=loader_name, batches_count=self.__train_batches_count, batch=batch,
@@ -122,11 +123,13 @@ class Trainer(object):
             batch = cur_loader_state["samples"][i]
             for cb in self.__train_callbacks:
                 cb.on_batch_begin(batch)
+
             loss, train_result = self.__session.train_step(tuple([batch[key_i] for key_i in data_key]),
-                                                     tuple([cast_tensor(batch[key_i], cast_target)
-                                                            for key_i in target_key]),
-                                                     accumulate_grad=False,
-                                                     return_out=True, callbacks=self.__train_callbacks)
+                                                           tuple([cast_tensor(batch[key_i], cast_target)
+                                                                  for key_i in target_key]),
+                                                           accumulate_grad=accumulate_grad,
+                                                           return_out=True,
+                                                           callbacks=self.__train_callbacks)
             self.__train_batches_count += 1
             for cb in self.__train_callbacks:
                 cb.on_batch_end(loader_name=loader_name,
@@ -170,10 +173,10 @@ class Trainer(object):
                                  f"but found {n_iter}")
 
             if isinstance(data_key, str):
-                data_key = (data_key, )
+                data_key = (data_key,)
 
             if isinstance(target_key, str):
-                target_key = (target_key, )
+                target_key = (target_key,)
 
             batch = cur_loader_state["samples"][0]
 
@@ -192,7 +195,6 @@ class Trainer(object):
                                   input=batch,
                                   data_key=data_key, target_key=target_key,
                                   session=self.__session)
-
 
             loss, eval_result = self.__session.eval_step(input, target,
                                                          return_out=True,
