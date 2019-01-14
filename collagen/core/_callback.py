@@ -58,3 +58,6 @@ class Callback(object):
 
     def on_loss_end(self, *args, **kwargs):
         pass
+
+    def __str__(self):
+        return ""

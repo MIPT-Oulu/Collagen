@@ -1,18 +1,13 @@
 import torch
 from torch.nn import BCELoss
 from torch import optim
-from tqdm import tqdm
 
-from collagen.data import DataProvider, ItemLoader, GANFakeSampler, GaussianNoiseSampler
-from collagen.core import Session
+from collagen.data import DataProvider, ItemLoader, GANFakeSampler
 from collagen.strategies import GANStrategy
-from collagen.metrics import RunningAverageMeter, AccuracyMeter, AccuracyThresholdMeter
+from collagen.metrics import RunningAverageMeter, AccuracyThresholdMeter
 from collagen.data.utils import get_mnist
 from examples.dcgan.ex_utils import init_args, parse_item_mnist_gan, init_mnist_transforms
 from examples.dcgan.ex_utils import Discriminator, Generator
-
-# from . import init_args, parse_item_mnist_gan, init_mnist_transforms
-# from . import Discriminator, Generator
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -46,37 +41,34 @@ if __name__ == "__main__":
     g_crit = GeneratorLoss(d_network=d_network, d_loss=d_crit)
 
     # Data provider
-    d_item_loaders = dict()
-    g_item_loaders = dict()
-    g_item_loaders['fake'] = GaussianNoiseSampler(batch_size=args.bs, latent_size=args.latent_size)
+    item_loaders = dict()
 
-    d_item_loaders['real'] = ItemLoader(meta_data=train_ds,
-                                        transform=init_mnist_transforms()[1],
-                                        parse_item_cb=parse_item_mnist_gan,
-                                        batch_size=args.bs, num_workers=args.num_threads)
+    item_loaders['real'] = ItemLoader(meta_data=train_ds,
+                                      transform=init_mnist_transforms()[1],
+                                      parse_item_cb=parse_item_mnist_gan,
+                                      batch_size=args.bs, num_workers=args.num_threads)
 
-    d_item_loaders['fake'] = GANFakeSampler(g_network=g_network,
-                                            batch_size=args.bs,
-                                            latent_size=args.latent_size)
+    item_loaders['fake'] = GANFakeSampler(g_network=g_network,
+                                          batch_size=args.bs,
+                                          latent_size=args.latent_size)
 
-    g_data_provider = DataProvider(g_item_loaders)
-    d_data_provider = DataProvider(d_item_loaders)
+    data_provider = DataProvider(item_loaders)
 
     # Callbacks
-    g_callbacks = (RunningAverageMeter(), )
-    d_callbacks = (RunningAverageMeter(), AccuracyThresholdMeter(threshold=0.5, sigmoid=False))
+    g_callbacks = (RunningAverageMeter(prefix="g"),)
+    d_callbacks = (RunningAverageMeter(prefix="d"), AccuracyThresholdMeter(threshold=0.5, sigmoid=False, prefix="d", name="acc"))
 
     # Strategy
-    dcgan = GANStrategy(g_data_provider=g_data_provider, d_data_provider=d_data_provider,
+    num_samples_dict = {'real': 1, 'fake': 1}
+    dcgan = GANStrategy(data_provider=data_provider,
                         g_loader_names=('fake'), d_loader_names=('real', 'fake'),
                         g_criterion=g_crit, d_criterion=d_crit,
                         g_model=g_network, d_model=d_network,
                         g_optimizer=g_optim, d_optimizer=d_optim,
-                        g_data_key=('data'), d_data_key=('data'),
-                        g_target_key=('target'), d_target_key=('target'),
-                        g_num_samples=(1), d_num_samples=(1, 1),
+                        g_data_key='latent', d_data_key=('data', 'data'),
+                        g_target_key='target', d_target_key='target',
                         g_callbacks=g_callbacks, d_callbacks=d_callbacks,
-                        n_epochs=args.n_epochs, device=args.device)
+                        n_epochs=args.n_epochs, device=args.device,
+                        num_samples_dict=num_samples_dict)
 
     dcgan.run()
-

@@ -35,64 +35,58 @@ class GANStrategy(object):
         """
 
     def __init__(self,
-                 g_data_provider: DataProvider, d_data_provider: DataProvider,
+                 data_provider: DataProvider,
+                 num_samples_dict: dict,
                  g_loader_names: Tuple[str] or str, d_loader_names: Tuple[str] or str,
                  g_criterion: nn.Module, d_criterion: nn.Module,
                  g_model: Module, d_model: Module,
                  g_optimizer: Optimizer, d_optimizer: Optimizer,
                  g_data_key: str, d_data_key: str,
                  g_target_key: str = (), d_target_key: str = (),
-                 g_num_samples: Tuple[int] or int or None = (), d_num_samples: Tuple[int] or int or None = (),
                  g_callbacks: Tuple[Callback] or Callback = (),
                  d_callbacks: Tuple[Callback] or Callback = (),
                  n_epochs: int or None = 100,
                  device: str or None = "cuda"):
         self.__discriminator = dict()
-        self.__discriminator["data_provider"] = d_data_provider
+        self.__data_provider = data_provider
+        self.__num_samples_dict = num_samples_dict
+        self.__n_epochs = n_epochs
+
+        # Discriminator
         self.__discriminator["loader_names"] = unify_tuple(d_loader_names)
-        self.__discriminator["data_key"] = d_data_key
-        self.__discriminator["target_key"] = d_target_key
-        self.__discriminator["num_samples"] = unify_tuple(d_num_samples)
+        self.__discriminator["data_key"] = unify_tuple(d_data_key)
+        self.__discriminator["target_key"] = unify_tuple(d_target_key)
         self.__discriminator["criterion"] = d_criterion
         self.__discriminator["optimizer"] = d_optimizer
         self.__discriminator["model"] = d_model
         self.__discriminator["callbacks"] = d_callbacks
 
+        # Generator
         self.__generator = dict()
-        self.__generator["data_provider"] = g_data_provider
         self.__generator["loader_names"] = unify_tuple(g_loader_names)
-        self.__generator["data_key"] = g_data_key
-        self.__generator["target_key"] = g_target_key
-        self.__generator["num_samples"] = unify_tuple(g_num_samples)
+        self.__generator["data_key"] = unify_tuple(g_data_key)
+        self.__generator["target_key"] = unify_tuple(g_target_key)
         self.__generator["criterion"] = g_criterion
         self.__generator["optimizer"] = g_optimizer
         self.__generator["model"] = g_model
         self.__generator["callbacks"] = g_callbacks
 
-        self.__n_epochs = n_epochs
-
         # Discriminator
-        if len(self.__discriminator["loader_names"]) != len(self.__discriminator["num_samples"]):
+        if len(self.__discriminator["loader_names"]) != len(self.__discriminator["data_key"]):
             raise ValueError(
-                "In discriminator, the number of loaders and the number of sample quantities must be matched."
-                "({} vs {})".format(len(self.__discriminator["loader_names"]),
-                                    len(self.__discriminator["num_samples"])))
+                "In discriminator, the number of loaders and the number of data keys must be matched."
+                "({} vs {})".format(len(self.__discriminator["loader_names"]), len(self.__discriminator["data_key"])))
 
         # Generator
-        if len(self.__generator["loader_names"]) != len(self.__generator["num_samples"]):
+        if len(self.__generator["loader_names"]) != len(self.__generator["data_key"]):
             raise ValueError("In generator, the number of loaders and the number of sample quantities must be matched."
-                             "({} vs {})".format(len(self.__generator["loader_names"]),
-                                                 len(self.__generator["num_samples"])))
+                             "({} vs {})".format(len(self.__generator["loader_names"]), len(self.__generator["data_key"])))
 
-        self.__discriminator["sampling_kwargs"] = dict()
-        self.__generator["sampling_kwargs"] = dict()
         self.__num_batches = -1
-        for i, d_loader_name in enumerate(self.__discriminator["loader_names"]):
-            self.__num_batches = max(len(self.__discriminator["data_provider"].get_loader_by_name(d_loader_name)), self.__num_batches)
-            self.__discriminator["sampling_kwargs"][d_loader_name] = self.__discriminator["num_samples"][i]
 
-        for i, g_loader_name in enumerate(self.__generator["loader_names"]):
-            self.__generator["sampling_kwargs"][g_loader_name] = self.__generator["num_samples"][i]
+        # TODO: get union of dicriminator's and generator's loader names
+        for i, d_loader_name in enumerate(self.__discriminator["loader_names"]):
+            self.__num_batches = max(len(self.__data_provider.get_loader_by_name(d_loader_name)), self.__num_batches)
 
         self.__use_cuda = torch.cuda.is_available() and device == "cuda"
         self.__device = torch.device("cuda" if self.__use_cuda and torch.cuda.is_available() else "cpu")
@@ -110,12 +104,12 @@ class GANStrategy(object):
                                               optimizer=self.__generator["optimizer"],
                                               loss=self.__generator["criterion"])
 
-        self.__discriminator["trainer"] = Trainer(data_provider=self.__discriminator["data_provider"],
+        self.__discriminator["trainer"] = Trainer(data_provider=self.__data_provider,
                                                   train_loader_names=self.__discriminator["loader_names"],
                                                   session=self.__discriminator["session"],
                                                   train_callbacks=self.__discriminator["callbacks"])
 
-        self.__generator["trainer"] = Trainer(data_provider=self.__generator["data_provider"],
+        self.__generator["trainer"] = Trainer(data_provider=self.__data_provider,
                                               train_loader_names=self.__generator["loader_names"],
                                               session=self.__generator["session"],
                                               train_callbacks=self.__generator["callbacks"])
@@ -124,7 +118,7 @@ class GANStrategy(object):
         for cb in self.__generator["callbacks"]:
             cb.on_epoch_begin(epoch=epoch,
                               stage="generate",
-                              data_provider=self.__generator["data_provider"],
+                              data_provider=self.__data_provider,
                               data_key=self.__generator["data_key"],
                               target_key=self.__generator["target_key"],
                               session=self.__generator["session"])
@@ -132,7 +126,7 @@ class GANStrategy(object):
         for cb in self.__discriminator["callbacks"]:
             cb.on_epoch_begin(epoch=epoch,
                               stage="discriminate",
-                              data_provider=self.__discriminator["data_provider"],
+                              data_provider=self.__data_provider,
                               data_key=self.__discriminator["data_key"],
                               target_key=self.__discriminator["target_key"],
                               session=self.__discriminator["session"])
@@ -140,14 +134,18 @@ class GANStrategy(object):
     def _on_epoch_end_callbacks(self, epoch):
         for cb in self.__generator["callbacks"]:
             cb.on_epoch_end(stage="generate",
-                            data_provider=self.__generator["data_provider"],
+                            epoch=epoch,
+                            num_epochs=self.__n_epochs,
+                            data_provider=self.__data_provider,
                             data_key=self.__generator["data_key"],
                             target_key=self.__generator["target_key"],
                             session=self.__generator["session"])
 
         for cb in self.__discriminator["callbacks"]:
             cb.on_epoch_end(stage="discriminate",
-                            data_provider=self.__discriminator["data_provider"],
+                            epoch=epoch,
+                            num_epochs=self.__n_epochs,
+                            data_provider=self.__data_provider,
                             data_key=self.__discriminator["data_key"],
                             target_key=self.__discriminator["target_key"],
                             session=self.__discriminator["session"])
@@ -157,7 +155,7 @@ class GANStrategy(object):
             cb.on_sample_begin(epoch=epoch,
                                stage=stage,
                                batch_index=batch_i,
-                               data_provider=self.__discriminator["data_provider"],
+                               data_provider=self.__data_provider,
                                data_key=self.__discriminator["data_key"],
                                target_key=self.__discriminator["target_key"],
                                session=self.__discriminator["session"])
@@ -165,7 +163,7 @@ class GANStrategy(object):
             cb.on_sample_begin(epoch=epoch,
                                stage=stage,
                                batch_index=batch_i,
-                               data_provider=self.__generator["data_provider"],
+                               data_provider=self.__data_provider,
                                data_key=self.__generator["data_key"],
                                target_key=self.__generator["target_key"],
                                session=self.__generator["session"])
@@ -175,7 +173,7 @@ class GANStrategy(object):
             cb.on_sample_end(epoch=epoch,
                              stage=stage,
                              batch_index=batch_i,
-                             data_provider=self.__discriminator["data_provider"],
+                             data_provider=self.__data_provider,
                              data_key=self.__discriminator["data_key"],
                              target_key=self.__discriminator["target_key"],
                              session=self.__discriminator["session"])
@@ -184,7 +182,7 @@ class GANStrategy(object):
             cb.on_sample_end(epoch=epoch,
                              stage=stage,
                              batch_index=batch_i,
-                             data_provider=self.__generator["data_provider"],
+                             data_provider=self.__data_provider,
                              data_key=self.__generator["data_key"],
                              target_key=self.__generator["target_key"],
                              session=self.__generator["session"])
@@ -193,13 +191,18 @@ class GANStrategy(object):
         stage = "train"
         for epoch in range(self.__n_epochs):
             self._on_epoch_begin_callbacks(epoch=epoch)
-            for batch_i in tqdm(range(self.__num_batches), total=self.__num_batches, desc=f'Epoch [{epoch}] ::'): #range(self.__num_batches):
+            metrics_desc = ""
+            progress_bar = tqdm(range(self.__num_batches), total=self.__num_batches, desc=f'Epoch [{epoch}]::{metrics_desc}')
+            for batch_i in progress_bar:
                 self._on_sample_begin_callbacks(epoch=epoch, stage="train", batch_i=batch_i)
-                self.__generator["data_provider"].sample(**self.__generator["sampling_kwargs"])
-                self.__discriminator["data_provider"].sample(**self.__discriminator["sampling_kwargs"])
+                self.__data_provider.sample(**self.__num_samples_dict)
                 self._on_sample_end_callbacks(epoch=epoch, stage="train", batch_i=batch_i)
                 getattr(self.__generator["trainer"], stage)(data_key=self.__generator["data_key"],
                                                             target_key=self.__generator["target_key"])
                 getattr(self.__discriminator["trainer"], stage)(data_key=self.__discriminator["data_key"],
                                                                 target_key=self.__discriminator["target_key"])
+                list_metrics_desc = [str(cb) for cb in self.__generator["callbacks"]]
+                list_metrics_desc += [str(cb) for cb in self.__discriminator["callbacks"]]
+                metrics_desc = ", ".join(list_metrics_desc)
+                progress_bar.set_description(f'Epoch [{epoch}]::{metrics_desc}')
             self._on_epoch_end_callbacks(epoch=epoch)
