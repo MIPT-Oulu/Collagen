@@ -2,6 +2,7 @@ import torch
 from torch.nn import BCELoss
 from torch import optim
 
+from collagen.core import Callback, Session
 from collagen.data import DataProvider, ItemLoader, GANFakeSampler
 from collagen.strategies import GANStrategy
 from collagen.metrics import RunningAverageMeter, AccuracyThresholdMeter
@@ -22,6 +23,13 @@ class GeneratorLoss(torch.nn.Module):
         output = self.__d_network(img)
         loss = self.__d_loss(output, target)
         return loss
+
+class BackwardCallback(Callback):
+    def __init__(self, retain_graph=True, create_graph=False):
+        self.__retain_graph = retain_graph
+        self.__create_graph = create_graph
+    def on_backward_begin(self, session: Session, **kwargs):
+        session.set_backward_param(retain_graph=self.__retain_graph, create_graph=self.__create_graph)
 
 
 if __name__ == "__main__":
@@ -56,10 +64,12 @@ if __name__ == "__main__":
 
     # Callbacks
     g_callbacks = (RunningAverageMeter(prefix="g"),)
-    d_callbacks = (RunningAverageMeter(prefix="d"), AccuracyThresholdMeter(threshold=0.5, sigmoid=False, prefix="d", name="acc"))
+    d_callbacks = (RunningAverageMeter(prefix="d"),
+                   AccuracyThresholdMeter(threshold=0.5, sigmoid=False, prefix="d", name="acc"),
+                   BackwardCallback(retain_graph=True))
 
     # Strategy
-    num_samples_dict = {'real': 1, 'fake': 1}
+    num_samples_dict = {'real': 1, 'fake': 6}
     dcgan = GANStrategy(data_provider=data_provider,
                         g_loader_names=('fake'), d_loader_names=('real', 'fake'),
                         g_criterion=g_crit, d_criterion=d_crit,

@@ -31,6 +31,11 @@ class Session(object):
         self.__loss: torch.nn.Module = loss
         self.__kvs: KVS = KVS()
 
+        # Params of ``backward``
+        self.__retain_graph: bool or None = None
+        self.__create_graph: bool = False
+        self.__gradient = None
+
     @property
     def loss(self):
         return self.__loss
@@ -62,6 +67,11 @@ class Session(object):
             else:
                 if new_value[0] == group['name']:
                     group[param_name] = new_value[1]
+
+    def set_backward_param(self, gradient=None, retain_graph=None, create_graph=False):
+        self.__gradient = gradient
+        self.__retain_graph = retain_graph
+        self.__create_graph = create_graph
 
     def add_param_group(self, group_name: str):
         """Adds parameter group to the optimizer.
@@ -210,39 +220,35 @@ class Session(object):
 
             # Compute loss
             for cb in callbacks:
-                cb.on_loss_begin(module=self.__module,
+                cb.on_loss_begin(session=self,
                                  input=batch_on_device,
                                  target=target_on_device,
-                                 output=out,
-                                 optimizer=self.__optimizer,
-                                 criterion=self.__loss)
+                                 output=out)
 
             loss = self.__loss(out, target_on_device)
 
             for cb in callbacks:
-                cb.on_loss_end(module=self.__module,
+                cb.on_loss_end(session=self,
                                loss=loss,
                                input=batch_on_device,
                                target=target_on_device,
-                               output=out,
-                               optimizer=self.__optimizer,
-                               criterion=self.__loss)
+                               output=out)
 
             if with_backward:
                 # Backward
                 for cb in callbacks:
-                    cb.on_backward_begin(module=self.__module,
+                    cb.on_backward_begin(session=self,
                                          loss=loss,
                                          input=batch_on_device,
                                          target=target_on_device,
-                                         output=out,
-                                         optimizer=self.__optimizer,
-                                         criterion=self.__loss)
+                                         output=out)
 
-                loss.backward()
+                loss.backward(gradient=self.__gradient,
+                              retain_graph=self.__retain_graph,
+                              create_graph=self.__create_graph)
 
                 for cb in callbacks:
-                    cb.on_backward_end(module=self.__module,
+                    cb.on_backward_end(session=self,
                                        loss=loss,
                                        input=batch_on_device,
                                        target=target_on_device,

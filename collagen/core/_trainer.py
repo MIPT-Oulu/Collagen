@@ -110,16 +110,21 @@ class Trainer(object):
                                       target_key=target_key,
                                       session=self.__session)
 
-                train_result = self.__session.train_step(tuple([batch[key_i] for key_i in data_key[ind]]),
-                                                         tuple([cast_tensor(batch[key_i], cast_target)
-                                                                for key_i in target_key]),
+                input_data = batch[data_key[ind]]
+                target = tuple([cast_tensor(batch[key_i], cast_target) for key_i in target_key])
+                loss, train_result = self.__session.train_step(input_data,
+                                                         target,
                                                          accumulate_grad=accumulate_grad,
                                                          return_out=True, callbacks=self.__train_callbacks)
                 self.__train_batches_count += 1
 
                 for cb in self.__train_callbacks:
-                    cb.on_batch_end(loader_name=loader_name, batches_count=self.__train_batches_count,
-                                    result=train_result, batch=batch,
+                    cb.on_batch_end(loader_name=loader_name,
+                                    batches_count=self.__train_batches_count,
+                                    loss=loss,
+                                    input=input_data,
+                                    output=train_result,
+                                    target=target[0],
                                     data_key=data_key[ind],
                                     target_key=target_key,
                                     session=self.__session)
@@ -128,13 +133,12 @@ class Trainer(object):
             for cb in self.__train_callbacks:
                 cb.on_batch_begin(batch)
 
-            # input = tuple([batch[key_i] for key_i in data_key[ind]])
-            input = batch[data_key[ind]]
+            input_data = batch[data_key[ind]]
             target = tuple([cast_tensor(batch[key_i], cast_target) for key_i in target_key])
             # target = cast_tensor(batch[key_i], cast_target)
-            loss, train_result = self.__session.train_step(input,
+            loss, train_result = self.__session.train_step(input_data,
                                                            target,
-                                                           accumulate_grad=accumulate_grad,
+                                                           accumulate_grad=False,
                                                            return_out=True,
                                                            callbacks=self.__train_callbacks)
             self.__train_batches_count += 1
@@ -143,7 +147,7 @@ class Trainer(object):
                 cb.on_batch_end(loader_name=loader_name,
                                 batches_count=self.__train_batches_count,
                                 loss=loss,
-                                input=input,
+                                input=input_data,
                                 output=train_result,
                                 target=target[0],
                                 data_key=data_key[ind],
