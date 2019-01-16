@@ -1,6 +1,6 @@
 from collagen.core import Callback, Trainer, Session, Module
 from collagen.data import DataProvider
-from collagen.data.utils import unify_tuple
+from collagen.data.utils import to_tuple
 import torch.nn as nn
 from torch.optim import Optimizer
 import pandas as pd
@@ -45,31 +45,35 @@ class GANStrategy(object):
                  g_target_key: str = (), d_target_key: str = (),
                  g_callbacks: Tuple[Callback] or Callback = (),
                  d_callbacks: Tuple[Callback] or Callback = (),
+                 callbacks: Tuple[Callback] or Callback = (),
                  n_epochs: int or None = 100,
                  device: str or None = "cuda"):
-        self.__discriminator = dict()
+
         self.__data_provider = data_provider
         self.__num_samples_dict = num_samples_dict
         self.__n_epochs = n_epochs
+        self.__callbacks = to_tuple(callbacks)
+        self.__progress_desc = ""
 
         # Discriminator
-        self.__discriminator["loader_names"] = unify_tuple(d_loader_names)
-        self.__discriminator["data_key"] = unify_tuple(d_data_key)
-        self.__discriminator["target_key"] = unify_tuple(d_target_key)
+        self.__discriminator = dict()
+        self.__discriminator["loader_names"] = to_tuple(d_loader_names)
+        self.__discriminator["data_key"] = to_tuple(d_data_key)
+        self.__discriminator["target_key"] = to_tuple(d_target_key)
         self.__discriminator["criterion"] = d_criterion
         self.__discriminator["optimizer"] = d_optimizer
         self.__discriminator["model"] = d_model
-        self.__discriminator["callbacks"] = d_callbacks
+        self.__discriminator["callbacks"] = to_tuple(d_callbacks)
 
         # Generator
         self.__generator = dict()
-        self.__generator["loader_names"] = unify_tuple(g_loader_names)
-        self.__generator["data_key"] = unify_tuple(g_data_key)
-        self.__generator["target_key"] = unify_tuple(g_target_key)
+        self.__generator["loader_names"] = to_tuple(g_loader_names)
+        self.__generator["data_key"] = to_tuple(g_data_key)
+        self.__generator["target_key"] = to_tuple(g_target_key)
         self.__generator["criterion"] = g_criterion
         self.__generator["optimizer"] = g_optimizer
         self.__generator["model"] = g_model
-        self.__generator["callbacks"] = g_callbacks
+        self.__generator["callbacks"] = to_tuple(g_callbacks)
 
         # Discriminator
         if len(self.__discriminator["loader_names"]) != len(self.__discriminator["data_key"]):
@@ -80,7 +84,8 @@ class GANStrategy(object):
         # Generator
         if len(self.__generator["loader_names"]) != len(self.__generator["data_key"]):
             raise ValueError("In generator, the number of loaders and the number of sample quantities must be matched."
-                             "({} vs {})".format(len(self.__generator["loader_names"]), len(self.__generator["data_key"])))
+                             "({} vs {})".format(len(self.__generator["loader_names"]),
+                                                 len(self.__generator["data_key"])))
 
         self.__num_batches = -1
 
@@ -113,6 +118,9 @@ class GANStrategy(object):
                                               train_loader_names=self.__generator["loader_names"],
                                               session=self.__generator["session"],
                                               train_callbacks=self.__generator["callbacks"])
+
+    def set_progress_desc(self, desc):
+        self.__progress_desc = desc
 
     def _on_epoch_begin_callbacks(self, epoch):
         for cb in self.__generator["callbacks"]:
@@ -168,7 +176,7 @@ class GANStrategy(object):
                                target_key=self.__generator["target_key"],
                                session=self.__generator["session"])
 
-    def _on_sample_end_callbacks(self,epoch, stage, batch_i):
+    def _on_sample_end_callbacks(self, epoch, stage, batch_i):
         for cb in self.__discriminator["callbacks"]:
             cb.on_sample_end(epoch=epoch,
                              stage=stage,
@@ -187,13 +195,59 @@ class GANStrategy(object):
                              target_key=self.__generator["target_key"],
                              session=self.__generator["session"])
 
+    def _on_batch_begin_strategy_callbacks(self, progress_bar: tqdm, epoch: int, stage: str, batch_i: int,
+                                           trainer_cbs: Tuple[Callback] or Callback):
+        for cb in self.__callbacks:
+            cb.on_batch_end(strategy=self,
+                            progress_bar=progress_bar,
+                            epoch=epoch,
+                            stage=stage,
+                            batch_i=batch_i,
+                            callbacks=trainer_cbs)
+
+    def _on_batch_end_strategy_callbacks(self, progress_bar: tqdm, epoch: int, stage: str, batch_i: int,
+                                         trainer_cbs: Tuple[Callback] or Callback):
+        for cb in self.__callbacks:
+            cb.on_batch_end(strategy=self,
+                            progress_bar=progress_bar,
+                            epoch=epoch,
+                            stage=stage,
+                            batch_i=batch_i,
+                            callbacks=trainer_cbs)
+
+    def _on_epoch_begin_strategy_callbacks(self, epoch, stage, trainer_cbs):
+        for cb in self.__callbacks:
+            cb.on_epoch_begin(strategy=self,
+                              epoch=epoch,
+                              stage=stage,
+                              callbacks=trainer_cbs)
+
+    def _on_epoch_end_strategy_callbacks(self, epoch, stage, trainer_cbs):
+        for cb in self.__callbacks:
+            cb.on_epoch_end(strategy=self,
+                            epoch=epoch,
+                            stage=stage,
+                            num_epochs=self.__n_epochs,
+                            callbacks=trainer_cbs)
+
     def run(self):
         stage = "train"
         for epoch in range(self.__n_epochs):
             self._on_epoch_begin_callbacks(epoch=epoch)
+            self._on_epoch_begin_strategy_callbacks(epoch=epoch,
+                                                  stage="train",
+                                                  trainer_cbs=self.__discriminator["callbacks"] + self.__generator[
+                                                      "callbacks"])
             metrics_desc = ""
-            progress_bar = tqdm(range(self.__num_batches), total=self.__num_batches, desc=f'Epoch [{epoch}]::{metrics_desc}')
+            progress_bar = tqdm(range(self.__num_batches), total=self.__num_batches,
+                                desc=f'Epoch [{epoch}]::{metrics_desc}')
             for batch_i in progress_bar:
+                self._on_batch_begin_strategy_callbacks(progress_bar=progress_bar,
+                                                      epoch=epoch,
+                                                      stage="train",
+                                                      batch_i=batch_i,
+                                                      trainer_cbs=self.__discriminator["callbacks"] + self.__generator[
+                                                                                                                                                              "callbacks"])
                 self._on_sample_begin_callbacks(epoch=epoch, stage="train", batch_i=batch_i)
                 self.__data_provider.sample(**self.__num_samples_dict)
                 self._on_sample_end_callbacks(epoch=epoch, stage="train", batch_i=batch_i)
@@ -201,8 +255,16 @@ class GANStrategy(object):
                                                             target_key=self.__generator["target_key"])
                 getattr(self.__discriminator["trainer"], stage)(data_key=self.__discriminator["data_key"],
                                                                 target_key=self.__discriminator["target_key"])
-                list_metrics_desc = [str(cb) for cb in self.__generator["callbacks"]]
-                list_metrics_desc += [str(cb) for cb in self.__discriminator["callbacks"]]
-                metrics_desc = ", ".join(list_metrics_desc)
-                progress_bar.set_description(f'Epoch [{epoch}]::{metrics_desc}')
+                self._on_batch_end_strategy_callbacks(progress_bar=progress_bar,
+                                                      epoch=epoch,
+                                                      stage="train",
+                                                      batch_i=batch_i,
+                                                      trainer_cbs=self.__discriminator["callbacks"] + self.__generator[
+                                                          "callbacks"])
+
+                progress_bar.set_description(f'Epoch [{epoch}]::{self.__progress_desc}')
             self._on_epoch_end_callbacks(epoch=epoch)
+            self._on_epoch_end_strategy_callbacks(epoch=epoch,
+                                                  stage="train",
+                                                  trainer_cbs=self.__discriminator["callbacks"] + self.__generator[
+                                                      "callbacks"])

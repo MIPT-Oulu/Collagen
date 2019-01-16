@@ -1,6 +1,7 @@
 import copy
 import torch
 
+
 class ApplyTransform(object):
     """Applies a callable transform to certain objects in iterable using given indices.
 
@@ -12,10 +13,11 @@ class ApplyTransform(object):
         Index or set of indices, where the transform will be applied.
 
     """
-    def __init__(self, transform: callable, idx: int  or tuple or list = 0):
+
+    def __init__(self, transform: callable, idx: int or tuple or list = 0):
         self.__transform: callable = transform
         if isinstance(idx, int):
-            idx = (idx, )
+            idx = (idx,)
         self.__idx: int or tuple or list = idx
 
     def __call__(self, items):
@@ -95,21 +97,24 @@ class Compose(object):
 def to_cpu(x: torch.Tensor or torch.cuda.FloatTensor, use_numpy=True):
     x_cpu = x
 
-    if x.is_cuda:
-        if use_numpy:
-            x_cpu = x.cpu().data.numpy()
-        else:
-            x_cpu = x.cpu().data
-    elif use_numpy:
-        x_cpu = x.numpy()
+    if isinstance(x, torch.Tensor):
+        if x.is_cuda:
+            if use_numpy:
+                x_cpu = x.cpu().data.numpy()
+            else:
+                x_cpu = x.cpu().data
+        elif use_numpy:
+            x_cpu = x.numpy()
 
     return x_cpu
 
-def unify_tuple(x):
+
+def to_tuple(x):
     if not isinstance(x, tuple):
-        return (x, )
+        return (x,)
     else:
         return x
+
 
 def cast_tensor(x, to='float'):
     if to is None:

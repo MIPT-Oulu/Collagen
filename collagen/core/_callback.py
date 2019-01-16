@@ -1,6 +1,10 @@
 class Callback(object):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, type = None, *args, **kwargs):
+        self.__type = type
         self.state_dict = {}
+
+    def get_type(self):
+        return self.__type
 
     def on_epoch_begin(self, *args, **kwargs):
         pass

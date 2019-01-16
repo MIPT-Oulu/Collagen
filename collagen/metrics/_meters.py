@@ -4,6 +4,7 @@ from collagen.data.utils import to_cpu
 
 class Meter(Callback):
     def __init__(self, name: str = "unknown", prefix: str = ""):
+        super().__init__(type="meter")
         self.__name = name
         self.__prefix = prefix
         self.__metric = -1.0
@@ -18,7 +19,7 @@ class Meter(Callback):
 
 class RunningAverageMeter(Meter):
     def __init__(self, name: str = "loss", prefix=""):
-        super(RunningAverageMeter, self).__init__(name=name, prefix=prefix)
+        super().__init__(name=name, prefix=prefix)
         self.__name = name
         self.__value = 0
         self.__count = 0
@@ -44,7 +45,7 @@ class RunningAverageMeter(Meter):
 
 class AccuracyMeter(Meter):
     def __init__(self, name: str = "categorical_accuracy", prefix=""):
-        super(AccuracyMeter, self).__init__(name=name, prefix=prefix)
+        super().__init__(name=name, prefix=prefix)
         self.__name = name
         self.__data_count = 0.0
         self.__correct_count = 0.0
@@ -84,7 +85,7 @@ class AccuracyMeter(Meter):
 
 class AccuracyThresholdMeter(Meter):
     def __init__(self, name: str = "binary_accuracy", threshold:float = 0.5, sigmoid:bool = False, prefix=""):
-        super(AccuracyThresholdMeter, self).__init__(name=name, prefix=prefix)
+        super().__init__(name=name, prefix=prefix)
         self.__name: str = name
         self.__threshold:int = threshold
         self.__sigmoid:bool = sigmoid
