@@ -21,7 +21,7 @@ class GeneratorLoss(torch.nn.Module):
 
     def forward(self, img: torch.Tensor, target: torch.Tensor):
         output = self.__d_network(img)
-        loss = self.__d_loss(output, target)
+        loss = self.__d_loss(output, 1 - target)
         return loss
 
 class BackwardCallback(Callback):
