@@ -1,4 +1,4 @@
-from ..core import Callback
+from collagen.core import Callback
 from collagen.data.utils import to_cpu
 
 
@@ -13,8 +13,12 @@ class Meter(Callback):
         return None
 
     def __str__(self):
-        prefix = self.__prefix + ("_" if self.__prefix else "")
-        return "{0}{1}: {2:.3f}".format(prefix, self.__name, self.current())
+        name = self.get_name()
+        value = self.current()
+        return "{0}: {1:.3f}".format(name, value)
+
+    def get_name(self):
+        return self.__prefix + ("/" if self.__prefix else "") + self.__name
 
 
 class RunningAverageMeter(Meter):

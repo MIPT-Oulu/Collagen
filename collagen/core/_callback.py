@@ -6,6 +6,9 @@ class Callback(object):
     def get_type(self):
         return self.__type
 
+    def get_name(self):
+        pass
+
     def on_epoch_begin(self, *args, **kwargs):
         pass
 
@@ -61,6 +64,18 @@ class Callback(object):
         pass
 
     def on_loss_end(self, *args, **kwargs):
+        pass
+
+    def on_train_begin(self, *args, **kwargs):
+        pass
+
+    def on_train_end(self, *args, **kwargs):
+        pass
+
+    def on_test_begin(self, *args, **kwargs):
+        pass
+
+    def on_test_end(self, *args, **kwargs):
         pass
 
     def __str__(self):

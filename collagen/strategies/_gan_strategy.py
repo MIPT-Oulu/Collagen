@@ -3,7 +3,6 @@ from collagen.data import DataProvider
 from collagen.data.utils import to_tuple
 import torch.nn as nn
 from torch.optim import Optimizer
-import pandas as pd
 from typing import Tuple
 import torch
 from tqdm import tqdm
@@ -53,7 +52,6 @@ class GANStrategy(object):
         self.__num_samples_dict = num_samples_dict
         self.__n_epochs = n_epochs
         self.__callbacks = to_tuple(callbacks)
-        self.__progress_desc = ""
 
         # Discriminator
         self.__discriminator = dict()
@@ -119,8 +117,6 @@ class GANStrategy(object):
                                               session=self.__generator["session"],
                                               train_callbacks=self.__generator["callbacks"])
 
-    def set_progress_desc(self, desc):
-        self.__progress_desc = desc
 
     def _on_epoch_begin_callbacks(self, epoch):
         for cb in self.__generator["callbacks"]:
@@ -238,16 +234,14 @@ class GANStrategy(object):
                                                   stage="train",
                                                   trainer_cbs=self.__discriminator["callbacks"] + self.__generator[
                                                       "callbacks"])
-            metrics_desc = ""
             progress_bar = tqdm(range(self.__num_batches), total=self.__num_batches,
-                                desc=f'Epoch [{epoch}]::{metrics_desc}')
+                                desc=f'Epoch [{epoch}]::')
             for batch_i in progress_bar:
                 self._on_batch_begin_strategy_callbacks(progress_bar=progress_bar,
                                                       epoch=epoch,
                                                       stage="train",
                                                       batch_i=batch_i,
-                                                      trainer_cbs=self.__discriminator["callbacks"] + self.__generator[
-                                                                                                                                                              "callbacks"])
+                                                      trainer_cbs=self.__discriminator["callbacks"] + self.__generator["callbacks"])
                 self._on_sample_begin_callbacks(epoch=epoch, stage="train", batch_i=batch_i)
                 self.__data_provider.sample(**self.__num_samples_dict)
                 self._on_sample_end_callbacks(epoch=epoch, stage="train", batch_i=batch_i)
@@ -259,10 +253,8 @@ class GANStrategy(object):
                                                       epoch=epoch,
                                                       stage="train",
                                                       batch_i=batch_i,
-                                                      trainer_cbs=self.__discriminator["callbacks"] + self.__generator[
-                                                          "callbacks"])
+                                                      trainer_cbs=self.__discriminator["callbacks"] + self.__generator["callbacks"])
 
-                progress_bar.set_description(f'Epoch [{epoch}]::{self.__progress_desc}')
             self._on_epoch_end_callbacks(epoch=epoch)
             self._on_epoch_end_strategy_callbacks(epoch=epoch,
                                                   stage="train",

@@ -1,3 +1,4 @@
+from collections import OrderedDict
 import tqdm
 import torch
 from torch.nn import BCELoss
@@ -8,6 +9,7 @@ from collagen.data import DataProvider, ItemLoader, GANFakeSampler
 from collagen.strategies import GANStrategy
 from collagen.metrics import RunningAverageMeter, AccuracyThresholdMeter
 from collagen.data.utils import get_mnist
+from collagen.logging import MeterLogging
 from examples.dcgan.ex_utils import init_args, parse_item_mnist_gan, init_mnist_transforms
 from examples.dcgan.ex_utils import Discriminator, Generator
 
@@ -52,11 +54,13 @@ class ProgressbarCallback(Callback):
         self.__count += 1
         if self._check_freq():
             list_metrics_desc = []
+            postfix_progress = OrderedDict()
             for cb in callbacks:
                 if cb.get_type() == "meter":
                     list_metrics_desc.append(str(cb))
-            metrics_desc = ", ".join(list_metrics_desc)
-            strategy.set_progress_desc(desc=metrics_desc)
+                    postfix_progress[cb.get_name()] = f'{cb.current():.03f}'
+
+            progress_bar.set_postfix(ordered_dict=postfix_progress, refresh=True)
 
 
 if __name__ == "__main__":
@@ -94,7 +98,8 @@ if __name__ == "__main__":
     d_callbacks = (RunningAverageMeter(prefix="d", name="loss"),
                    AccuracyThresholdMeter(threshold=0.5, sigmoid=False, prefix="d", name="acc"),
                    BackwardCallback(retain_graph=True))
-    st_callbacks = (ProgressbarCallback(update_freq=1),)
+    st_callbacks = (ProgressbarCallback(update_freq=1),
+                    MeterLogging())
 
     # Strategy
     num_samples_dict = {'real': 1, 'fake': 30}

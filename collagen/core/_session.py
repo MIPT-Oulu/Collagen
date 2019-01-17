@@ -1,7 +1,7 @@
 import torch
 
-from ..logging import KVS
-from ._model import Module
+from collagen.logging import KVS
+from collagen.core import Module
 
 
 from typing import Tuple, Any, List
