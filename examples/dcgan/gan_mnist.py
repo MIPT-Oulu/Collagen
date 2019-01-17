@@ -1,8 +1,11 @@
 from collections import OrderedDict
+from typing import Tuple
 import tqdm
 import torch
 from torch.nn import BCELoss
 from torch import optim
+from torchvision.utils import make_grid
+from tensorboardX import SummaryWriter
 
 from collagen.core import Callback, Session
 from collagen.data import DataProvider, ItemLoader, GANFakeSampler
@@ -63,6 +66,26 @@ class ProgressbarCallback(Callback):
             progress_bar.set_postfix(ordered_dict=postfix_progress, refresh=True)
 
 
+class GeneratorCallback(Callback):
+    def __init__(self, generator_sampler: GANFakeSampler, tag:str = "generated", log_dir:str = None, comment:str = "", grid_shape: Tuple[int] = (6,6)):
+        super().__init__(type="visualizer")
+        self.__generator_sampler = generator_sampler
+
+        if len(grid_shape) != 2:
+            raise ValueError("`grid_shape` must have 2 dim, but found {}".format(len(grid_shape)))
+
+        self.__writer = SummaryWriter(log_dir=log_dir, comment=comment)
+
+        self.__grid_shape = grid_shape
+        self.__num_images = grid_shape[0]*grid_shape[1]
+        self.__tag = tag
+
+    def on_epoch_end(self, *args, **kwargs):
+        images = self.__generator_sampler.sample(self.__num_images)
+        grid_images = make_grid(images, nrow=self.__grid_shape[0], padding=3)
+        self.__writer.add_images(self.__tag, img_tensor=grid_images, global_step=self.__epoch)
+
+
 if __name__ == "__main__":
     args = init_args()
 
@@ -99,7 +122,8 @@ if __name__ == "__main__":
                    AccuracyThresholdMeter(threshold=0.5, sigmoid=False, prefix="d", name="acc"),
                    BackwardCallback(retain_graph=True))
     st_callbacks = (ProgressbarCallback(update_freq=1),
-                    MeterLogging())
+                    MeterLogging(log_dir="runs/tbx", comment="dcgan"),
+                    GeneratorCallback(generator_sampler=g_network, log_dir="runs/tbx", grid_shape=(4,4)))
 
     # Strategy
     num_samples_dict = {'real': 1, 'fake': 30}

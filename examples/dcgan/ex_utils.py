@@ -120,7 +120,7 @@ def parse_item_mnist_gan(root, entry, trf):
 def init_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--n_epochs', type=int, default=10, help='Number of epochs')
-    parser.add_argument('--bs', type=int, default=32, help='Batch size')
+    parser.add_argument('--bs', type=int, default=256, help='Batch size')
     parser.add_argument('--d_lr', type=float, default=1e-4, help='Learning rate (Discriminator)')
     parser.add_argument('--d_wd', type=float, default=1e-4, help='Weight decay (Generator)')
     parser.add_argument('--g_lr', type=float, default=1e-4, help='Learning rate (Discriminator)')
