@@ -98,9 +98,9 @@ if __name__ == "__main__":
     d_crit = BCELoss().to(device)
 
     # Initializing Generator
-    g_network = Generator(nc=1, nz=args.latent_size, ngf=args.g_net_features)
+    g_network = Generator(nc=1, nz=args.latent_size, ngf=args.g_net_features).to(device)
     g_optim = optim.Adam(g_network.parameters(), lr=args.g_lr, weight_decay=args.g_wd, betas=(args.beta1, 0.999))
-    g_crit = GeneratorLoss(d_network=d_network, d_loss=d_crit)
+    g_crit = GeneratorLoss(d_network=d_network, d_loss=d_crit).to(device)
 
     # Data provider
     item_loaders = dict()
