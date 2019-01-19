@@ -90,8 +90,7 @@ class ProgressbarCallback(Callback):
 
 
 class GeneratorCallback(Callback):
-    def __init__(self, generator_sampler: SSGANFakeSampler, tag: str = "generated", log_dir: str = None,
-                 comment: str = "", grid_shape: Tuple[int] = (6, 6)):
+    def __init__(self, generator_sampler: SSGANFakeSampler, tag:str = "generated", log_dir:str = None, comment:str = "", grid_shape: Tuple[int] = (6,6)):
         super().__init__(type="visualizer")
         self.__generator_sampler = generator_sampler
 
@@ -101,13 +100,20 @@ class GeneratorCallback(Callback):
         self.__writer = SummaryWriter(log_dir=log_dir, comment=comment)
 
         self.__grid_shape = grid_shape
-        self.__num_images = grid_shape[0] * grid_shape[1]
+        self.__num_images = grid_shape[0]*grid_shape[1]
+        self.__num_batches = self.__num_images // self.__generator_sampler.batch_size + 1
         self.__tag = tag
 
-    def on_epoch_end(self, *args, **kwargs):
-        images = self.__generator_sampler.sample(self.__num_images)
-        grid_images = make_grid(images, nrow=self.__grid_shape[0], padding=3)
-        self.__writer.add_images(self.__tag, img_tensor=grid_images, global_step=self.__epoch)
+    def on_epoch_end(self, epoch, **kwargs):
+        sampled_data = self.__generator_sampler.sample(self.__num_batches)
+        images = []
+        for i, dt in enumerate(sampled_data):
+            if i < self.__num_images:
+                images += list(torch.unbind(dt["data"], dim=0))
+            else:
+                break
+        grid_images = make_grid(images, nrow=self.__grid_shape[0])
+        self.__writer.add_images(self.__tag, img_tensor=grid_images, global_step=epoch, dataformats='CHW')
 
 
 if __name__ == "__main__":

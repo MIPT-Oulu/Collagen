@@ -78,17 +78,24 @@ class GeneratorCallback(Callback):
 
         self.__grid_shape = grid_shape
         self.__num_images = grid_shape[0]*grid_shape[1]
+        self.__num_batches = self.__num_images // self.__generator_sampler.batch_size + 1
         self.__tag = tag
 
-    def on_epoch_end(self, *args, **kwargs):
-        images = self.__generator_sampler.sample(self.__num_images)
-        grid_images = make_grid(images, nrow=self.__grid_shape[0], padding=3)
-        self.__writer.add_images(self.__tag, img_tensor=grid_images, global_step=self.__epoch)
+    def on_epoch_end(self, epoch, **kwargs):
+        sampled_data = self.__generator_sampler.sample(self.__num_batches)
+        images = []
+        for i, dt in enumerate(sampled_data):
+            if i < self.__num_images:
+                images += list(torch.unbind(dt["data"], dim=0))
+            else:
+                break
+        grid_images = make_grid(images, nrow=self.__grid_shape[0])
+        self.__writer.add_images(self.__tag, img_tensor=grid_images, global_step=epoch, dataformats='CHW')
 
 
 if __name__ == "__main__":
     args = init_args()
-
+    log_dir = "runs/tbx"
     # Data
     train_ds, classes = get_mnist(data_folder=args.save_data, train=True)
 
@@ -98,9 +105,9 @@ if __name__ == "__main__":
     d_crit = BCELoss().to(device)
 
     # Initializing Generator
-    g_network = Generator(nc=1, nz=args.latent_size, ngf=args.g_net_features)
+    g_network = Generator(nc=1, nz=args.latent_size, ngf=args.g_net_features).to(device)
     g_optim = optim.Adam(g_network.parameters(), lr=args.g_lr, weight_decay=args.g_wd, betas=(args.beta1, 0.999))
-    g_crit = GeneratorLoss(d_network=d_network, d_loss=d_crit)
+    g_crit = GeneratorLoss(d_network=d_network, d_loss=d_crit).to(device)
 
     # Data provider
     item_loaders = dict()
@@ -122,8 +129,8 @@ if __name__ == "__main__":
                    AccuracyThresholdMeter(threshold=0.5, sigmoid=False, prefix="d", name="acc"),
                    BackwardCallback(retain_graph=True))
     st_callbacks = (ProgressbarCallback(update_freq=1),
-                    MeterLogging(log_dir="runs/tbx", comment="dcgan"),
-                    GeneratorCallback(generator_sampler=g_network, log_dir="runs/tbx", grid_shape=(4,4)))
+                    MeterLogging(log_dir=log_dir, comment="dcgan"),
+                    GeneratorCallback(generator_sampler=item_loaders['fake'], log_dir=log_dir, grid_shape=(4,4)))
 
     # Strategy
     num_samples_dict = {'real': 1, 'fake': 30}
