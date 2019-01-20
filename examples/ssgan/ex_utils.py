@@ -13,12 +13,18 @@ def wrap2solt(inp):
     img, label = inp
     return sld.DataContainer((img, label), 'IL')
 
-
 def unpack_solt(dc: sld.DataContainer):
     img, target = dc.data
-    img = torch.from_numpy(img).permute(2, 0, 1).float()
-    target = torch.cat((torch.ones([img.shape[0], 1]), target), dim=-1)
+    img, target = torch.from_numpy(img).permute(2, 0, 1).float(), target
     return img, np.float32(target)
+
+# def unpack_solt(dc: sld.DataContainer):
+#     img, target = dc.data
+#     img = torch.from_numpy(img).permute(2, 0, 1).float()
+#     valid = torch.ones([img.shape[0], 1], dtype=torch.float32)
+#     target = torch.zeros([img.shape[0], 10], dtype=torch.float32)
+#     ext_target = torch.cat((valid, target), dim=-1)
+#     return img, ext_target
 
 
 def init_mnist_transforms():
@@ -84,7 +90,7 @@ class Discriminator(Module):
         o3 = self.layer3(o2)
         validator = self.valid(o3).squeeze(-1).squeeze(-1)
         classifier = self.classify(o3).squeeze(-1).squeeze(-1)
-        return torch.cat(validator, classifier, dim=-1)
+        return torch.cat((validator, classifier), dim=-1)
 
 
 class Generator(nn.Module):
@@ -103,7 +109,7 @@ class Generator(nn.Module):
                                     nn.ReLU(True))  # state size. (ngf*2) x 16 x 16
 
         self.out = nn.Sequential(nn.ConvTranspose2d(ngf * 2, nc, 4, 2, 1, bias=False),
-                                 nn.Tanh())  # state size. (nc) x 32 x 32
+                                 nn.Sigmoid())  # state size. (nc) x 32 x 32
 
         self.apply(weights_init)
 
@@ -123,10 +129,18 @@ def parse_item_mnist_gan(root, entry, trf):
     return {'data': img, 'target': np.float32(1.0), 'class': target}
 
 
+def parse_item_mnist_ssgan(root, entry, trf):
+    img, target = trf((entry.img, entry.target))
+    ext_y = np.zeros(2, dtype=np.int64)
+    ext_y[0] = 1
+    ext_y[1] = target
+    return {'data': img, 'target': ext_y, 'class': target}
+
+
 def init_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--n_epochs', type=int, default=10, help='Number of epochs')
-    parser.add_argument('--bs', type=int, default=256, help='Batch size')
+    parser.add_argument('--bs', type=int, default=32, help='Batch size')
     parser.add_argument('--d_lr', type=float, default=1e-4, help='Learning rate (Discriminator)')
     parser.add_argument('--d_wd', type=float, default=1e-4, help='Weight decay (Generator)')
     parser.add_argument('--g_lr', type=float, default=1e-4, help='Learning rate (Discriminator)')
