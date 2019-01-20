@@ -86,18 +86,18 @@ class Generator(nn.Module):
         super(Generator, self).__init__()
         self.layer1 = nn.Sequential(nn.ConvTranspose2d(nz, ngf * 8, 4, 1, 0, bias=False),
                                     nn.BatchNorm2d(ngf * 8),
-                                    nn.ReLU(True))  # state size. (ngf*8) x 4 x 4
+                                    nn.ReLU6(True))  # state size. (ngf*8) x 4 x 4
 
         self.layer2 = nn.Sequential(nn.ConvTranspose2d(ngf * 8, ngf * 4, 4, 2, 1, bias=False),
                                     nn.BatchNorm2d(ngf * 4),
-                                    nn.ReLU(True))  # state size. (ngf*2) x 8 x 8
+                                    nn.ReLU6(True))  # state size. (ngf*2) x 8 x 8
 
         self.layer3 = nn.Sequential(nn.ConvTranspose2d(ngf * 4, ngf * 2, 4, 2, 1, bias=False),
                                     nn.BatchNorm2d(ngf * 2),
-                                    nn.ReLU(True))  # state size. (ngf*2) x 16 x 16
+                                    nn.ReLU6(True))  # state size. (ngf*2) x 16 x 16
 
         self.out = nn.Sequential(nn.ConvTranspose2d(ngf * 2, nc, 4, 2, 1, bias=False),
-                                 nn.Tanh())  # state size. (nc) x 32 x 32
+                                 nn.Sigmoid())  # state size. (nc) x 32 x 32
 
         self.apply(weights_init)
 
@@ -119,8 +119,8 @@ def parse_item_mnist_gan(root, entry, trf):
 
 def init_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--n_epochs', type=int, default=10, help='Number of epochs')
-    parser.add_argument('--bs', type=int, default=256, help='Batch size')
+    parser.add_argument('--n_epochs', type=int, default=100, help='Number of epochs')
+    parser.add_argument('--bs', type=int, default=32, help='Batch size')
     parser.add_argument('--d_lr', type=float, default=1e-4, help='Learning rate (Discriminator)')
     parser.add_argument('--d_wd', type=float, default=1e-4, help='Weight decay (Generator)')
     parser.add_argument('--g_lr', type=float, default=1e-4, help='Learning rate (Discriminator)')

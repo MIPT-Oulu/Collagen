@@ -122,16 +122,16 @@ class GANFakeSampler(ItemLoader):
     def __init__(self, g_network, batch_size, latent_size):
         super().__init__(meta_data=None, parse_item_cb=None)
         self.__latent_size = latent_size
-        self.__batch_size = batch_size
+        self.batch_size = batch_size
         self.__g_network = g_network
 
     def sample(self, k=1):
         samples = []
         for _ in range(k):
-            noise = torch.randn(self.__batch_size, self.__latent_size)
+            noise = torch.randn(self.batch_size, self.__latent_size)
             noise_on_device = noise.to(next(self.__g_network.parameters()).device)
             fake: torch.Tensor = self.__g_network(noise_on_device)
-            samples.append({'data': fake, 'target': torch.zeros(self.__batch_size).to(fake.device), 'latent': noise})
+            samples.append({'data': fake, 'target': torch.zeros(self.batch_size).to(fake.device), 'latent': noise})
 
         return samples
 
@@ -143,17 +143,17 @@ class SSGANFakeSampler(ItemLoader):
     def __init__(self, g_network, batch_size, latent_size, n_classes):
         super().__init__(meta_data=None, parse_item_cb=None)
         self.__latent_size = latent_size
-        self.__batch_size = batch_size
+        self.batch_size = batch_size
         self.__g_network = g_network
         self.__n_classes = n_classes
 
     def sample(self, k=1):
         samples = []
         for _ in range(k):
-            noise = torch.randn(self.__batch_size, self.__latent_size)
+            noise = torch.randn(self.batch_size, self.__latent_size)
             noise_on_device = noise.to(next(self.__g_network.parameters()).device)
             fake: torch.Tensor = self.__g_network(noise_on_device)
-            target = torch.cat((torch.ones([self.__batch_size, 1]), torch.zeros([self.__batch_size, self.__n_classes])), dim=-1).to(fake.device)
+            target = torch.zeros([self.batch_size, self.__n_classes + 1]).to(fake.device)
             samples.append({'data': fake, 'target': target, 'latent': noise})
 
         return samples

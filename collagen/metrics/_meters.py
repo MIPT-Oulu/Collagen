@@ -7,7 +7,6 @@ class Meter(Callback):
         super().__init__(type="meter")
         self.__name = name
         self.__prefix = prefix
-        self.__metric = -1.0
 
     def current(self):
         return None
@@ -27,14 +26,13 @@ class RunningAverageMeter(Meter):
         self.__name = name
         self.__value = 0
         self.__count = 0
-        self.__metric = None
+        self.__avg_loss = None
 
     def on_epoch_begin(self, epoch, **kwargs):
-        if epoch == 0:
-            self.__value = 0
-            self.__count = 0
+        self.__value = 0
+        self.__count = 0
 
-    def on_batch_end(self, loss, **kwargs):
+    def on_minibatch_end(self, loss, **kwargs):
         self.__value += loss
         self.__count += 1
 
@@ -56,11 +54,10 @@ class AccuracyMeter(Meter):
         self.__accuracy = None
 
     def on_epoch_begin(self, epoch, *args, **kwargs):
-        if epoch == 0:
-            self.__data_count = 0.0
-            self.__correct_count = 0.0
+        self.__data_count = 0.0
+        self.__correct_count = 0.0
 
-    def on_batch_end(self, target, output, device=None, **kwargs):
+    def on_minibatch_end(self, target, output, device=None, **kwargs):
         n = target.shape[0]
         output = output.argmax(dim=-1).view(n, -1)
         target = target.view(n, -1)
@@ -75,34 +72,32 @@ class AccuracyMeter(Meter):
         self.__correct_count += (output_on_device == target_on_device).float().sum()
         self.__data_count += n
 
-    def on_epoch_end(self, epoch, num_epochs, *args, **kwargs):
-        if epoch >= num_epochs - 1:
-            self.__accuracy = self.current()
+    def on_epoch_end(self, epoch, n_epochs, *args, **kwargs):
+        self.__accuracy = self.current()
 
     def current(self):
         if self.__data_count > 0:
-            acc = self.__correct_count/self.__data_count
+            acc = self.__correct_count / self.__data_count
         else:
             acc = 0.0
         return to_cpu(acc, use_numpy=True)
 
 
 class AccuracyThresholdMeter(Meter):
-    def __init__(self, name: str = "binary_accuracy", threshold:float = 0.5, sigmoid:bool = False, prefix=""):
+    def __init__(self, name: str = "binary_accuracy", threshold: float = 0.5, sigmoid: bool = False, prefix=""):
         super().__init__(name=name, prefix=prefix)
         self.__name: str = name
-        self.__threshold:int = threshold
-        self.__sigmoid:bool = sigmoid
+        self.__threshold: int = threshold
+        self.__sigmoid: bool = sigmoid
         self.__data_count = 0.0
         self.__correct_count = 0.0
         self.__accuracy = None
 
     def on_epoch_begin(self, epoch, *args, **kwargs):
-        if epoch == 0:
-            self.__data_count = 0.0
-            self.__correct_count = 0.0
+        self.__data_count = 0.0
+        self.__correct_count = 0.0
 
-    def on_batch_end(self, target, output, device=None, **kwargs):
+    def on_minibatch_end(self, target, output, device=None, **kwargs):
         n = target.shape[0]
 
         if device is None:
@@ -119,13 +114,99 @@ class AccuracyThresholdMeter(Meter):
         self.__correct_count += ((output_on_device > self.__threshold) == target_on_device.byte()).float().sum()
         self.__data_count += n
 
-    def on_epoch_end(self, epoch, num_epochs, *args, **kwargs):
-        if epoch >= num_epochs - 1:
-            self.__accuracy = self.current()
+    def on_epoch_end(self, epoch, n_epochs, *args, **kwargs):
+        self.__accuracy = self.current()
 
     def current(self):
         if self.__data_count > 0:
-            acc = self.__correct_count/self.__data_count
+            acc = self.__correct_count / self.__data_count
+        else:
+            acc = 0.0
+        return to_cpu(acc, use_numpy=True)
+
+
+class SSAccuracyMeter(Meter):
+    def __init__(self, name: str = "ssl_accuracy", sigmoid: bool = False, prefix=""):
+        super().__init__(name=name, prefix=prefix)
+        self.__name: str = name
+        self.__sigmoid: bool = sigmoid
+        self.__data_count = 0.0
+        self.__correct_count = 0.0
+        self.__accuracy = None
+
+    def on_epoch_begin(self, epoch, *args, **kwargs):
+        self.__data_count = 0.0
+        self.__correct_count = 0.0
+
+    def on_minibatch_end(self, target, output, device=None, **kwargs):
+        n = target.shape[0]
+
+        if device is None:
+            device = output.device
+            target_on_device = target.to(device)
+            output_on_device = output
+        else:
+            target_on_device = target.to(device)
+            output_on_device = output.to(device)
+
+        if self.__sigmoid:
+            output_on_device = output_on_device.sigmoid()
+
+        _output_on_device = output_on_device.argmax(dim=-1).view(n, -1)
+
+        cls = (_output_on_device.type(target_on_device.type()) == target_on_device[:, 1]).float()
+        self.__correct_count += (target_on_device[:, 0].float()*cls).float().sum()
+        self.__data_count += target_on_device[:, 0].sum().float()
+
+    def on_epoch_end(self, epoch, n_epochs, *args, **kwargs):
+        self.__accuracy = self.current()
+
+    def current(self):
+        if self.__data_count > 0:
+            acc = self.__correct_count / self.__data_count
+        else:
+            acc = 0.0
+        return to_cpu(acc, use_numpy=True)
+
+
+class SSValidityMeter(Meter):
+    def __init__(self, name: str = "ssl_validity", threshold: float = 0.5, sigmoid: bool = False, prefix=""):
+        super().__init__(name=name, prefix=prefix)
+        self.__name: str = name
+        self.__sigmoid: bool = sigmoid
+        self.__threshold = threshold
+        self.__data_count = 0.0
+        self.__correct_count = 0.0
+        self.__accuracy = None
+
+    def on_epoch_begin(self, epoch, *args, **kwargs):
+        self.__data_count = 0.0
+        self.__correct_count = 0.0
+
+    def on_minibatch_end(self, target, output, device=None, **kwargs):
+        n = target.shape[0]
+
+        if device is None:
+            device = output.device
+            target_on_device = target.to(device)
+            output_on_device = output
+        else:
+            target_on_device = target.to(device)
+            output_on_device = output.to(device)
+
+        if self.__sigmoid:
+            output_on_device = output_on_device.sigmoid()
+
+        valid = ((output_on_device[:, 0] > self.__threshold) == target_on_device[:, 0].byte()).float()
+        self.__correct_count += valid.sum()
+        self.__data_count += n
+
+    def on_epoch_end(self, epoch, n_epochs, *args, **kwargs):
+        self.__accuracy = self.current()
+
+    def current(self):
+        if self.__data_count > 0:
+            acc = self.__correct_count / self.__data_count
         else:
             acc = 0.0
         return to_cpu(acc, use_numpy=True)
