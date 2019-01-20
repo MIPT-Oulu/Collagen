@@ -10,10 +10,10 @@ from tensorboardX import SummaryWriter
 from collagen.core import Callback, Session
 from collagen.data import DataProvider, ItemLoader, SSGANFakeSampler
 from collagen.strategies import GANStrategy
-from collagen.metrics import RunningAverageMeter, AccuracyThresholdMeter
+from collagen.metrics import RunningAverageMeter, SSValidityMeter, SSAccuracyMeter
 from collagen.data.utils import get_mnist
 from collagen.logging import MeterLogging
-from examples.ssgan.ex_utils import init_args, parse_item_mnist_gan, init_mnist_transforms
+from examples.ssgan.ex_utils import init_args, parse_item_mnist_ssgan, init_mnist_transforms
 from examples.ssgan.ex_utils import Discriminator, Generator
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -44,10 +44,11 @@ class DicriminatorLoss(torch.nn.Module):
         pred_cls = pred[:, 1:]
 
         target_valid = target[:, 0]
-        target_cls = target[:, 1:]
+        target_cls = target[:, 1]
 
-        loss_valid = self.__loss_valid(pred_valid, target_valid)
-        loss_cls = self.__loss_cls(pred_cls, target_cls)
+        # target_cls = target_cls.type(torch.int64)
+        loss_valid = self.__loss_valid(pred_valid, target_valid.type(torch.float32))
+        loss_cls = self.__loss_cls(pred_cls, target_cls.type(torch.int64))
 
         return self.__alpha * loss_valid + (1 - self.__alpha) * loss_cls
 
@@ -76,12 +77,12 @@ class ProgressbarCallback(Callback):
     def _check_freq(self):
         return self.__count % self.__update_freq == 0
 
-    def on_batch_end(self, strategy: GANStrategy, epoch: int, progress_bar: tqdm, callbacks: Callback, **kwargs):
+    def on_batch_end(self, strategy: GANStrategy, epoch: int, progress_bar: tqdm, **kwargs):
         self.__count += 1
         if self._check_freq():
             list_metrics_desc = []
             postfix_progress = OrderedDict()
-            for cb in callbacks:
+            for cb in strategy.get_callbacks_by_name("minibatch"):
                 if cb.get_type() == "meter":
                     list_metrics_desc.append(str(cb))
                     postfix_progress[cb.get_name()] = f'{cb.current():.03f}'
@@ -90,14 +91,14 @@ class ProgressbarCallback(Callback):
 
 
 class GeneratorCallback(Callback):
-    def __init__(self, generator_sampler: SSGANFakeSampler, tag:str = "generated", log_dir:str = None, comment:str = "", grid_shape: Tuple[int] = (6,6)):
+    def __init__(self, generator_sampler: SSGANFakeSampler, writer: SummaryWriter, tag: str = "generated", grid_shape: Tuple[int] = (6,6)):
         super().__init__(type="visualizer")
         self.__generator_sampler = generator_sampler
 
         if len(grid_shape) != 2:
             raise ValueError("`grid_shape` must have 2 dim, but found {}".format(len(grid_shape)))
 
-        self.__writer = SummaryWriter(log_dir=log_dir, comment=comment)
+        self.__writer = writer
 
         self.__grid_shape = grid_shape
         self.__num_images = grid_shape[0]*grid_shape[1]
@@ -118,7 +119,10 @@ class GeneratorCallback(Callback):
 
 if __name__ == "__main__":
     args = init_args()
-    log_dir = "runs/tbx"
+    log_dir = None
+    comment = "ssgan"
+
+    summary_writer = SummaryWriter(log_dir=log_dir, comment=comment)
     # Data
     train_ds, classes = get_mnist(data_folder=args.save_data, train=True)
 
@@ -137,7 +141,7 @@ if __name__ == "__main__":
 
     item_loaders['real'] = ItemLoader(meta_data=train_ds,
                                       transform=init_mnist_transforms()[1],
-                                      parse_item_cb=parse_item_mnist_gan,
+                                      parse_item_cb=parse_item_mnist_ssgan,
                                       batch_size=args.bs, num_workers=args.num_threads)
 
     item_loaders['fake'] = SSGANFakeSampler(g_network=g_network,
@@ -148,13 +152,14 @@ if __name__ == "__main__":
     data_provider = DataProvider(item_loaders)
 
     # Callbacks
-    g_callbacks = (RunningAverageMeter(prefix="g", name="loss"),)
-    d_callbacks = (RunningAverageMeter(prefix="d", name="loss"),
-                   AccuracyThresholdMeter(threshold=0.5, sigmoid=False, prefix="d", name="acc"),
+    g_callbacks = (RunningAverageMeter(prefix="G", name="loss"),)
+    d_callbacks = (RunningAverageMeter(prefix="D", name="loss"),
+                   SSValidityMeter(threshold=0.5, sigmoid=False, prefix="D", name="ss_acc"),
+                   SSAccuracyMeter(prefix="D", name="ss_valid"),
                    BackwardCallback(retain_graph=True))
     st_callbacks = (ProgressbarCallback(update_freq=1),
-                    MeterLogging(log_dir=log_dir, comment="ssgan"),
-                    GeneratorCallback(generator_sampler=g_network, log_dir=log_dir, grid_shape=(4, 4)))
+                    MeterLogging(writer=summary_writer),
+                    GeneratorCallback(generator_sampler=item_loaders['fake'], writer=summary_writer, grid_shape=(4, 4)))
 
     # Strategy
     num_samples_dict = {'real': 1, 'fake': 30}
