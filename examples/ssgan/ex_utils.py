@@ -139,8 +139,8 @@ def parse_item_mnist_ssgan(root, entry, trf):
 
 def init_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--n_epochs', type=int, default=10, help='Number of epochs')
-    parser.add_argument('--bs', type=int, default=32, help='Batch size')
+    parser.add_argument('--n_epochs', type=int, default=1000, help='Number of epochs')
+    parser.add_argument('--bs', type=int, default=300, help='Batch size')
     parser.add_argument('--d_lr', type=float, default=1e-4, help='Learning rate (Discriminator)')
     parser.add_argument('--d_wd', type=float, default=1e-4, help='Weight decay (Generator)')
     parser.add_argument('--g_lr', type=float, default=1e-4, help='Learning rate (Discriminator)')
@@ -154,6 +154,8 @@ def init_args():
     parser.add_argument('--seed', type=int, default=12345, help='Random seed')
     parser.add_argument('--n_classes', type=int, default=10, help='Num of classes')
     parser.add_argument('--device', type=str, default="cuda", help='Use `cuda` or `cpu`')
+    parser.add_argument('--log_dir', type=str, default=None, help='Log directory')
+    parser.add_argument('--grid_shape', type=tuple, default=(24, 24), help='Shape of grid of generated images')
     args = parser.parse_args()
 
     torch.manual_seed(args.seed)

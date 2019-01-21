@@ -99,21 +99,21 @@ class GeneratorCallback(Callback):
 
 if __name__ == "__main__":
     args = init_args()
-    log_dir = None
+    log_dir = args.log_dir
     comment = "dcgan"
     summary_writer = SummaryWriter(log_dir=log_dir, comment=comment)
     # Data
     train_ds, classes = get_mnist(data_folder=args.save_data, train=True)
 
     # Initializing Discriminator
-    d_network = Discriminator(nc=1, ndf=args.d_net_features).to(device)
+    d_network = Discriminator(nc=1, ndf=args.d_net_features, ngpu=args.ngpu, drop_rate=0.5).to(device)
     d_optim = optim.Adam(d_network.parameters(), lr=args.d_lr, weight_decay=args.d_wd, betas=(args.beta1, 0.999))
     d_crit = BCELoss().to(device)
 
     # Initializing Generator
-    g_network = Generator(nc=1, nz=args.latent_size, ngf=args.g_net_features).to(device)
+    g_network = Generator(nc=1, nz=args.latent_size, ngf=args.g_net_features, ngpu=args.ngpu).to(device)
     g_optim = optim.Adam(g_network.parameters(), lr=args.g_lr, weight_decay=args.g_wd, betas=(args.beta1, 0.999))
-    g_crit = GeneratorLoss(d_network=d_network, d_loss=d_crit).to(device)
+    g_crit = GeneratorLoss(d_network=d_network, d_loss=BCELoss().to(device)).to(device)
 
     # Data provider
     item_loaders = dict()
@@ -136,11 +136,11 @@ if __name__ == "__main__":
                    BackwardCallback(retain_graph=True))
     st_callbacks = (ProgressbarCallback(update_freq=1),
                     MeterLogging(writer=summary_writer),
-                    GeneratorCallback(generator_sampler=item_loaders['fake'], grid_shape=(4, 4),
+                    GeneratorCallback(generator_sampler=item_loaders['fake'], grid_shape=args.grid_shape,
                                       writer=summary_writer))
 
     # Strategy
-    num_samples_dict = {'real': 1, 'fake': 30}
+    num_samples_dict = {'real': 1, 'fake': 1}
     dcgan = GANStrategy(data_provider=data_provider,
                         g_loader_names='fake', d_loader_names=('real', 'fake'),
                         g_criterion=g_crit, d_criterion=d_crit,

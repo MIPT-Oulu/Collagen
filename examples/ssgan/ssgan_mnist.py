@@ -119,7 +119,7 @@ class GeneratorCallback(Callback):
 
 if __name__ == "__main__":
     args = init_args()
-    log_dir = None
+    log_dir = args.log_dir
     comment = "ssgan"
 
     summary_writer = SummaryWriter(log_dir=log_dir, comment=comment)
@@ -159,7 +159,7 @@ if __name__ == "__main__":
                    BackwardCallback(retain_graph=True))
     st_callbacks = (ProgressbarCallback(update_freq=1),
                     MeterLogging(writer=summary_writer),
-                    GeneratorCallback(generator_sampler=item_loaders['fake'], writer=summary_writer, grid_shape=(4, 4)))
+                    GeneratorCallback(generator_sampler=item_loaders['fake'], writer=summary_writer, grid_shape=args.grid_shape))
 
     # Strategy
     num_samples_dict = {'real': 1, 'fake': 30}
