@@ -109,7 +109,7 @@ class Generator(nn.Module):
                                     nn.ReLU(True))  # state size. (ngf*2) x 16 x 16
 
         self.out = nn.Sequential(nn.ConvTranspose2d(ngf * 2, nc, 4, 2, 1, bias=False),
-                                 nn.Sigmoid())  # state size. (nc) x 32 x 32
+                                 nn.Tanh())  # state size. (nc) x 32 x 32
 
         self.apply(weights_init)
 
@@ -131,16 +131,19 @@ def parse_item_mnist_gan(root, entry, trf):
 
 def parse_item_mnist_ssgan(root, entry, trf):
     img, target = trf((entry.img, entry.target))
-    ext_y = np.zeros(2, dtype=np.int64)
+    # ext_y = np.zeros(2, dtype=np.int64)
+    # ext_y[0] = 1
+    # ext_y[1] = target
+    ext_y = np.zeros(11, dtype=np.float32)
     ext_y[0] = 1
-    ext_y[1] = target
+    ext_y[int(round(target))] = 1
     return {'data': img, 'target': ext_y, 'class': target}
 
 
 def init_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--n_epochs', type=int, default=1000, help='Number of epochs')
-    parser.add_argument('--bs', type=int, default=300, help='Batch size')
+    parser.add_argument('--bs', type=int, default=128, help='Batch size')
     parser.add_argument('--d_lr', type=float, default=1e-4, help='Learning rate (Discriminator)')
     parser.add_argument('--d_wd', type=float, default=1e-4, help='Weight decay (Generator)')
     parser.add_argument('--g_lr', type=float, default=1e-4, help='Learning rate (Discriminator)')

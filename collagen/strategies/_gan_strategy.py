@@ -260,9 +260,9 @@ class GANStrategy(object):
                              batch_index=batch_i,
                              strategy=self)
 
-    def _on_gan_d_batch_begin_callbacks(self, epoch, n_epochs, stage, batch_i, progress_bar, **kwargs):
+    def _on_d_batch_begin_callbacks(self, epoch, n_epochs, stage, batch_i, progress_bar, **kwargs):
         for cb in self.__discriminator["callbacks"]:
-            cb.on_gan_d_begin(epoch=epoch,
+            cb.on_gan_d_batch_begin(epoch=epoch,
                               n_epochs=n_epochs,
                               batch_i=batch_i,
                               progress_bar=progress_bar,
@@ -271,7 +271,7 @@ class GANStrategy(object):
                               strategy=self)
 
         for cb in self.__generator["callbacks"]:
-            cb.on_gan_d_begin(epoch=epoch,
+            cb.on_gan_d_batch_begin(epoch=epoch,
                               n_epochs=n_epochs,
                               batch_i=batch_i,
                               progress_bar=progress_bar,
@@ -280,7 +280,7 @@ class GANStrategy(object):
                               strategy=self)
 
         for cb in self.__callbacks:
-            cb.on_gan_d_begin(epoch=epoch,
+            cb.on_gan_d_batch_begin(epoch=epoch,
                               n_epochs=n_epochs,
                               batch_i=batch_i,
                               progress_bar=progress_bar,
@@ -288,9 +288,9 @@ class GANStrategy(object):
                               batch_index=batch_i,
                               strategy=self)
 
-    def _on_gan_d_batch_end_callbacks(self, epoch, n_epochs, stage, batch_i, progress_bar, **kwargs):
+    def _on_d_batch_end_callbacks(self, epoch, n_epochs, stage, batch_i, progress_bar, **kwargs):
         for cb in self.__discriminator["callbacks"]:
-            cb.on_gan_d_end(epoch=epoch,
+            cb.on_gan_d_batch_end(epoch=epoch,
                             n_epochs=n_epochs,
                             batch_i=batch_i,
                             progress_bar=progress_bar,
@@ -299,7 +299,7 @@ class GANStrategy(object):
                             strategy=self)
 
         for cb in self.__generator["callbacks"]:
-            cb.on_gan_d_end(epoch=epoch,
+            cb.on_gan_d_batch_end(epoch=epoch,
                             n_epochs=n_epochs,
                             batch_i=batch_i,
                             progress_bar=progress_bar,
@@ -308,7 +308,7 @@ class GANStrategy(object):
                             strategy=self)
 
         for cb in self.__callbacks:
-            cb.on_gan_d_end(epoch=epoch,
+            cb.on_gan_d_batch_end(epoch=epoch,
                             n_epochs=n_epochs,
                             batch_i=batch_i,
                             progress_bar=progress_bar,
@@ -316,9 +316,9 @@ class GANStrategy(object):
                             batch_index=batch_i,
                             strategy=self)
 
-    def _on_gan_g_batch_begin_callbacks(self, epoch, n_epochs, stage, batch_i, progress_bar, **kwargs):
+    def _on_g_batch_begin_callbacks(self, epoch, n_epochs, stage, batch_i, progress_bar, **kwargs):
         for cb in self.__discriminator["callbacks"]:
-            cb.on_gan_g_begin(epoch=epoch,
+            cb.on_gan_g_batch_begin(epoch=epoch,
                               n_epochs=n_epochs,
                               batch_i=batch_i,
                               progress_bar=progress_bar,
@@ -327,7 +327,7 @@ class GANStrategy(object):
                               strategy=self)
 
         for cb in self.__generator["callbacks"]:
-            cb.on_gan_g_begin(epoch=epoch,
+            cb.on_gan_g_batch_begin(epoch=epoch,
                               n_epochs=n_epochs,
                               batch_i=batch_i,
                               progress_bar=progress_bar,
@@ -336,7 +336,7 @@ class GANStrategy(object):
                               strategy=self)
 
         for cb in self.__callbacks:
-            cb.on_gan_g_begin(epoch=epoch,
+            cb.on_gan_g_batch_begin(epoch=epoch,
                               n_epochs=n_epochs,
                               batch_i=batch_i,
                               progress_bar=progress_bar,
@@ -344,9 +344,9 @@ class GANStrategy(object):
                               batch_index=batch_i,
                               strategy=self)
 
-    def _on_gan_g_batch_end_callbacks(self, epoch, n_epochs, stage, batch_i, progress_bar, **kwargs):
+    def _on_g_batch_end_callbacks(self, epoch, n_epochs, stage, batch_i, progress_bar, **kwargs):
         for cb in self.__discriminator["callbacks"]:
-            cb.on_gan_g_end(epoch=epoch,
+            cb.on_gan_g_batch_end(epoch=epoch,
                             n_epochs=n_epochs,
                             batch_i=batch_i,
                             progress_bar=progress_bar,
@@ -355,7 +355,7 @@ class GANStrategy(object):
                             strategy=self)
 
         for cb in self.__generator["callbacks"]:
-            cb.on_gan_g_end(epoch=epoch,
+            cb.on_gan_g_batch_end(epoch=epoch,
                             n_epochs=n_epochs,
                             batch_i=batch_i,
                             progress_bar=progress_bar,
@@ -364,7 +364,7 @@ class GANStrategy(object):
                             strategy=self)
 
         for cb in self.__callbacks:
-            cb.on_gan_g_end(epoch=epoch,
+            cb.on_gan_g_batch_end(epoch=epoch,
                             n_epochs=n_epochs,
                             batch_i=batch_i,
                             progress_bar=progress_bar,
@@ -410,26 +410,26 @@ class GANStrategy(object):
                                                stage=stage,
                                                batch_i=batch_i)
 
-                self._on_d_batch_begin_callback(progress_bar=progress_bar,
+                self._on_d_batch_begin_callbacks(progress_bar=progress_bar,
                                                 epoch=epoch,
                                                 n_epochs=self.__n_epochs,
                                                 stage=stage,
                                                 batch_i=batch_i)
                 getattr(self.__discriminator["trainer"], stage)(data_key=self.__discriminator["data_key"],
                                                                 target_key=self.__discriminator["target_key"])
-                self._on_d_batch_end_callback(progress_bar=progress_bar,
+                self._on_d_batch_end_callbacks(progress_bar=progress_bar,
                                               epoch=epoch,
                                               n_epochs=self.__n_epochs,
                                               stage=stage,
                                               batch_i=batch_i)
-                self._on_g_batch_begin_callback(progress_bar=progress_bar,
+                self._on_g_batch_begin_callbacks(progress_bar=progress_bar,
                                                 epoch=epoch,
                                                 n_epochs=self.__n_epochs,
                                                 stage=stage,
                                                 batch_i=batch_i)
                 getattr(self.__generator["trainer"], stage)(data_key=self.__generator["data_key"],
                                                             target_key=self.__generator["target_key"])
-                self._on_g_batch_end_callback(progress_bar=progress_bar,
+                self._on_g_batch_end_callbacks(progress_bar=progress_bar,
                                               epoch=epoch,
                                               n_epochs=self.__n_epochs,
                                               stage=stage,

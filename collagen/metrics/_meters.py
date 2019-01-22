@@ -152,11 +152,13 @@ class SSAccuracyMeter(Meter):
         if self.__sigmoid:
             output_on_device = output_on_device.sigmoid()
 
-        _output_on_device = output_on_device.argmax(dim=-1).view(n, -1)
+        _output_on_device = output_on_device.argmax(dim=-1).view(n)
 
         cls = (_output_on_device.type(target_on_device.type()) == target_on_device[:, 1]).float()
-        self.__correct_count += (target_on_device[:, 0].float()*cls).float().sum()
-        self.__data_count += target_on_device[:, 0].sum().float()
+        fp = (target_on_device[:, 0].float()*cls).float().sum()
+        total = target_on_device[:, 0].sum().float()
+        self.__correct_count += fp
+        self.__data_count += total
 
     def on_epoch_end(self, epoch, n_epochs, *args, **kwargs):
         self.__accuracy = self.current()

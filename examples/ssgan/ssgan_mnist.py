@@ -7,7 +7,7 @@ from torch import optim
 from torchvision.utils import make_grid
 from tensorboardX import SummaryWriter
 
-from collagen.core import Callback, Session
+from collagen.core import Callback, Session, Module
 from collagen.data import DataProvider, ItemLoader, SSGANFakeSampler
 from collagen.strategies import GANStrategy
 from collagen.metrics import RunningAverageMeter, SSValidityMeter, SSAccuracyMeter
@@ -36,7 +36,7 @@ class DicriminatorLoss(torch.nn.Module):
     def __init__(self, alpha=0.5):
         super().__init__()
         self.__loss_valid = BCELoss()
-        self.__loss_cls = CrossEntropyLoss()
+        self.__loss_cls = BCELoss()
         self.__alpha = alpha
 
     def forward(self, pred: torch.Tensor, target: torch.Tensor):
@@ -44,13 +44,53 @@ class DicriminatorLoss(torch.nn.Module):
         pred_cls = pred[:, 1:]
 
         target_valid = target[:, 0]
-        target_cls = target[:, 1]
+        target_cls = target[:, 1:]
 
         # target_cls = target_cls.type(torch.int64)
-        loss_valid = self.__loss_valid(pred_valid, target_valid.type(torch.float32))
-        loss_cls = self.__loss_cls(pred_cls, target_cls.type(torch.int64))
+        loss_valid = self.__loss_valid(pred_valid, target_valid)
+        loss_cls = self.__loss_cls(pred_cls, target_cls)
 
         return self.__alpha * loss_valid + (1 - self.__alpha) * loss_cls
+
+
+class DiscriminatorFreezerCallback(Callback):
+    def __init__(self, d_module: Module):
+        super().__init__(type="freezer")
+        self.__module: Module = d_module
+
+    def on_gan_g_batch_begin(self, *args, **kwargs):
+        self._freeze()
+
+    def on_gan_g_batch_end(self, *args, **kwargs):
+        self._unfreeze()
+
+    def _freeze(self):
+        for param in self.__module.parameters():
+            param.requires_grad = False
+
+    def _unfreeze(self):
+        for param in self.__module.parameters():
+            param.requires_grad = True
+
+
+class GeneratorFreezerCallback(Callback):
+    def __init__(self, g_module: Module):
+        super().__init__(type="freezer")
+        self.__module: Module = g_module
+
+    def on_gan_d_batch_begin(self, *args, **kwargs):
+        self._freeze()
+
+    def on_gan_d_batch_end(self, *args, **kwargs):
+        self._unfreeze()
+
+    def _freeze(self):
+        for param in self.__module.parameters():
+            param.requires_grad = False
+
+    def _unfreeze(self):
+        for param in self.__module.parameters():
+            param.requires_grad = True
 
 
 class BackwardCallback(Callback):
@@ -152,18 +192,20 @@ if __name__ == "__main__":
     data_provider = DataProvider(item_loaders)
 
     # Callbacks
-    g_callbacks = (RunningAverageMeter(prefix="G", name="loss"),)
+    g_callbacks = (RunningAverageMeter(prefix="G", name="loss"),
+                   DiscriminatorFreezerCallback(d_module=d_network))
     d_callbacks = (RunningAverageMeter(prefix="D", name="loss"),
                    SSValidityMeter(threshold=0.5, sigmoid=False, prefix="D", name="ss_acc"),
                    SSAccuracyMeter(prefix="D", name="ss_valid"),
-                   BackwardCallback(retain_graph=True))
+                   BackwardCallback(retain_graph=True),
+                   GeneratorFreezerCallback(g_module=g_network))
     st_callbacks = (ProgressbarCallback(update_freq=1),
                     MeterLogging(writer=summary_writer),
                     GeneratorCallback(generator_sampler=item_loaders['fake'], writer=summary_writer, grid_shape=args.grid_shape))
 
     # Strategy
-    num_samples_dict = {'real': 1, 'fake': 30}
-    dcgan = GANStrategy(data_provider=data_provider,
+    num_samples_dict = {'real': 1, 'fake': 1}
+    ssgan = GANStrategy(data_provider=data_provider,
                         g_loader_names=('fake'), d_loader_names=('real', 'fake'),
                         g_criterion=g_crit, d_criterion=d_crit,
                         g_model=g_network, d_model=d_network,
@@ -175,4 +217,4 @@ if __name__ == "__main__":
                         n_epochs=args.n_epochs, device=args.device,
                         num_samples_dict=num_samples_dict)
 
-    dcgan.run()
+    ssgan.run()

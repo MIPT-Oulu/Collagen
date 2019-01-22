@@ -84,5 +84,18 @@ class Callback(object):
     def on_minibatch_end(self, *args, **kwargs):
         pass
 
+    # GAN
+    def on_gan_g_batch_begin(self, *args, **kwargs):
+        pass
+
+    def on_gan_g_batch_end(self, *args, **kwargs):
+        pass
+
+    def on_gan_d_batch_begin(self, *args, **kwargs):
+        pass
+
+    def on_gan_d_batch_end(self, *args, **kwargs):
+        pass
+
     def __str__(self):
         return ""

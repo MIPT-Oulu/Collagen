@@ -8,7 +8,7 @@ from torch import optim
 from torchvision.utils import make_grid
 from tensorboardX import SummaryWriter
 
-from collagen.core import Callback, Session
+from collagen.core import Callback, Session, Module
 from collagen.data import DataProvider, ItemLoader, GANFakeSampler
 from collagen.strategies import GANStrategy
 from collagen.metrics import RunningAverageMeter, AccuracyThresholdMeter
@@ -67,6 +67,46 @@ class ProgressbarCallback(Callback):
                     postfix_progress[cb.get_name()] = f'{cb.current():.03f}'
 
             progress_bar.set_postfix(ordered_dict=postfix_progress, refresh=True)
+
+
+class DiscriminatorFreezerCallback(Callback):
+    def __init__(self, d_module: Module):
+        super().__init__(type="freezer")
+        self.__module: Module = d_module
+
+    def on_gan_g_batch_begin(self, *args, **kwargs):
+        self._freeze()
+
+    def on_gan_g_batch_end(self, *args, **kwargs):
+        self._unfreeze()
+
+    def _freeze(self):
+        for param in self.__module.parameters():
+            param.requires_grad = False
+
+    def _unfreeze(self):
+        for param in self.__module.parameters():
+            param.requires_grad = True
+
+
+class GeneratorFreezerCallback(Callback):
+    def __init__(self, g_module: Module):
+        super().__init__(type="freezer")
+        self.__module: Module = g_module
+
+    def on_gan_d_batch_begin(self, *args, **kwargs):
+        self._freeze()
+
+    def on_gan_d_batch_end(self, *args, **kwargs):
+        self._unfreeze()
+
+    def _freeze(self):
+        for param in self.__module.parameters():
+            param.requires_grad = False
+
+    def _unfreeze(self):
+        for param in self.__module.parameters():
+            param.requires_grad = True
 
 
 class GeneratorCallback(Callback):
@@ -130,10 +170,14 @@ if __name__ == "__main__":
     data_provider = DataProvider(item_loaders)
 
     # Callbacks
-    g_callbacks = (RunningAverageMeter(prefix="g", name="loss"),)
+    g_callbacks = (RunningAverageMeter(prefix="g", name="loss"),
+                   DiscriminatorFreezerCallback(d_module=d_network))
+
     d_callbacks = (RunningAverageMeter(prefix="d", name="loss"),
                    AccuracyThresholdMeter(threshold=0.5, sigmoid=False, prefix="d", name="acc"),
-                   BackwardCallback(retain_graph=True))
+                   BackwardCallback(retain_graph=True),
+                   GeneratorFreezerCallback(g_module=g_network))
+
     st_callbacks = (ProgressbarCallback(update_freq=1),
                     MeterLogging(writer=summary_writer),
                     GeneratorCallback(generator_sampler=item_loaders['fake'], grid_shape=args.grid_shape,
