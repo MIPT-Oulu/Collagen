@@ -1,10 +1,7 @@
 import torch
-
+from typing import Tuple, Any, List
 from collagen.logging import KVS
 from collagen.core import Module
-
-
-from typing import Tuple, Any, List
 
 
 class Session(object):

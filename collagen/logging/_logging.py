@@ -1,6 +1,4 @@
-from tensorboardX import SummaryWriter
-
-from collagen.core._callback import Callback
+from collagen.callbacks import Callback
 
 
 class Logging(Callback):

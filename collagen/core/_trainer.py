@@ -1,9 +1,7 @@
-from abc import abstractmethod
-
 from ..data import DataProvider
 from ._session import Session
 from typing import Tuple
-from ._callback import Callback
+from collagen.callbacks._callback import Callback
 from ..data.utils import cast_tensor
 
 

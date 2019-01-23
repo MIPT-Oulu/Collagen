@@ -1,4 +1,5 @@
-from collagen.core import Callback, Trainer, Session, Module
+from collagen.core import Trainer, Session, Module
+from collagen.callbacks import Callback
 from collagen.data import DataProvider
 from collagen.data.utils import to_tuple
 import torch.nn as nn
@@ -40,7 +41,7 @@ class GANStrategy(object):
                  g_criterion: nn.Module, d_criterion: nn.Module,
                  g_model: Module, d_model: Module,
                  g_optimizer: Optimizer, d_optimizer: Optimizer,
-                 g_data_key: str, d_data_key: str,
+                 g_data_key: Tuple[str] or str, d_data_key: Tuple[str] or str,
                  g_target_key: Tuple[str] or str = (), d_target_key: Tuple[str] or str = (),
                  g_callbacks: Tuple[Callback] or Callback = (),
                  d_callbacks: Tuple[Callback] or Callback = (),
