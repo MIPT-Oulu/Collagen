@@ -204,7 +204,7 @@ if __name__ == "__main__":
                     GeneratorCallback(generator_sampler=item_loaders['fake'], writer=summary_writer, grid_shape=args.grid_shape))
 
     # Strategy
-    num_samples_dict = {'real': 1, 'fake': 1}
+    num_samples_dict = {'real': 1, 'fake': 6}
     ssgan = GANStrategy(data_provider=data_provider,
                         g_loader_names=('fake'), d_loader_names=('real', 'fake'),
                         g_criterion=g_crit, d_criterion=d_crit,

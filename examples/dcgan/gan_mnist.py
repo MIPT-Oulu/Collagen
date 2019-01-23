@@ -9,7 +9,7 @@ from torchvision.utils import make_grid
 from tensorboardX import SummaryWriter
 
 from collagen.core import Callback, Session, Module
-from collagen.data import DataProvider, ItemLoader, GANFakeSampler
+from collagen.data import DataProvider, ItemLoader, GANFakeSampler, GaussianNoiseSampler
 from collagen.strategies import GANStrategy
 from collagen.metrics import RunningAverageMeter, AccuracyThresholdMeter
 from collagen.data.utils import get_mnist
@@ -108,10 +108,16 @@ class GeneratorFreezerCallback(Callback):
         for param in self.__module.parameters():
             param.requires_grad = True
 
+class CalmDownDiscCallback(Callback):
+    def __init__(self, d_module: Module):
+        super().__init__(type="gan_trick")
+        self.__d_module = d_module
 
-class GeneratorCallback(Callback):
-    def __init__(self, writer, generator_sampler: GANFakeSampler, tag: str = "generated", log_dir: str = None,
-                 comment: str = "", grid_shape: Tuple[int] = (6, 6)):
+    def on_minibatch_begin(self, **kwargs):
+        pass
+
+class TensorboardSynthesisVisualizerCallback(Callback):
+    def __init__(self, writer, generator_sampler: GANFakeSampler, key_name: str = "data", tag: str = "Generated", grid_shape: Tuple[int] = (10, 10)):
         super().__init__(type="visualizer")
         self.__generator_sampler = generator_sampler
 
@@ -119,7 +125,7 @@ class GeneratorCallback(Callback):
             raise ValueError("`grid_shape` must have 2 dim, but found {}".format(len(grid_shape)))
 
         self.__writer = writer
-
+        self.__key_name = key_name
         self.__grid_shape = grid_shape
         self.__num_images = grid_shape[0] * grid_shape[1]
         self.__num_batches = self.__num_images // self.__generator_sampler.batch_size + 1
@@ -130,7 +136,7 @@ class GeneratorCallback(Callback):
         images = []
         for i, dt in enumerate(sampled_data):
             if i < self.__num_images:
-                images += list(torch.unbind(dt["data"], dim=0))
+                images += list(torch.unbind(dt[self.__key_name], dim=0))
             else:
                 break
         grid_images = make_grid(images[:self.__num_images], nrow=self.__grid_shape[0])
@@ -170,8 +176,8 @@ if __name__ == "__main__":
     data_provider = DataProvider(item_loaders)
 
     # Callbacks
-    g_callbacks = (RunningAverageMeter(prefix="g", name="loss"),
-                   DiscriminatorFreezerCallback(d_module=d_network))
+    g_callbacks = (RunningAverageMeter(prefix="g", name="loss"),)
+                   # DiscriminatorFreezerCallback(d_module=d_network))
 
     d_callbacks = (RunningAverageMeter(prefix="d", name="loss"),
                    AccuracyThresholdMeter(threshold=0.5, sigmoid=False, prefix="d", name="acc"),
@@ -180,8 +186,9 @@ if __name__ == "__main__":
 
     st_callbacks = (ProgressbarCallback(update_freq=1),
                     MeterLogging(writer=summary_writer),
-                    GeneratorCallback(generator_sampler=item_loaders['fake'], grid_shape=args.grid_shape,
-                                      writer=summary_writer))
+                    TensorboardSynthesisVisualizerCallback(generator_sampler=item_loaders['fake'],
+                                                           grid_shape=args.grid_shape,
+                                                           writer=summary_writer))
 
     # Strategy
     num_samples_dict = {'real': 1, 'fake': 1}

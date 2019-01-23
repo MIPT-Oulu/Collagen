@@ -1,6 +1,7 @@
 import argparse
 from collagen.core import Module
 from torch import nn
+from torch.tensor import OrderedDict
 import torch
 import numpy as np
 import solt.data as sld
@@ -62,66 +63,94 @@ def weights_init(m):
 
 
 class Discriminator(Module):
-    def __init__(self, nc=1, ndf=64, n_cls=10):
+    def __init__(self, nc=1, ndf=64, n_cls=10, ngpu=1, drop_rate=0.35):
         super(Discriminator, self).__init__()
         # input is (nc) x 32 x 32
-        self.layer1 = nn.Sequential(nn.Conv2d(nc, ndf, 4, 2, 1, bias=False),
-                                    nn.LeakyReLU(0.2, inplace=True))  # state size. (ndf) x 16 x 16
+        self.__ngpu = ngpu
 
-        self.layer2 = nn.Sequential(nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False),
-                                    nn.BatchNorm2d(ndf * 2),
-                                    nn.LeakyReLU(0.2, inplace=True))  # state size. (ndf*2) x 8 x 8
+        self.__drop_rate = drop_rate
+        self.dropout = nn.Dropout(p=self.__drop_rate)
+        # input is (nc) x 32 x 32
+        self._layer1 = nn.Sequential(nn.Conv2d(nc, ndf, 4, 2, 1, bias=False),
+                                     nn.LeakyReLU(0.2, inplace=True))  # state size. (ndf) x 16 x 16
 
-        self.layer3 = nn.Sequential(nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1, bias=False),
-                                    nn.BatchNorm2d(ndf * 4),
-                                    nn.LeakyReLU(0.2, inplace=True))  # state size. (ndf*4) x 4 x 4
+        self._layer2 = nn.Sequential(nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False),
+                                     nn.BatchNorm2d(ndf * 2),
+                                     nn.LeakyReLU(0.2, inplace=True))  # state size. (ndf*2) x 8 x 8
+
+        self._layer3 = nn.Sequential(nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1, bias=False),
+                                     nn.BatchNorm2d(ndf * 4),
+                                     nn.LeakyReLU(0.2, inplace=True))  # state size. (ndf*4) x 4 x 4
+
+        self.main_flow = nn.Sequential(OrderedDict([("conv_block1", self._layer1),
+                                                    ("dropout1", self.dropout),
+                                                    ("conv_block2", self._layer2),
+                                                    ("dropout2", self.dropout),
+                                                    ("conv_block3", self._layer3),
+                                                    ("dropout3", self.dropout)
+                                                    ]))
 
         self.valid = nn.Sequential(nn.Conv2d(ndf * 4, 1, 4, 1, 0, bias=False),
-                                   nn.Sigmoid())   # state size. 1x1x1
+                                   nn.Sigmoid())  # state size. 1x1x1
 
         self.classify = nn.Sequential(nn.Conv2d(ndf * 4, n_cls, 4, 1, 0, bias=False),
                                       nn.Softmax(dim=1))  # state size. n_clsx1x1
 
-        self.apply(weights_init)
+        self.main_flow.apply(weights_init)
 
     def forward(self, x):
-        o1 = self.layer1(x)
-        o2 = self.layer2(o1)
-        o3 = self.layer3(o2)
+        o3 = self.main_flow(x)
         validator = self.valid(o3).squeeze(-1).squeeze(-1)
         classifier = self.classify(o3).squeeze(-1).squeeze(-1)
         return torch.cat((validator, classifier), dim=-1)
 
 
 class Generator(nn.Module):
-    def __init__(self, nc=1, nz=100, ngf=64):
+    def __init__(self, nc=1, nz=100, ngf=64, ngpu=1):
         super(Generator, self).__init__()
-        self.layer1 = nn.Sequential(nn.ConvTranspose2d(nz, ngf * 8, 4, 1, 0, bias=False),
-                                    nn.BatchNorm2d(ngf * 8),
-                                    nn.ReLU(True))  # state size. (ngf*8) x 4 x 4
+        self.__ngpu = ngpu
 
-        self.layer2 = nn.Sequential(nn.ConvTranspose2d(ngf * 8, ngf * 4, 4, 2, 1, bias=False),
-                                    nn.BatchNorm2d(ngf * 4),
-                                    nn.ReLU(True))  # state size. (ngf*2) x 8 x 8
+        self._layer1 = nn.Sequential(nn.Conv2d(nz, ngf * 4, 1, 1, 0, bias=False),
+                                     nn.ReLU(True),
+                                     nn.ConvTranspose2d(ngf * 4, ngf * 8, 4, 1, 0, bias=False),
+                                     nn.BatchNorm2d(ngf * 8),
+                                     nn.ReLU(True))  # state size. (ngf*8) x 4 x 4
 
-        self.layer3 = nn.Sequential(nn.ConvTranspose2d(ngf * 4, ngf * 2, 4, 2, 1, bias=False),
-                                    nn.BatchNorm2d(ngf * 2),
-                                    nn.ReLU(True))  # state size. (ngf*2) x 16 x 16
+        self._layer2 = nn.Sequential(nn.ConvTranspose2d(ngf * 8, ngf * 4, 4, 2, 1, bias=False),
+                                     nn.BatchNorm2d(ngf * 4),
+                                     nn.ReLU(True))  # state size. (ngf*2) x 8 x 8
 
-        self.out = nn.Sequential(nn.ConvTranspose2d(ngf * 2, nc, 4, 2, 1, bias=False),
-                                 nn.Tanh())  # state size. (nc) x 32 x 32
+        self._layer3 = nn.Sequential(nn.ConvTranspose2d(ngf * 4, ngf * 2, 4, 2, 1, bias=False),
+                                     nn.BatchNorm2d(ngf * 2),
+                                     nn.ReLU(True))  # state size. (ngf*2) x 16 x 16
 
-        self.apply(weights_init)
+        self._layer4 = nn.Sequential(nn.ConvTranspose2d(ngf * 2, ngf, 4, 2, 1, bias=False),
+                                     nn.BatchNorm2d(ngf),
+                                     nn.ReLU(True))  # state size. (ngf) x 32 x 32
+
+        self._layer5 = nn.Sequential(nn.Conv2d(ngf, 1, 5, 1, 2),
+                                     nn.Tanh())  # state size. (nc) x 32 x 32
+
+        self.main_flow = nn.Sequential(OrderedDict([("conv_block1", self._layer1),
+                                                    ("conv_block2", self._layer2),
+                                                    ("conv_block3", self._layer3),
+                                                    ("conv_block4", self._layer4),
+                                                    ("conv_block5", self._layer5)
+                                                    ]))
+
+        self.main_flow.apply(weights_init)
 
     def forward(self, x):
         if len(x.size()) != 2:
             raise ValueError("Input must have 2 dim but found {}".format(x.shape))
+        x = x.view(x.size(0), x.size(1), 1, 1)
 
-        o1 = self.layer1(x.view(x.size(0), x.size(1), 1, 1))
-        o2 = self.layer2(o1)
-        o3 = self.layer3(o2)
+        if x.is_cuda and self.__ngpu > 1:
+            output = nn.parallel.data_parallel(self.main_flow, x, range(self.__ngpu))
+        else:
+            output = self.main_flow(x)
 
-        return self.out(o3)
+        return output
 
 
 def parse_item_mnist_gan(root, entry, trf):
