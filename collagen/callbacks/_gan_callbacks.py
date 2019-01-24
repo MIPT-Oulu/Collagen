@@ -1,7 +1,6 @@
 from typing import Tuple
-from . import Callback
 import torch
-from collagen.core import Module
+from collagen.core import Module, Callback
 from collagen.data.utils import to_tuple, freeze_modules
 
 

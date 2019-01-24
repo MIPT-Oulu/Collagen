@@ -1,7 +1,7 @@
 from ..data import DataProvider
 from ._session import Session
 from typing import Tuple
-from collagen.callbacks._callback import Callback
+from collagen.core._callback import Callback
 from ..data.utils import cast_tensor
 
 

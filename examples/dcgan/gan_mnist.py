@@ -2,8 +2,8 @@ from torch.nn import BCELoss
 from torch import optim
 from tensorboardX import SummaryWriter
 
-from collagen.core import Module
-from collagen.callbacks import Callback, OnGeneratorBatchFreezer, OnDiscriminatorBatchFreezer, BackwardCallback
+from collagen.core import Module, Callback
+from collagen.callbacks import OnGeneratorBatchFreezer, OnDiscriminatorBatchFreezer, BackwardCallback
 from collagen.callbacks import ProgressbarVisualizer, TensorboardSynthesisVisualizer, GeneratorLoss
 from collagen.data import DataProvider, ItemLoader, GANFakeSampler
 from collagen.strategies import GANStrategy

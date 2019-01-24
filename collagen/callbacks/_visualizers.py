@@ -2,7 +2,7 @@ import tqdm
 import torch
 from torch.tensor import OrderedDict
 from typing import Tuple
-from . import Callback
+from collagen.core import Callback
 from collagen.strategies import Strategy
 from torchvision.utils import make_grid
 

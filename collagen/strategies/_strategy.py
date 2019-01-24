@@ -1,5 +1,5 @@
 from collagen.core import Trainer, Session, Module
-from collagen.callbacks import Callback
+from collagen.core import Callback
 from collagen.data import DataProvider, ItemLoader, Splitter
 import torch.nn as nn
 from torch.optim import Optimizer
