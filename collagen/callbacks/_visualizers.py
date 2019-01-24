@@ -9,8 +9,7 @@ from torchvision.utils import make_grid
 
 class ProgressbarVisualizer(Callback):
     def __init__(self, update_freq=1):
-        self.__type = "progressbar"
-        super().__init__(type=self.__type)
+        super().__init__(type="visualizer")
         self.__count = 0
         self.__update_freq = update_freq
         if not isinstance(self.__update_freq, int) or self.__update_freq < 1:

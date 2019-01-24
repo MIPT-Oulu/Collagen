@@ -139,9 +139,12 @@ class GANFakeSampler(ItemLoader):
         return 1
 
 
-class SSGANFakeSampler(GANFakeSampler):
+class SSGANFakeSampler(ItemLoader):
     def __init__(self, g_network, batch_size, latent_size, n_classes):
-        super().__init__(g_network=g_network, batch_size=batch_size, latent_size=latent_size)
+        super().__init__(meta_data=None, parse_item_cb=None)
+        self.__latent_size = latent_size
+        self.batch_size = batch_size
+        self.__g_network = g_network
         self.__n_classes = n_classes
 
     def sample(self, k=1):
@@ -154,6 +157,9 @@ class SSGANFakeSampler(GANFakeSampler):
             samples.append({'data': fake, 'target': target, 'latent': noise})
 
         return samples
+
+    def __len__(self):
+        return 1
 
 
 class GaussianNoiseSampler(ItemLoader):

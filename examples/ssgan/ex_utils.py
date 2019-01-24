@@ -19,15 +19,6 @@ def unpack_solt(dc: sld.DataContainer):
     img, target = torch.from_numpy(img).permute(2, 0, 1).float(), target
     return img, np.float32(target)
 
-# def unpack_solt(dc: sld.DataContainer):
-#     img, target = dc.data
-#     img = torch.from_numpy(img).permute(2, 0, 1).float()
-#     valid = torch.ones([img.shape[0], 1], dtype=torch.float32)
-#     target = torch.zeros([img.shape[0], 10], dtype=torch.float32)
-#     ext_target = torch.cat((valid, target), dim=-1)
-#     return img, ext_target
-
-
 def init_mnist_transforms():
     train_trf = Compose([
         wrap2solt,
@@ -188,6 +179,7 @@ def init_args():
     parser.add_argument('--device', type=str, default="cuda", help='Use `cuda` or `cpu`')
     parser.add_argument('--log_dir', type=str, default=None, help='Log directory')
     parser.add_argument('--grid_shape', type=tuple, default=(24, 24), help='Shape of grid of generated images')
+    parser.add_argument('--ngpu', type=int, default=1, help='Num of GPUs')
     args = parser.parse_args()
 
     torch.manual_seed(args.seed)
