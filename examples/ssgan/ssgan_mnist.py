@@ -1,12 +1,14 @@
 from torch.nn import BCELoss
 from torch import optim, Tensor
 from tensorboardX import SummaryWriter
+import pandas as pd
+import yaml
 
-from collagen.core import Module
+from collagen.core import Module, Session, Trainer
 from collagen.callbacks import OnGeneratorBatchFreezer, OnDiscriminatorBatchFreezer, BackwardCallback
-from collagen.callbacks import ProgressbarVisualizer, TensorboardSynthesisVisualizer, GeneratorLoss
-from collagen.data import DataProvider, ItemLoader, SSGANFakeSampler
-from collagen.strategies import GANStrategy
+from collagen.callbacks import ProgressbarVisualizer, TensorboardSynthesisVisualizer, ClipGradCallback
+from collagen.data import DataProvider, ItemLoader, SSGANFakeSampler, SSFoldSplit
+from collagen.strategies import SSGANStrategy
 from collagen.metrics import RunningAverageMeter, SSAccuracyMeter, SSValidityMeter
 from collagen.data.utils import get_mnist, auto_detect_device
 from collagen.logging import MeterLogging
@@ -38,14 +40,40 @@ class SSDicriminatorLoss(Module):
         return self.__alpha * loss_valid + (1 - self.__alpha) * loss_cls
 
 
+class SSGeneratorLoss(Module):
+    def __init__(self, d_network, d_loss):
+        super().__init__()
+        self.__d_network = d_network
+        self.__d_loss = d_loss
+
+    def forward(self, img: Tensor, target: Tensor):
+        output = self.__d_network(img)
+        loss = self.__d_loss(output[:, 0], 1 - target[:, 0])
+        return loss
+
+
 if __name__ == "__main__":
     args = init_args()
     log_dir = args.log_dir
     comment = "ssgan"
 
-    summary_writer = SummaryWriter(log_dir=log_dir, comment=comment)
-    # Data
+    # Data provider
+    n_folds = 10
     train_ds, classes = get_mnist(data_folder=args.save_data, train=True)
+    splitter = SSFoldSplit(train_ds, n_folds=n_folds, target_col="target", unlabeled_size=0.5, val_size=0.4, shuffle=True)
+
+    num_folds_dict = dict()
+    num_folds_dict["real_labeled_train"] = 2
+    num_folds_dict["real_unlabeled_train"] = 5
+    num_folds_dict["real_labeled_val"] = 3
+
+    n_requested_folds = num_folds_dict["real_labeled_val"] + num_folds_dict["real_labeled_train"] + num_folds_dict["real_unlabeled_train"]
+    if n_requested_folds > n_folds:
+        raise ValueError(
+            "Number of requested folds must be less or equal to input number of folds, but found {} > {}".
+                format(n_requested_folds, n_folds))
+
+    summary_writer = SummaryWriter(log_dir=log_dir, comment=comment)
 
     # Initializing Discriminator
     d_network = Discriminator(nc=1, ndf=args.d_net_features).to(device)
@@ -55,26 +83,43 @@ if __name__ == "__main__":
     # Initializing Generator
     g_network = Generator(nc=1, nz=args.latent_size, ngf=args.g_net_features).to(device)
     g_optim = optim.Adam(g_network.parameters(), lr=args.g_lr, weight_decay=args.g_wd, betas=(args.beta1, 0.999))
-    g_crit = GeneratorLoss(d_network=d_network, d_loss=BCELoss()).to(device)
+    g_crit = SSGeneratorLoss(d_network=d_network, d_loss=BCELoss()).to(device)
 
-    # Data provider
+    df_dict = {}
     item_loaders = dict()
+    train_labeled_data, train_unlabeled_data, val_labeled_data = next(splitter)
 
-    item_loaders['real'] = ItemLoader(meta_data=train_ds,
-                                      transform=init_mnist_transforms()[1],
-                                      parse_item_cb=parse_item_mnist_ssgan,
-                                      batch_size=args.bs, num_workers=args.num_threads)
+    item_loaders["real_labeled_train"] = ItemLoader(meta_data=train_labeled_data,
+                                             transform=init_mnist_transforms()[1],
+                                             parse_item_cb=parse_item_mnist_ssgan,
+                                             batch_size=args.bs, num_workers=args.num_threads)
 
-    item_loaders['fake'] = SSGANFakeSampler(g_network=g_network,
-                                            batch_size=args.bs,
-                                            latent_size=args.latent_size,
-                                            n_classes=args.n_classes)
+    item_loaders["real_unlabeled_train"] = ItemLoader(meta_data=train_unlabeled_data,
+                                                    transform=init_mnist_transforms()[1],
+                                                    parse_item_cb=parse_item_mnist_ssgan,
+                                                    batch_size=args.bs, num_workers=args.num_threads)
+
+    item_loaders["real_labeled_val"] = ItemLoader(meta_data=val_labeled_data,
+                                                    transform=init_mnist_transforms()[1],
+                                                    parse_item_cb=parse_item_mnist_ssgan,
+                                                    batch_size=args.bs, num_workers=args.num_threads)
+
+    item_loaders['fake_unlabeled_train'] = SSGANFakeSampler(g_network=g_network,
+                                                            batch_size=args.bs,
+                                                            latent_size=args.latent_size,
+                                                            n_classes=args.n_classes)
+
+    item_loaders['fake_unlabeled_val'] = SSGANFakeSampler(g_network=g_network,
+                                                          batch_size=args.bs,
+                                                          latent_size=args.latent_size,
+                                                          n_classes=args.n_classes)
 
     data_provider = DataProvider(item_loaders)
 
     # Callbacks
     g_callbacks = (RunningAverageMeter(prefix="G", name="loss"),
-                   OnGeneratorBatchFreezer(modules=d_network))
+                   OnGeneratorBatchFreezer(modules=d_network),
+                   ClipGradCallback(g_network, mode="norm", max_norm=0.1, norm_type=2))
     d_callbacks = (RunningAverageMeter(prefix="D", name="loss"),
                    SSValidityMeter(threshold=0.5, sigmoid=False, prefix="D", name="ss_acc"),
                    SSAccuracyMeter(prefix="D", name="ss_valid"),
@@ -82,20 +127,56 @@ if __name__ == "__main__":
                    OnDiscriminatorBatchFreezer(modules=g_network))
     st_callbacks = (ProgressbarVisualizer(update_freq=1),
                     MeterLogging(writer=summary_writer),
-                    TensorboardSynthesisVisualizer(generator_sampler=item_loaders['fake'], writer=summary_writer, grid_shape=args.grid_shape))
+                    TensorboardSynthesisVisualizer(generator_sampler=item_loaders['fake_unlabeled_train'], writer=summary_writer,
+                                                   grid_shape=args.grid_shape))
+
+    d_network.to(device)
+    g_network.to(device)
+    d_crit.to(device)
+    g_crit.to(device)
+
+    d_session = Session(module=d_network,
+                        optimizer=d_optim,
+                        loss=d_crit)
+
+    g_session = Session(module=g_network,
+                        optimizer=g_optim,
+                        loss=g_crit)
+
+    with open("settings.yml", "r") as f:
+        sampling = yaml.load(f)
+
+    train_n_samples_by_loader_names = {
+        "D": {'real_labeled_train': 1, 'real_unlabeled_train': 1, 'fake_unlabeled_train': 1},
+        "G": {'fake_unlabeled_train': 1}}
+    eval_n_samples_by_loader_names = {
+        "D": {'real_labeled_train': 1, 'real_unlabeled_train': 1, 'fake_unlabeled_train': 1},
+        "G": {'fake_unlabeled_train': 1}}
+
+    d_trainer = Trainer(data_provider=data_provider,
+                        train_loader_names=tuple(train_n_samples_by_loader_names["D"].keys()),
+                        val_loader_names=tuple(eval_n_samples_by_loader_names["D"].keys()),
+                        session=d_session,
+                        train_callbacks=d_callbacks,
+                        val_callbacks=d_callbacks)
+
+    g_trainer = Trainer(data_provider=data_provider,
+                        train_loader_names=tuple(train_n_samples_by_loader_names["G"].keys()),
+                        val_loader_names=tuple(eval_n_samples_by_loader_names["G"].keys()),
+                        session=g_session,
+                        train_callbacks=g_callbacks,
+                        val_callbacks=g_callbacks)
 
     # Strategy
     num_samples_dict = {'real': 1, 'fake': 1}
-    ssgan = GANStrategy(data_provider=data_provider,
-                        g_loader_names=('fake'), d_loader_names=('real', 'fake'),
-                        g_criterion=g_crit, d_criterion=d_crit,
-                        g_model=g_network, d_model=d_network,
-                        g_optimizer=g_optim, d_optimizer=d_optim,
-                        g_data_key='latent', d_data_key=('data', 'data'),
-                        g_target_key='target', d_target_key='target',
-                        g_callbacks=g_callbacks, d_callbacks=d_callbacks,
-                        callbacks=st_callbacks,
-                        n_epochs=args.n_epochs, device=args.device,
-                        num_samples_dict=num_samples_dict)
+
+    ssgan = SSGANStrategy(data_provider=data_provider,
+                          train_samples_dict=train_n_samples_by_loader_names,
+                          eval_samples_dict=eval_n_samples_by_loader_names,
+                          d_trainer=d_trainer,
+                          g_trainer=g_trainer,
+                          n_epochs=args.n_epochs,
+                          callbacks=st_callbacks,
+                          device=args.device)
 
     ssgan.run()

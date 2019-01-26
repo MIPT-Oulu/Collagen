@@ -228,3 +228,9 @@ class Trainer(object):
                                     loss=loss,
                                     data_key=data_key, target_key=target_key,
                                     session=self.__session)
+
+    def get_train_callbacks(self):
+        return self.__train_callbacks
+
+    def get_eval_callbacks(self):
+        return self.__val_callbacks

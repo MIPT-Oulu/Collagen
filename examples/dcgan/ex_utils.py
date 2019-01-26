@@ -18,7 +18,7 @@ def wrap2solt(inp):
 def unpack_solt(dc: sld.DataContainer):
     img, target = dc.data
     img, target = torch.from_numpy(img).permute(2, 0, 1).float(), target
-    return img, np.float32(target)
+    return img/255.0, np.float32(target)
 
 
 def init_mnist_transforms():
