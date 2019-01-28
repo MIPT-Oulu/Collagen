@@ -163,17 +163,19 @@ class SSGANFakeSampler(ItemLoader):
 
 
 class GaussianNoiseSampler(ItemLoader):
-    def __init__(self, batch_size, latent_size, device):
+    def __init__(self, batch_size, latent_size, device, n_classes):
         super().__init__(meta_data=None, parse_item_cb=None)
         self.latent_size = latent_size
         self.device = device
         self.batch_size = batch_size
+        self.__n_classes = n_classes
 
     def sample(self, k=1):
         samples = []
         for _ in range(k):
             noise = torch.randn(self.batch_size, self.latent_size).to(self.device)
-            samples.append({'data': noise})
+            target = torch.zeros([self.batch_size, self.__n_classes + 1]).to(self.device)
+            samples.append({'latent': noise, 'target': target})
 
         return samples
 

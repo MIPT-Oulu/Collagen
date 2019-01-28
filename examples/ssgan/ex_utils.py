@@ -25,11 +25,13 @@ def init_mnist_transforms():
     train_trf = Compose([
         wrap2solt,
         slc.Stream([
+            slt.ResizeTransform(resize_to=(64, 64), interpolation='bilinear'),
             slt.RandomScale(range_x=(0.9, 1.1), same=False, p=0.5),
             slt.RandomShear(range_x=(-0.05, 0.05), p=0.5),
-            slt.RandomRotate(rotation_range=(-5, 5), p=0.5),
-            slt.PadTransform(pad_to=34),
-            slt.CropTransform(crop_size=32, crop_mode='r')
+            slt.RandomRotate(rotation_range=(-10, 10), p=0.5),
+            # slt.RandomRotate(rotation_range=(-5, 5), p=0.5),
+            slt.PadTransform(pad_to=70),
+            slt.CropTransform(crop_size=64, crop_mode='r')
         ]),
         unpack_solt,
         ApplyTransform(Normalize((0.5,), (0.5,)))
@@ -37,7 +39,8 @@ def init_mnist_transforms():
 
     test_trf = Compose([
         wrap2solt,
-        slt.PadTransform(pad_to=32),
+        slt.ResizeTransform(resize_to=(64, 64), interpolation='bilinear'),
+        # slt.PadTransform(pad_to=64),
         unpack_solt,
         ApplyTransform(Normalize((0.5,), (0.5,))),
 
@@ -60,36 +63,46 @@ class Discriminator(Module):
         super(Discriminator, self).__init__()
         # input is (nc) x 32 x 32
         self.__ngpu = ngpu
-
         self.__drop_rate = drop_rate
+
         self.dropout = nn.Dropout(p=self.__drop_rate)
-        # input is (nc) x 32 x 32
+        # input is (nc) x 64 x 64
         self._layer1 = nn.Sequential(nn.Conv2d(nc, ndf, 4, 2, 1, bias=False),
-                                     nn.LeakyReLU(0.2, inplace=True))  # state size. (ndf) x 16 x 16
+                                     nn.LeakyReLU(0.2, inplace=True))  # state size. (ndf) x 32 x 32
 
         self._layer2 = nn.Sequential(nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False),
                                      nn.BatchNorm2d(ndf * 2),
-                                     nn.LeakyReLU(0.2, inplace=True))  # state size. (ndf*2) x 8 x 8
+                                     nn.LeakyReLU(0.2, inplace=True))  # state size. (ndf*2) x 16 x 16
 
         self._layer3 = nn.Sequential(nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1, bias=False),
                                      nn.BatchNorm2d(ndf * 4),
+                                     nn.LeakyReLU(0.2, inplace=True))  # state size. (ndf*4) x 8 x 8
+
+        self._layer4 = nn.Sequential(nn.Conv2d(ndf * 4, ndf * 8, 4, 2, 1, bias=False),
+                                     nn.BatchNorm2d(ndf * 8),
                                      nn.LeakyReLU(0.2, inplace=True))  # state size. (ndf*4) x 4 x 4
+
+        # self._layer5 = nn.Sequential(nn.Conv2d(ndf * 8, 1, 4, 1, 0, bias=False),
+        #                              nn.Sigmoid())  # state size. 1x1x1
 
         self.main_flow = nn.Sequential(OrderedDict([("conv_block1", self._layer1),
                                                     ("dropout1", self.dropout),
                                                     ("conv_block2", self._layer2),
                                                     ("dropout2", self.dropout),
                                                     ("conv_block3", self._layer3),
-                                                    ("dropout3", self.dropout)
+                                                    ("dropout3", self.dropout),
+                                                    ("conv_block4", self._layer4),
+                                                    ("dropout3", self.dropout),
+                                                    # ("conv_final", self._layer5)
                                                     ]))
 
-        self.valid = nn.Sequential(nn.Conv2d(ndf * 4, 1, 4, 1, 0, bias=False),
+        self.valid = nn.Sequential(nn.Conv2d(ndf * 8, 1, 4, 1, 0, bias=False),
                                    nn.Sigmoid())  # state size. 1x1x1
 
-        self.classify = nn.Sequential(nn.Conv2d(ndf * 4, n_cls, 4, 1, 0, bias=False),
+        self.classify = nn.Sequential(nn.Conv2d(ndf * 8, n_cls, 4, 1, 0, bias=False),
                                       nn.Softmax(dim=1))  # state size. n_clsx1x1
 
-        self.main_flow.apply(weights_init)
+        self.apply(weights_init)
 
     def forward(self, x):
         o3 = self.main_flow(x)
@@ -103,9 +116,7 @@ class Generator(nn.Module):
         super(Generator, self).__init__()
         self.__ngpu = ngpu
 
-        self._layer1 = nn.Sequential(nn.Conv2d(nz, ngf * 4, 1, 1, 0, bias=False),
-                                     nn.ReLU(True),
-                                     nn.ConvTranspose2d(ngf * 4, ngf * 8, 4, 1, 0, bias=False),
+        self._layer1 = nn.Sequential(nn.ConvTranspose2d(nz, ngf * 8, 4, 1, 0, bias=False),
                                      nn.BatchNorm2d(ngf * 8),
                                      nn.ReLU(True))  # state size. (ngf*8) x 4 x 4
 
@@ -121,14 +132,18 @@ class Generator(nn.Module):
                                      nn.BatchNorm2d(ngf),
                                      nn.ReLU(True))  # state size. (ngf) x 32 x 32
 
-        self._layer5 = nn.Sequential(nn.Conv2d(ngf, 1, 5, 1, 2),
-                                     nn.Tanh())  # state size. (nc) x 32 x 32
+        self._layer5 = nn.Sequential(nn.ConvTranspose2d(ngf, 1, 4, 2, 1, bias=False),
+                                     nn.Tanh())  # state size. (nc) x 64 x 64
+
+        # self._layer6 = nn.Sequential(nn.Conv2d(ngf // 2, 1, 3, 1, 1, bias=False),
+        #                              nn.Sigmoid())  # state size. (ngf) x 64 x 64
 
         self.main_flow = nn.Sequential(OrderedDict([("conv_block1", self._layer1),
                                                     ("conv_block2", self._layer2),
                                                     ("conv_block3", self._layer3),
                                                     ("conv_block4", self._layer4),
-                                                    ("conv_block5", self._layer5)
+                                                    ("conv_block5", self._layer5),
+                                                    # ("conv_final", self._layer6)
                                                     ]))
 
         self.main_flow.apply(weights_init)
@@ -157,9 +172,9 @@ def parse_item_mnist_ssgan(root, entry, trf):
     # ext_y[0] = 1
     # ext_y[1] = target
     ext_y = np.zeros(11, dtype=np.float32)
-    ext_y[0] = 1
-    ext_y[int(round(target))] = 1
-    return {'data': img, 'target': ext_y, 'class': target}
+    ext_y[0] = 1.0
+    ext_y[int(round(target))] = 1.0
+    return {'data': img, 'target': ext_y, 'class': target, 'valid': ext_y[0]}
 
 
 def init_args():

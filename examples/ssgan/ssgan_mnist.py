@@ -1,5 +1,5 @@
-from torch.nn import BCELoss
-from torch import optim, Tensor
+from torch.nn import BCELoss, CrossEntropyLoss
+from torch import optim, Tensor, argmax
 from tensorboardX import SummaryWriter
 import pandas as pd
 import yaml
@@ -7,7 +7,7 @@ import yaml
 from collagen.core import Module, Session, Trainer
 from collagen.callbacks import OnGeneratorBatchFreezer, OnDiscriminatorBatchFreezer, BackwardCallback
 from collagen.callbacks import ProgressbarVisualizer, TensorboardSynthesisVisualizer, ClipGradCallback
-from collagen.data import DataProvider, ItemLoader, SSGANFakeSampler, SSFoldSplit
+from collagen.data import DataProvider, ItemLoader, SSGANFakeSampler, SSFoldSplit, GaussianNoiseSampler
 from collagen.strategies import SSGANStrategy
 from collagen.metrics import RunningAverageMeter, SSAccuracyMeter, SSValidityMeter
 from collagen.data.utils import get_mnist, auto_detect_device
@@ -23,21 +23,28 @@ class SSDicriminatorLoss(Module):
     def __init__(self, alpha=0.5):
         super().__init__()
         self.__loss_valid = BCELoss()
-        self.__loss_cls = BCELoss()
+        self.__loss_cls = CrossEntropyLoss()
         self.__alpha = alpha
 
     def forward(self, pred: Tensor, target: Tensor):
         pred_valid = pred[:, 0]
         pred_cls = pred[:, 1:]
 
-        target_valid = target[:, 0]
-        target_cls = target[:, 1:]
+        if len(target.shape) > 1 and target.shape[1] > 1:
+            target_valid = target[:, 0]
+            target_cls = target[:, 1:]
+
+            loss_valid = self.__loss_valid(pred_valid, target_valid)
+            decoded_target_cls = target_cls.argmax(dim=-1)
+            loss_cls = self.__loss_cls(pred_cls, decoded_target_cls)
+
+            _loss =  self.__alpha * loss_valid + (1 - self.__alpha) * loss_cls
+        else:
+            target_valid = target
+            _loss = self.__loss_valid(pred_valid, target_valid)
 
         # target_cls = target_cls.type(torch.int64)
-        loss_valid = self.__loss_valid(pred_valid, target_valid)
-        loss_cls = self.__loss_cls(pred_cls, target_cls)
-
-        return self.__alpha * loss_valid + (1 - self.__alpha) * loss_cls
+        return  _loss
 
 
 class SSGeneratorLoss(Module):
@@ -105,36 +112,39 @@ if __name__ == "__main__":
                                                   parse_item_cb=parse_item_mnist_ssgan,
                                                   batch_size=args.bs, num_workers=args.num_threads)
 
-    item_loaders['fake_unlabeled_train'] = SSGANFakeSampler(g_network=g_network,
+    item_loaders['fake_unlabeled_gen'] = SSGANFakeSampler(g_network=g_network,
                                                             batch_size=args.bs,
                                                             latent_size=args.latent_size,
                                                             n_classes=args.n_classes)
 
-    item_loaders['fake_unlabeled_val'] = SSGANFakeSampler(g_network=g_network,
-                                                          batch_size=args.bs,
-                                                          latent_size=args.latent_size,
-                                                          n_classes=args.n_classes)
+    item_loaders['fake_unlabeled_latent'] = GaussianNoiseSampler(batch_size=args.bs, latent_size=args.latent_size,
+                                                                 n_classes=args.n_classes, device=device)
+
+    # item_loaders['fake_unlabeled_latent'] = SSGANFakeSampler(g_network=g_network,
+    #                                                          batch_size=args.bs,
+    #                                                          latent_size=args.latent_size,
+    #                                                          n_classes=args.n_classes)
 
     data_provider = DataProvider(item_loaders)
 
     # Callbacks
-    g_callbacks_train = (RunningAverageMeter(prefix="G", name="loss"),
+    g_callbacks_train = (RunningAverageMeter(prefix="train/G", name="loss"),
                          OnGeneratorBatchFreezer(modules=d_network),
                          ClipGradCallback(g_network, mode="norm", max_norm=0.1, norm_type=2))
 
-    g_callbacks_eval = (RunningAverageMeter(prefix="G", name="loss"),)
+    g_callbacks_eval = (RunningAverageMeter(prefix="eval/G", name="loss"),)
 
-    d_callbacks_train = (RunningAverageMeter(prefix="D", name="loss"),
+    d_callbacks_train = (RunningAverageMeter(prefix="train/D", name="loss"),
                          BackwardCallback(retain_graph=True),
                          OnDiscriminatorBatchFreezer(modules=g_network))
 
-    d_callbacks_eval = (RunningAverageMeter(prefix="D", name="loss"),
-                        SSValidityMeter(threshold=0.5, sigmoid=False, prefix="D", name="ss_acc"),
-                        SSAccuracyMeter(prefix="D", name="ss_valid"))
+    d_callbacks_eval = (RunningAverageMeter(prefix="eval/D", name="loss"),
+                        SSValidityMeter(threshold=0.5, sigmoid=False, prefix="eval/D", name="ss_valid"),
+                        SSAccuracyMeter(prefix="eval/D", name="ss_acc"))
 
     st_callbacks = (ProgressbarVisualizer(update_freq=1),
                     MeterLogging(writer=summary_writer),
-                    TensorboardSynthesisVisualizer(generator_sampler=item_loaders['fake_unlabeled_train'],
+                    TensorboardSynthesisVisualizer(generator_sampler=item_loaders['fake_unlabeled_gen'],
                                                    writer=summary_writer,
                                                    grid_shape=args.grid_shape))
 

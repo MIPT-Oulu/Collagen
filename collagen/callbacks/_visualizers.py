@@ -20,12 +20,12 @@ class ProgressbarVisualizer(Callback):
     def _check_freq(self):
         return self.__count % self.__update_freq == 0
 
-    def on_batch_end(self, strategy: Strategy, epoch: int, progress_bar: tqdm, **kwargs):
+    def on_batch_end(self, strategy: Strategy, epoch: int, progress_bar: tqdm, stage: str or None, **kwargs):
         self.__count += 1
         if self._check_freq():
             list_metrics_desc = []
             postfix_progress = OrderedDict()
-            for cb in strategy.get_callbacks_by_name("minibatch"):
+            for cb in strategy.get_callbacks_by_name("minibatch", stage=stage):
                 if cb.get_type() == "meter":
                     list_metrics_desc.append(str(cb))
                     postfix_progress[cb.get_name()] = f'{cb.current():.03f}'

@@ -109,9 +109,10 @@ class Trainer(object):
                                           session=self.__session)
 
                 input_data = batch[data_key[ind]]
-                target = tuple([cast_tensor(batch[key_i], cast_target) for key_i in target_key])
+                # target = tuple([cast_tensor(batch[key_i], cast_target) for key_i in target_key])
+                target = cast_tensor(batch[target_key[ind]], cast_target)
                 loss, train_result = self.__session.train_step(input_data,
-                                                               target[ind],
+                                                               target,
                                                                accumulate_grad=accumulate_grad,
                                                                return_out=True, callbacks=self.__train_callbacks)
                 self.__train_batches_count += 1
@@ -122,7 +123,7 @@ class Trainer(object):
                                         loss=loss,
                                         input=input_data,
                                         output=train_result,
-                                        target=target[ind],
+                                        target=target,
                                         data_key=data_key[ind],
                                         target_key=target_key[ind],
                                         session=self.__session)
@@ -137,10 +138,10 @@ class Trainer(object):
                                       session=self.__session)
 
             input_data = batch[data_key[ind]]
-            target = tuple([cast_tensor(batch[key_i], cast_target) for key_i in target_key])
-            # target = cast_tensor(batch[key_i], cast_target)
+            # target = tuple([cast_tensor(batch[key_i], cast_target) for key_i in target_key])
+            target = cast_tensor(batch[target_key[ind]], cast_target)
             loss, train_result = self.__session.train_step(input_data,
-                                                           target[ind],
+                                                           target,
                                                            accumulate_grad=False,
                                                            return_out=True,
                                                            callbacks=self.__train_callbacks)
@@ -152,7 +153,7 @@ class Trainer(object):
                                     loss=loss,
                                     input=input_data,
                                     output=train_result,
-                                    target=target[ind],
+                                    target=target,
                                     data_key=data_key[ind],
                                     target_key=target_key[ind],
                                     session=self.__session)
@@ -247,8 +248,12 @@ class Trainer(object):
                                     target_key=target_key[ind],
                                     session=self.__session)
 
-    def get_train_callbacks(self):
-        return self.__train_callbacks
-
-    def get_eval_callbacks(self):
-        return self.__val_callbacks
+    def get_callbacks_by_stage(self, stage):
+        if stage == "train" or "train" in stage:
+            return self.__train_callbacks
+        elif stage == "eval" or "eval" in stage:
+            return self.__val_callbacks
+        elif stage is None:
+            return self.__train_callbacks + self.__val_callbacks
+        else:
+            raise ValueError("stage must be `train`, `eval`, tuple of both or None, but found {}".format(stage))
