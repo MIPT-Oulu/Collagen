@@ -140,23 +140,25 @@ class SSAccuracyMeter(Meter):
 
     def on_minibatch_end(self, target, output, device=None, **kwargs):
         n = target.shape[0]
-
+        target_cls = target[:,:-1].float()
+        output_cls = output[:,:-1].float()
         if device is None:
             device = output.device
-            target_on_device = target.to(device)
-            output_on_device = output
+            target_on_device = target_cls.to(device)
+            output_on_device = output_cls
         else:
-            target_on_device = target.to(device)
-            output_on_device = output.to(device)
+            target_on_device = target_cls.to(device)
+            output_on_device = output_cls.to(device)
 
         if self.__sigmoid:
             output_on_device = output_on_device.sigmoid()
 
-        _output_on_device = output_on_device.argmax(dim=-1).view(n)
+        discrete_output_on_device = output_on_device.argmax(dim=-1).view(n)
+        discrete_target_on_device = target_on_device.argmax(dim=-1).view(n)
 
-        cls = (_output_on_device.type(target_on_device.type()) == target_on_device[:, 1]).float()
-        fp = (target_on_device[:, 0].float()*cls).float().sum()
-        total = target_on_device[:, 0].sum().float()
+        cls = (discrete_output_on_device.byte() == discrete_target_on_device.byte()).float()
+        fp = (target_on_device[:, -1]*cls).sum()
+        total = target_on_device[:, -1].sum().float()
         self.__correct_count += fp
         self.__data_count += total
 
@@ -190,18 +192,21 @@ class SSValidityMeter(Meter):
 
         if device is None:
             device = output.device
-            target_on_device = target.to(device)
-            output_on_device = output
+            target_on_device = target[:,-1].to(device)
+            output_on_device = output[:,-1]
         else:
-            target_on_device = target.to(device)
-            output_on_device = output.to(device)
+            target_on_device = target[:,-1].to(device)
+            output_on_device = output[:,-1].to(device)
 
         if self.__sigmoid:
             output_on_device = output_on_device.sigmoid()
 
-        valid = ((output_on_device[:, 0] > self.__threshold) == target_on_device[:, 0].byte()).float()
-        self.__correct_count += valid.sum()
+        valid = ((output_on_device > self.__threshold) == target_on_device.byte()).float()
+        fp = valid.sum()
+        self.__correct_count += fp
         self.__data_count += n
+        acc = self.__correct_count/self.__data_count
+        acc1 = acc
 
     def on_epoch_end(self, epoch, n_epochs, *args, **kwargs):
         self.__accuracy = self.current()

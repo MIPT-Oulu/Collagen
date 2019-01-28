@@ -5,7 +5,7 @@ from tensorboardX import SummaryWriter
 from collagen.core import Module, Callback
 from collagen.callbacks import OnGeneratorBatchFreezer, OnDiscriminatorBatchFreezer, BackwardCallback
 from collagen.callbacks import ProgressbarVisualizer, TensorboardSynthesisVisualizer, GeneratorLoss
-from collagen.data import DataProvider, ItemLoader, GANFakeSampler
+from collagen.data import DataProvider, ItemLoader, GANFakeSampler, GaussianNoiseSampler
 from collagen.strategies import GANStrategy
 from collagen.metrics import RunningAverageMeter, AccuracyThresholdMeter
 from collagen.data.utils import get_mnist, auto_detect_device

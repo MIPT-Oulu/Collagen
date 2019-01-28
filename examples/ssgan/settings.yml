@@ -19,7 +19,7 @@ train:
     G:
       fake_unlabeled_latent:
         cate: GaussianNoiseSampler
-        num_samples: 1
+        num_samples: 5
         data_key: "latent"
         target_key: "target"
   meters:

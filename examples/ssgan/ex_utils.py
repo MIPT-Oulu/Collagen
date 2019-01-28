@@ -86,13 +86,13 @@ class Discriminator(Module):
         #                              nn.Sigmoid())  # state size. 1x1x1
 
         self.main_flow = nn.Sequential(OrderedDict([("conv_block1", self._layer1),
-                                                    ("dropout1", self.dropout),
+                                                    # ("dropout1", self.dropout),
                                                     ("conv_block2", self._layer2),
-                                                    ("dropout2", self.dropout),
+                                                    # ("dropout2", self.dropout),
                                                     ("conv_block3", self._layer3),
-                                                    ("dropout3", self.dropout),
+                                                    # ("dropout3", self.dropout),
                                                     ("conv_block4", self._layer4),
-                                                    ("dropout3", self.dropout),
+                                                    # ("dropout3", self.dropout),
                                                     # ("conv_final", self._layer5)
                                                     ]))
 
@@ -108,7 +108,7 @@ class Discriminator(Module):
         o3 = self.main_flow(x)
         validator = self.valid(o3).squeeze(-1).squeeze(-1)
         classifier = self.classify(o3).squeeze(-1).squeeze(-1)
-        return torch.cat((validator, classifier), dim=-1)
+        return torch.cat((classifier, validator), dim=-1)
 
 
 class Generator(nn.Module):
@@ -172,15 +172,15 @@ def parse_item_mnist_ssgan(root, entry, trf):
     # ext_y[0] = 1
     # ext_y[1] = target
     ext_y = np.zeros(11, dtype=np.float32)
-    ext_y[0] = 1.0
+    ext_y[-1] = 1.0
     ext_y[int(round(target))] = 1.0
-    return {'data': img, 'target': ext_y, 'class': target, 'valid': ext_y[0]}
+    return {'data': img, 'target': ext_y, 'class': target, 'valid': ext_y[-1]}
 
 
 def init_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--n_epochs', type=int, default=1000, help='Number of epochs')
-    parser.add_argument('--bs', type=int, default=128, help='Batch size')
+    parser.add_argument('--bs', type=int, default=32, help='Batch size')
     parser.add_argument('--d_lr', type=float, default=1e-4, help='Learning rate (Discriminator)')
     parser.add_argument('--d_wd', type=float, default=1e-4, help='Weight decay (Generator)')
     parser.add_argument('--g_lr', type=float, default=1e-4, help='Learning rate (Discriminator)')

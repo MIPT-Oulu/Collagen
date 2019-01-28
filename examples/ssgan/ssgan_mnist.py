@@ -27,12 +27,12 @@ class SSDicriminatorLoss(Module):
         self.__alpha = alpha
 
     def forward(self, pred: Tensor, target: Tensor):
-        pred_valid = pred[:, 0]
-        pred_cls = pred[:, 1:]
+        pred_valid = pred[:, -1]
+        pred_cls = pred[:, 0:-1]
 
         if len(target.shape) > 1 and target.shape[1] > 1:
-            target_valid = target[:, 0]
-            target_cls = target[:, 1:]
+            target_valid = target[:, -1]
+            target_cls = target[:, 0:-1]
 
             loss_valid = self.__loss_valid(pred_valid, target_valid)
             decoded_target_cls = target_cls.argmax(dim=-1)
@@ -55,7 +55,7 @@ class SSGeneratorLoss(Module):
 
     def forward(self, img: Tensor, target: Tensor):
         output = self.__d_network(img)
-        loss = self.__d_loss(output[:, 0], 1 - target[:, 0])
+        loss = self.__d_loss(output[:, -1], 1 - target[:, -1])
         return loss
 
 
@@ -71,9 +71,9 @@ if __name__ == "__main__":
                            shuffle=True)
 
     num_folds_dict = dict()
-    num_folds_dict["real_labeled_train"] = 2
+    num_folds_dict["real_labeled_train"] = 1
     num_folds_dict["real_unlabeled_train"] = 5
-    num_folds_dict["real_labeled_val"] = 3
+    num_folds_dict["real_labeled_val"] = 4
 
     n_requested_folds = num_folds_dict["real_labeled_val"] + num_folds_dict["real_labeled_train"] + num_folds_dict[
         "real_unlabeled_train"]
