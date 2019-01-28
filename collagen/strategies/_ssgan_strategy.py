@@ -20,8 +20,7 @@ class SSGANStrategy(object):
     """
 
     def __init__(self, data_provider: DataProvider,
-                 train_samples_dict: dict,
-                 eval_samples_dict: dict,
+                 data_sampling_config: dict,
                  d_trainer: Trainer, g_trainer: Trainer,
                  n_epochs: int or None = 100,
                  callbacks: Tuple[Callback] or Callback = None,
@@ -33,10 +32,34 @@ class SSGANStrategy(object):
         self.__callbacks = to_tuple(callbacks)
         self.__data_provider = data_provider
 
-        self.__num_samples_by_name = {"train": train_samples_dict, "eval": eval_samples_dict}
+        self.__data_sampling_config = data_sampling_config
 
-        # TODO: get union of dicriminator's and generator's loader names
-        self.__num_batches = -1
+        self.__num_samples_by_stage = dict()
+        self.__data_key_by_stage = dict()
+        self.__target_key_by_stage = dict()
+        self.__num_batches_by_stage = dict()
+        for stage in self.__stage_names:
+            self.__num_batches_by_stage[stage] = -1
+            self.__data_key_by_stage[stage] = dict()
+            self.__num_samples_by_stage[stage] = dict()
+            self.__target_key_by_stage[stage] = dict()
+            n_samples_dict = dict()
+            for model_name in self.__model_names:
+                data_keys = []
+                target_keys = []
+                data_loader_names = self.__data_sampling_config[stage]["data_provider"][model_name]
+                for loader_name in data_loader_names:
+                    n_samples_dict[loader_name] = data_loader_names[loader_name]["num_samples"]
+                    n_batches = len(self.__data_provider.get_loader_by_name(loader_name))
+                    data_keys.append(data_loader_names[loader_name]["data_key"])
+                    target_keys.append(data_loader_names[loader_name]["target_key"])
+                    if self.__num_batches_by_stage[stage] < n_batches:
+                        self.__num_batches_by_stage[stage] = n_batches
+
+                self.__data_key_by_stage[stage][model_name] = tuple(data_keys)
+                self.__target_key_by_stage[stage][model_name] = tuple(target_keys)
+
+            self.__num_samples_by_stage[stage] = n_samples_dict
 
         self.__use_cuda = torch.cuda.is_available() and device == "cuda"
         self.__device = torch.device("cuda" if self.__use_cuda and torch.cuda.is_available() else "cpu")
@@ -245,7 +268,7 @@ class SSGANStrategy(object):
             for epoch in range(self.__n_epochs):
                 self._on_epoch_begin_callbacks(epoch=epoch, stage=stage, n_epochs=self.__n_epochs)
 
-                progress_bar = tqdm(range(self.__num_batches), total=self.__num_batches,
+                progress_bar = tqdm(range(self.__num_batches_by_stage[stage]), total=self.__num_batches_by_stage[stage],
                                     desc=f'Epoch [{epoch}]::')
                 for batch_i in progress_bar:
                     self._on_sample_begin_callbacks(progress_bar=progress_bar,
@@ -253,7 +276,7 @@ class SSGANStrategy(object):
                                                     n_epochs=self.__n_epochs,
                                                     stage=stage,
                                                     batch_i=batch_i)
-                    self.__data_provider.sample(**self.__num_samples_by_name[stage])
+                    self.__data_provider.sample(**self.__num_samples_by_stage[stage])
                     self._on_sample_end_callbacks(progress_bar=progress_bar,
                                                   epoch=epoch,
                                                   n_epochs=self.__n_epochs,
@@ -271,8 +294,8 @@ class SSGANStrategy(object):
                                                      n_epochs=self.__n_epochs,
                                                      stage=stage,
                                                      batch_i=batch_i)
-                    getattr(self.__trainers["D"], stage)(data_key=self.__discriminator["data_key"],
-                                                                    target_key=self.__discriminator["target_key"])
+                    getattr(self.__trainers["D"], stage)(data_key=self.__data_key_by_stage[stage]["D"],
+                                                         target_key=self.__target_key_by_stage[stage]["D"])
                     self._on_d_batch_end_callbacks(progress_bar=progress_bar,
                                                    epoch=epoch,
                                                    n_epochs=self.__n_epochs,
@@ -283,8 +306,8 @@ class SSGANStrategy(object):
                                                      n_epochs=self.__n_epochs,
                                                      stage=stage,
                                                      batch_i=batch_i)
-                    getattr(self.__trainers["G"], stage)(data_key=self.__generator["data_key"],
-                                                                target_key=self.__generator["target_key"])
+                    getattr(self.__trainers["G"], stage)(data_key=self.__data_key_by_stage[stage]["G"],
+                                                         target_key=self.__target_key_by_stage[stage]["G"])
                     self._on_g_batch_end_callbacks(progress_bar=progress_bar,
                                                    epoch=epoch,
                                                    n_epochs=self.__n_epochs,
