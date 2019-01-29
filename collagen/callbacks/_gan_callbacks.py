@@ -29,6 +29,18 @@ class OnDiscriminatorBatchFreezer(Callback):
         freeze_modules(self.__modules, invert=True)
 
 
+class OnSamplingFreezer(Callback):
+    def __init__(self, modules: Module or Tuple[Module]):
+        super().__init__(type="freezer")
+        self.__modules: Tuple[Module] = to_tuple(modules)
+
+    def on_sample_begin(self, *args, **kwargs):
+        freeze_modules(self.__modules)
+
+    def on_sample_end(self, *args, **kwargs):
+        freeze_modules(self.__modules, invert=True)
+
+
 class GeneratorLoss(Module):
     def __init__(self, d_network, d_loss):
         super(GeneratorLoss, self).__init__()

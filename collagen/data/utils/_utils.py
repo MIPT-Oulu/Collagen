@@ -134,6 +134,7 @@ def freeze_modules(modules: torch.nn.Module or Tuple[torch.nn.Module], invert=Fa
     requires_grad = invert
     _modules = to_tuple(modules)
     for md in _modules:
+        # md.train(requires_grad)
         for param in md.parameters():
             param.requires_grad = requires_grad
 

@@ -1,9 +1,8 @@
-from collagen.core import Trainer, Session, Module
+from collagen.core import Trainer
 from collagen.core import Callback
 from collagen.data import DataProvider
 from collagen.data.utils import to_tuple
-import torch.nn as nn
-from torch.optim import Optimizer
+
 from typing import Tuple
 import torch
 from tqdm import tqdm

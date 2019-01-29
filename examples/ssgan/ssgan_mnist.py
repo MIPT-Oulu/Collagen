@@ -5,7 +5,7 @@ import pandas as pd
 import yaml
 
 from collagen.core import Module, Session, Trainer
-from collagen.callbacks import OnGeneratorBatchFreezer, OnDiscriminatorBatchFreezer, BackwardCallback
+from collagen.callbacks import OnGeneratorBatchFreezer, OnDiscriminatorBatchFreezer, OnSamplingFreezer
 from collagen.callbacks import ProgressbarVisualizer, TensorboardSynthesisVisualizer, ClipGradCallback
 from collagen.data import DataProvider, ItemLoader, SSGANFakeSampler, SSFoldSplit, GaussianNoiseSampler
 from collagen.strategies import SSGANStrategy
@@ -54,8 +54,15 @@ class SSGeneratorLoss(Module):
         self.__d_loss = d_loss
 
     def forward(self, img: Tensor, target: Tensor):
+        # freeze_modules(modules=self.__d_network)
         output = self.__d_network(img)
-        loss = self.__d_loss(output[:, -1], 1 - target[:, -1])
+        # freeze_modules(modules=self.__d_network, invert=True)
+        output_valid = output[:, -1]
+        if len(target.shape) > 1:
+            target_fake = 1 - target[:, -1]
+        else:
+            target_fake = 1 - target
+        loss = self.__d_loss(output_valid, target_fake)
         return loss
 
 
@@ -117,8 +124,13 @@ if __name__ == "__main__":
                                                             latent_size=args.latent_size,
                                                             n_classes=args.n_classes)
 
-    item_loaders['fake_unlabeled_latent'] = GaussianNoiseSampler(batch_size=args.bs, latent_size=args.latent_size,
-                                                                 n_classes=args.n_classes, device=device)
+    item_loaders['fake_unlabeled_latent'] = SSGANFakeSampler(g_network=g_network,
+                                                          batch_size=args.bs,
+                                                          latent_size=args.latent_size,
+                                                          n_classes=args.n_classes)
+
+    # item_loaders['fake_unlabeled_latent'] = GaussianNoiseSampler(batch_size=args.bs, latent_size=args.latent_size,
+    #                                                              n_classes=args.n_classes, device=device)
 
     # item_loaders['fake_unlabeled_latent'] = SSGANFakeSampler(g_network=g_network,
     #                                                          batch_size=args.bs,
@@ -135,7 +147,9 @@ if __name__ == "__main__":
     g_callbacks_eval = (RunningAverageMeter(prefix="eval/G", name="loss"),)
 
     d_callbacks_train = (RunningAverageMeter(prefix="train/D", name="loss"),
-                         BackwardCallback(retain_graph=True),
+                         # BackwardCallback(retain_graph=True),
+                         SSValidityMeter(threshold=0.5, sigmoid=False, prefix="train/D", name="ss_valid"),
+                         SSAccuracyMeter(prefix="train/D", name="ss_acc"),
                          OnDiscriminatorBatchFreezer(modules=g_network))
 
     d_callbacks_eval = (RunningAverageMeter(prefix="eval/D", name="loss"),
@@ -144,6 +158,7 @@ if __name__ == "__main__":
 
     st_callbacks = (ProgressbarVisualizer(update_freq=1),
                     MeterLogging(writer=summary_writer),
+                    OnSamplingFreezer(modules=(g_network, d_network)),
                     TensorboardSynthesisVisualizer(generator_sampler=item_loaders['fake_unlabeled_gen'],
                                                    writer=summary_writer,
                                                    grid_shape=args.grid_shape))
