@@ -95,6 +95,51 @@ class SSFoldSplit(Splitter):
         return self.__cv_folds_idx
 
 
+class SSFoldSplit2(Splitter):
+    def __init__(self, ds: pd.DataFrame, n_ss_folds: int = 3, n_folds: int = 5, target_col: str = 'target',
+                 group_col: str or None = None, random_state: int or None = None,
+                 unlabeled_size: float = 0.5, shuffle: bool = True):
+        super().__init__()
+
+        master_splitter = model_selection.StratifiedKFold(n_splits=n_ss_folds*n_folds, random_state=random_state)
+        unlabeled_idx, labeled_idx = next(master_splitter.split(ds, ds[target_col]))
+        unlabeled_ds = ds.iloc[unlabeled_idx]
+        u_groups = ds[target_col].iloc[unlabeled_idx]
+        labeled_ds = ds.iloc[labeled_idx]
+        l_groups = ds[target_col].iloc[labeled_idx]
+
+        self.__cv_folds_idx = []
+
+        unlabeled_splitter = model_selection.GroupKFold(n_splits=n_folds)
+        unlabeled_spl_iter = unlabeled_splitter.split(unlabeled_ds, unlabeled_ds[target_col], groups=u_groups)
+
+        labeled_splitter = model_selection.GroupKFold(n_splits=n_folds)
+        labeled_spl_iter = labeled_splitter.split(labeled_ds, labeled_ds[target_col], groups=l_groups)
+
+        for i in range(n_folds):
+            u_train, u_test = next(unlabeled_spl_iter)
+            l_train, l_test = next(labeled_spl_iter)
+            self.__cv_folds_idx.append((l_train, l_test, u_train, u_test))
+
+        self.__ds_chunks = [(labeled_ds.iloc[split[0]], labeled_ds.iloc[split[1]], unlabeled_ds.iloc[split[2]], unlabeled_ds.iloc) for split in self.__cv_folds_idx]
+        self.__folds_iter = iter(self.__ds_chunks)
+
+    def __next__(self):
+        return next(self.__folds_iter)
+
+    def __iter__(self):
+        return self
+
+    def fold(self, i):
+        return self.__ds_chunks[i]
+
+    def n_folds(self):
+        return len(self.__cv_folds_idx)
+
+    def fold_idx(self, i):
+        return self.__cv_folds_idx
+
+
 class TrainValSplit(Splitter):
     def __init__(self, ds: pd.DataFrame, train_size: int or float, shuffle: bool, random_state: int or None = None):
         super().__init__()
