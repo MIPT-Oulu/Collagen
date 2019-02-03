@@ -49,20 +49,22 @@ class SSFoldSplit2(Splitter):
     def __init__(self, ds: pd.DataFrame, n_ss_folds: int = 3, n_folds: int = 5, target_col: str = 'target',
                  random_state: int or None = None, labeled_train_size: int = None, unlabeled_train_size: int = None, shuffle: bool = True):
         super().__init__()
-
-        master_splitter = model_selection.StratifiedKFold(n_splits=n_ss_folds*n_folds, random_state=random_state)
+        # Master split into Label/Unlabel
+        master_splitter = model_selection.StratifiedKFold(n_splits=n_ss_folds, random_state=random_state)
         unlabeled_idx, labeled_idx = next(master_splitter.split(ds, ds[target_col]))
         unlabeled_ds = ds.iloc[unlabeled_idx]
         u_groups = ds[target_col].iloc[unlabeled_idx]
         labeled_ds = ds.iloc[labeled_idx]
         l_groups = ds[target_col].iloc[labeled_idx]
 
-        if labeled_train_size > len(labeled_idx):
+        if labeled_train_size is not None and labeled_train_size > len(labeled_idx):
             raise ValueError('Input labeled train size {} is larger than actual labeled train size {}'.format(labeled_train_size, len(labeled_idx)))
 
-        if unlabeled_train_size > len(unlabeled_idx):
+        if unlabeled_train_size is not None and unlabeled_train_size > len(unlabeled_idx):
             raise ValueError('Input unlabeled train size {} is larger than actual unlabeled train size {}'.format(unlabeled_train_size, len(unlabeled_idx)))
 
+        # Split labeled data using GroupKFold
+        # Split unlabeled data using GroupKFold
         self.__cv_folds_idx = []
         self.__ds_chunks = []
         unlabeled_splitter = model_selection.GroupKFold(n_splits=n_folds)
@@ -74,16 +76,21 @@ class SSFoldSplit2(Splitter):
         for i in range(n_folds):
             u_train, u_test = next(unlabeled_spl_iter)
             l_train, l_test = next(labeled_spl_iter)
+            u_train_target = unlabeled_ds.iloc[u_train][target_col]
+            l_train_target = labeled_ds.iloc[l_train][target_col]
+
+            # Sample labeled_train_size of labeled data
             if labeled_train_size is not None:
                 chosen_l_train, _ = model_selection.train_test_split(l_train, train_size=labeled_train_size,
                                                                      random_state=random_state, shuffle=shuffle,
-                                                                     stratify=labeled_ds[target_col])
+                                                                     stratify=l_train_target)
             else:
                 chosen_l_train = l_train
+            # Sample unlabeled_train_size of labeled data
             if unlabeled_train_size is not None:
                 chosen_u_train, _ = model_selection.train_test_split(u_train, train_size=unlabeled_train_size,
                                                                      random_state=random_state, shuffle=shuffle,
-                                                                     stratify=unlabeled_ds[target_col])
+                                                                     stratify=u_train_target)
             else:
                 chosen_u_train = u_train
             self.__cv_folds_idx.append((chosen_l_train, l_test, chosen_u_train, u_test))

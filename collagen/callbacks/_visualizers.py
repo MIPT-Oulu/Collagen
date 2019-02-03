@@ -35,9 +35,10 @@ class ProgressbarVisualizer(Callback):
 
 class TensorboardSynthesisVisualizer(Callback):
     def __init__(self, writer, generator_sampler, key_name: str = "data", tag: str = "Generated",
-                 grid_shape: Tuple[int] = (10, 10)):
+                 grid_shape: Tuple[int] = (10, 10), split_channel=True):
         super().__init__(type="visualizer")
         self.__generator_sampler = generator_sampler
+        self.__split_channel = split_channel
 
         if len(grid_shape) != 2:
             raise ValueError("`grid_shape` must have 2 dim, but found {}".format(len(grid_shape)))
@@ -54,7 +55,16 @@ class TensorboardSynthesisVisualizer(Callback):
         images = []
         for i, dt in enumerate(sampled_data):
             if i < self.__num_images:
-                images += list(torch.unbind(dt[self.__key_name], dim=0))
+                for img in torch.unbind(dt[self.__key_name], dim=0):
+                    if len(img.shape) == 3 and img.shape[0] != 1 and img.shape[0] != 3:
+                        if self.__split_channel:
+                            separate_imgs = torch.unbind(img, dim=0)
+                            concate_img = torch.cat(separate_imgs, dim=-1)
+                            images.append(torch.unsqueeze(concate_img, 0))
+                        else:
+                            raise ValueError("Channels of image ({}) must be either 1 or 3, but found {}".format(img.shape, img.shape[0]))
+                    else:
+                        images.append(img)
             else:
                 break
         grid_images = make_grid(images[:self.__num_images], nrow=self.__grid_shape[0])
