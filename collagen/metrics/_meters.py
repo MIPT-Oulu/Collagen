@@ -143,12 +143,15 @@ class SSAccuracyMeter(Meter):
             n = target.shape[0]
             target_cls = target[:,:-1].float()
             output_cls = output[:,:-1].float()
+            target_valid = target[:, -1].float()
             if device is None:
                 device = output.device
                 target_on_device = target_cls.to(device)
+                target_valid_on_device = target_valid.to(device)
                 output_on_device = output_cls
             else:
                 target_on_device = target_cls.to(device)
+                target_valid_on_device = target_valid.to(device)
                 output_on_device = output_cls.to(device)
 
             if self.__sigmoid:
@@ -158,8 +161,8 @@ class SSAccuracyMeter(Meter):
             discrete_target_on_device = target_on_device.argmax(dim=-1).view(n)
 
             cls = (discrete_output_on_device.byte() == discrete_target_on_device.byte()).float()
-            fp = (target_on_device[:, -1]*cls).sum()
-            total = target_on_device[:, -1].sum().float()
+            fp = (target_valid_on_device*cls).sum()
+            total = target_valid_on_device.sum().float()
             self.__correct_count += fp
             self.__data_count += total
 
