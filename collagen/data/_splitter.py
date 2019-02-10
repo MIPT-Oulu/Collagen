@@ -49,9 +49,10 @@ class FoldSplit(Splitter):
 
 class SSFoldSplit2(Splitter):
     def __init__(self, ds: pd.DataFrame, n_ss_folds: int = 3, n_folds: int = 5, target_col: str = 'target',
-                 random_state: int or None = None, labeled_train_size_per_class: int = None,
+                 random_state: int or None = None,
+                 labeled_train_size_per_class: int = None, unlabeled_train_size_per_class: int = None,
                  labeled_train_size: int = None, unlabeled_train_size: int = None,
-                 equal_target: bool =False, shuffle: bool = True):
+                 equal_target: bool = True, equal_unlabeled_target: bool = True, shuffle: bool = True):
         super().__init__()
         if equal_target and labeled_train_size_per_class is None:
             raise ValueError("labeled_train_size_per_class must be determined when equal_target is True, but found None")
@@ -97,6 +98,7 @@ class SSFoldSplit2(Splitter):
                     filtered_rows_idx = filtered_rows.index
                     chosen_l_train_by_target = resample(filtered_rows_idx, n_samples=labeled_train_size_per_class, replace=True, random_state=random_state)
                     chosen_l_train += chosen_l_train_by_target.tolist()
+                filtered_l_train_idx = l_train_data.loc[chosen_l_train]
             else:
                 if labeled_train_size is not None:
                     chosen_l_train, _ = model_selection.train_test_split(l_train, train_size=labeled_train_size,
@@ -104,21 +106,35 @@ class SSFoldSplit2(Splitter):
                                                                          stratify=l_train_target)
                 else:
                     chosen_l_train = l_train
+                filtered_l_train_idx = labeled_ds.iloc[chosen_l_train]
             # Sample unlabeled_train_size of labeled data
-            if unlabeled_train_size is not None:
-                chosen_u_train, _ = model_selection.train_test_split(u_train, train_size=unlabeled_train_size,
-                                                                     random_state=random_state, shuffle=shuffle,
-                                                                     stratify=u_train_target)
+            # TODO: Use clustering instead
+            if equal_unlabeled_target:
+                u_train_target = unlabeled_ds.iloc[u_train][target_col]
+                u_train_data = unlabeled_ds.iloc[u_train]
+                ideal_labeled_targets = list(set(u_train_target.tolist()))
+                chosen_u_train = []
+                for lt in ideal_labeled_targets:
+                    filtered_rows = u_train_data[u_train_data[target_col] == lt]
+                    filtered_rows_idx = filtered_rows.index
+                    chosen_u_train_by_target = resample(filtered_rows_idx, n_samples=unlabeled_train_size_per_class,
+                                                        replace=True, random_state=random_state)
+                    chosen_u_train += chosen_u_train_by_target.tolist()
+                filtered_u_train_idx = u_train_data.loc[chosen_u_train]
             else:
-                chosen_u_train = u_train
+                if unlabeled_train_size is not None:
+                    chosen_u_train, _ = model_selection.train_test_split(u_train, train_size=unlabeled_train_size,
+                                                                         random_state=random_state, shuffle=shuffle,
+                                                                         stratify=u_train_target)
+                else:
+                    chosen_u_train = u_train
+                filtered_u_train_idx = unlabeled_ds.iloc[chosen_u_train]
+
             self.__cv_folds_idx.append((chosen_l_train, l_test, chosen_u_train, u_test))
 
-            if equal_target:
-                self.__ds_chunks.append((l_train_data.loc[chosen_l_train], labeled_ds.iloc[l_test],
-                                         unlabeled_ds.iloc[chosen_u_train], unlabeled_ds.iloc[u_test]))
-            else:
-                self.__ds_chunks.append((labeled_ds.iloc[chosen_l_train], labeled_ds.iloc[l_test],
-                                        unlabeled_ds.iloc[chosen_u_train], unlabeled_ds.iloc[u_test]))
+
+            self.__ds_chunks.append((filtered_l_train_idx,   labeled_ds.iloc[l_test],
+                                     filtered_u_train_idx, unlabeled_ds.iloc[u_test]))
 
         self.__folds_iter = iter(self.__ds_chunks)
 
