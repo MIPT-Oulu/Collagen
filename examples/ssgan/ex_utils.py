@@ -31,7 +31,8 @@ def init_mnist_transforms():
             slt.RandomRotate(rotation_range=(-10, 10), p=0.5),
             # slt.RandomRotate(rotation_range=(-5, 5), p=0.5),
             slt.PadTransform(pad_to=70),
-            slt.CropTransform(crop_size=64, crop_mode='r')
+            slt.CropTransform(crop_size=64, crop_mode='r'),
+            slt.ImageAdditiveGaussianNoise(p=1.0)
         ]),
         unpack_solt,
         ApplyTransform(Normalize((0.5,), (0.5,)))
@@ -82,9 +83,6 @@ class Discriminator(Module):
                                      nn.BatchNorm2d(ndf * 8),
                                      nn.LeakyReLU(0.2, inplace=True))  # state size. (ndf*4) x 4 x 4
 
-        # self._layer5 = nn.Sequential(nn.Conv2d(ndf * 8, 1, 4, 1, 0, bias=False),
-        #                              nn.Sigmoid())  # state size. 1x1x1
-
         self.main_flow = nn.Sequential(OrderedDict([("conv_block1", self._layer1),
                                                     # ("dropout1", self.dropout),
                                                     ("conv_block2", self._layer2),
@@ -99,7 +97,7 @@ class Discriminator(Module):
         self.valid = nn.Sequential(nn.Conv2d(ndf * 8, 1, 4, 1, 0, bias=False),
                                    nn.Sigmoid())  # state size. 1x1x1
 
-        self.classify = nn.Sequential(nn.Conv2d(ndf * 8, n_cls, 4, 1, 0, bias=False),
+        self.classify = nn.Sequential(nn.Conv2d(ndf * 8, n_cls + 1, 4, 1, 0, bias=False),
                                       nn.Softmax(dim=1))  # state size. n_clsx1x1
 
         self.apply(weights_init)
@@ -168,10 +166,7 @@ def parse_item_mnist_gan(root, entry, trf):
 
 def parse_item_mnist_ssgan(root, entry, trf):
     img, target = trf((entry.img, entry.target))
-    # ext_y = np.zeros(2, dtype=np.int64)
-    # ext_y[0] = 1
-    # ext_y[1] = target
-    ext_y = np.zeros(11, dtype=np.float32)
+    ext_y = np.zeros(10+2, dtype=np.float32)
     ext_y[-1] = 1.0
     ext_y[int(round(target))] = 1.0
     return {'data': img, 'target': ext_y, 'class': target, 'valid': ext_y[-1]}

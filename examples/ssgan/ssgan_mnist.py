@@ -1,16 +1,16 @@
 from torch.nn import BCELoss, CrossEntropyLoss
-from torch import optim, Tensor, argmax
+from torch import optim, Tensor
 from tensorboardX import SummaryWriter
-import pandas as pd
 import yaml
 
 from collagen.core import Module, Session, Trainer
 from collagen.callbacks import OnGeneratorBatchFreezer, OnDiscriminatorBatchFreezer, OnSamplingFreezer
 from collagen.callbacks import ProgressbarVisualizer, TensorboardSynthesisVisualizer, ClipGradCallback
-from collagen.data import DataProvider, ItemLoader, SSGANFakeSampler, SSFoldSplit, GaussianNoiseSampler
+from collagen.callbacks import ConfusionMatrixVisualizer
+from collagen.data import DataProvider, ItemLoader, SSGANFakeSampler, SSFoldSplit2
 from collagen.strategies import SSGANStrategy
 from collagen.metrics import RunningAverageMeter, SSAccuracyMeter, SSValidityMeter
-from collagen.data.utils import get_mnist, auto_detect_device
+from collagen.data.utils import get_mnist, auto_detect_device, to_cpu
 from collagen.logging import MeterLogging
 
 from examples.ssgan.ex_utils import init_args, parse_item_mnist_ssgan, init_mnist_transforms
@@ -38,13 +38,11 @@ class SSDicriminatorLoss(Module):
             decoded_target_cls = target_cls.argmax(dim=-1)
             loss_cls = self.__loss_cls(pred_cls, decoded_target_cls)
 
-            _loss =  self.__alpha * loss_valid + (1 - self.__alpha) * loss_cls
+            _loss = self.__alpha * loss_valid + (1 - self.__alpha) * loss_cls
         else:
             target_valid = target
             _loss = self.__loss_valid(pred_valid, target_valid)
-
-        # target_cls = target_cls.type(torch.int64)
-        return  _loss
+        return _loss
 
 
 class SSGeneratorLoss(Module):
@@ -66,28 +64,31 @@ class SSGeneratorLoss(Module):
         return loss
 
 
+class SSConfusionMatrixVisualizer(ConfusionMatrixVisualizer):
+    def __init__(self, writer, labels: list or None = None, tag="confusion_matrix"):
+        super().__init__(writer=writer, labels=labels, tag=tag)
+
+    def on_forward_end(self, output: Tensor, target: Tensor, **kwargs):
+        if len(target.shape) > 1 and target.shape[1] > 1:
+            pred_cls = output[:, 0:-1]
+            target_cls = target[:, :-1]
+            decoded_pred_cls = pred_cls.argmax(dim=-1)
+            decoded_target_cls = target_cls.argmax(dim=-1)
+            self._corrects += [self._labels[i] for i in to_cpu(decoded_target_cls, use_numpy=True).tolist()]
+            self._predicts += [self._labels[i] for i in to_cpu(decoded_pred_cls, use_numpy=True).tolist()]
+
+
 if __name__ == "__main__":
     args = init_args()
     log_dir = args.log_dir
     comment = "ssgan"
 
     # Data provider
-    n_folds = 10
     train_ds, classes = get_mnist(data_folder=args.save_data, train=True)
-    splitter = SSFoldSplit(train_ds, n_folds=n_folds, target_col="target", unlabeled_size=0.5, val_size=0.4,
-                           shuffle=True)
-
-    num_folds_dict = dict()
-    num_folds_dict["real_labeled_train"] = 1
-    num_folds_dict["real_unlabeled_train"] = 5
-    num_folds_dict["real_labeled_val"] = 4
-
-    n_requested_folds = num_folds_dict["real_labeled_val"] + num_folds_dict["real_labeled_train"] + num_folds_dict[
-        "real_unlabeled_train"]
-    if n_requested_folds > n_folds:
-        raise ValueError(
-            "Number of requested folds must be less or equal to input number of folds, but found {} > {}".
-                format(n_requested_folds, n_folds))
+    n_folds = 5
+    splitter = SSFoldSplit2(train_ds, n_ss_folds=3, n_folds=n_folds, target_col="target", random_state=args.seed,
+                            labeled_train_size_per_class=1000, unlabeled_train_size_per_class=2000,
+                            equal_target=True, equal_unlabeled_target=True, shuffle=True)
 
     summary_writer = SummaryWriter(log_dir=log_dir, comment=comment)
 
@@ -102,40 +103,41 @@ if __name__ == "__main__":
     g_crit = SSGeneratorLoss(d_network=d_network, d_loss=BCELoss()).to(device)
 
     item_loaders = dict()
-    train_labeled_data, train_unlabeled_data, val_labeled_data = next(splitter)
+    train_labeled_data, val_labeled_data, train_unlabeled_data, val_unlabeled_data = next(splitter)
 
     item_loaders["real_labeled_train"] = ItemLoader(meta_data=train_labeled_data,
                                                     transform=init_mnist_transforms()[1],
                                                     parse_item_cb=parse_item_mnist_ssgan,
-                                                    batch_size=args.bs, num_workers=args.num_threads)
+                                                    batch_size=args.bs, num_workers=args.num_threads,
+                                                    shuffle=True)
 
     item_loaders["real_unlabeled_train"] = ItemLoader(meta_data=train_unlabeled_data,
                                                       transform=init_mnist_transforms()[1],
                                                       parse_item_cb=parse_item_mnist_ssgan,
-                                                      batch_size=args.bs, num_workers=args.num_threads)
+                                                      batch_size=args.bs, num_workers=args.num_threads,
+                                                      shuffle=True)
 
     item_loaders["real_labeled_val"] = ItemLoader(meta_data=val_labeled_data,
                                                   transform=init_mnist_transforms()[1],
                                                   parse_item_cb=parse_item_mnist_ssgan,
-                                                  batch_size=args.bs, num_workers=args.num_threads)
+                                                  batch_size=args.bs, num_workers=args.num_threads,
+                                                  shuffle=False)
+
+    item_loaders["real_unlabeled_val"] = ItemLoader(meta_data=val_unlabeled_data,
+                                                    transform=init_mnist_transforms()[1],
+                                                    parse_item_cb=parse_item_mnist_ssgan,
+                                                    batch_size=args.bs, num_workers=args.num_threads,
+                                                    shuffle=False)
 
     item_loaders['fake_unlabeled_gen'] = SSGANFakeSampler(g_network=g_network,
-                                                            batch_size=args.bs,
-                                                            latent_size=args.latent_size,
-                                                            n_classes=args.n_classes)
-
-    item_loaders['fake_unlabeled_latent'] = SSGANFakeSampler(g_network=g_network,
                                                           batch_size=args.bs,
                                                           latent_size=args.latent_size,
                                                           n_classes=args.n_classes)
 
-    # item_loaders['fake_unlabeled_latent'] = GaussianNoiseSampler(batch_size=args.bs, latent_size=args.latent_size,
-    #                                                              n_classes=args.n_classes, device=device)
-
-    # item_loaders['fake_unlabeled_latent'] = SSGANFakeSampler(g_network=g_network,
-    #                                                          batch_size=args.bs,
-    #                                                          latent_size=args.latent_size,
-    #                                                          n_classes=args.n_classes)
+    item_loaders['fake_unlabeled_latent'] = SSGANFakeSampler(g_network=g_network,
+                                                             batch_size=args.bs,
+                                                             latent_size=args.latent_size,
+                                                             n_classes=args.n_classes)
 
     data_provider = DataProvider(item_loaders)
 
@@ -147,14 +149,16 @@ if __name__ == "__main__":
     g_callbacks_eval = (RunningAverageMeter(prefix="eval/G", name="loss"),)
 
     d_callbacks_train = (RunningAverageMeter(prefix="train/D", name="loss"),
-                         # BackwardCallback(retain_graph=True),
                          SSValidityMeter(threshold=0.5, sigmoid=False, prefix="train/D", name="ss_valid"),
                          SSAccuracyMeter(prefix="train/D", name="ss_acc"),
                          OnDiscriminatorBatchFreezer(modules=g_network))
 
     d_callbacks_eval = (RunningAverageMeter(prefix="eval/D", name="loss"),
                         SSValidityMeter(threshold=0.5, sigmoid=False, prefix="eval/D", name="ss_valid"),
-                        SSAccuracyMeter(prefix="eval/D", name="ss_acc"))
+                        SSAccuracyMeter(prefix="eval/D", name="ss_acc"),
+                        SSConfusionMatrixVisualizer(writer=summary_writer,
+                                                    labels=[str(i) for i in range(10)],
+                                                    tag="eval/confusion_matrix"))
 
     st_callbacks = (ProgressbarVisualizer(update_freq=1),
                     MeterLogging(writer=summary_writer),

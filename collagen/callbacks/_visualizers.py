@@ -1,10 +1,55 @@
 import tqdm
 import torch
+import numpy as np
+from torch import Tensor
 from torch.tensor import OrderedDict
 from typing import Tuple
 from collagen.core import Callback
 from collagen.strategies import Strategy
 from torchvision.utils import make_grid
+from collagen.data.utils import to_cpu
+from collagen.metrics import plot_confusion_matrix
+
+
+class ConfusionMatrixVisualizer(Callback):
+    def __init__(self, writer, labels: list or None = None, tag="confusion_matrix"):
+        super().__init__(type="visualizer")
+        self._labels = labels
+        self.__epoch = 0
+        self._writer = writer
+        self._tag = tag
+        self._predicts = []
+        self._corrects = []
+
+    def _reset(self):
+        self._predicts = []
+        self._corrects = []
+
+    def on_epoch_begin(self, epoch, *args, **kwargs):
+        self.__epoch = epoch
+        self._reset()
+
+    def on_forward_end(self, output: Tensor, target: Tensor, **kwargs):
+        if len(target.shape) > 1 and target.shape[1] > 1:
+            decoded_target_cls = target.argmax(dim=-1)
+        elif len(target.shape) == 1:
+            decoded_target_cls = target
+        else:
+            raise ValueError("target dims ({}) must be 1 or 2, but got {}".format(target.shape, len(target.shape)))
+
+        if len(output.shape) > 1 and output.shape[1] > 1:
+            decoded_pred_cls = output.argmax(dim=-1)
+        elif len(output.shape) == 1:
+            decoded_pred_cls = output
+        else:
+            raise ValueError("pred dims ({}) must be 1 or 2, but got {}".format(output.shape, len(output.shape)))
+
+        self._corrects += [self._labels[i] for i in to_cpu(decoded_target_cls, use_numpy=True).tolist()]
+        self._predicts += [self._labels[i] for i in to_cpu(decoded_pred_cls, use_numpy=True).tolist()]
+
+    def on_epoch_end(self, *args, **kwargs):
+        fig = plot_confusion_matrix(np.array(self._corrects), np.array(self._predicts), labels=self._labels)
+        self._writer.add_figure(self._tag, fig, global_step=self.__epoch)
 
 
 class ProgressbarVisualizer(Callback):

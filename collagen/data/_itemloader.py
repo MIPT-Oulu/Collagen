@@ -157,7 +157,7 @@ class SSGANFakeSampler(ItemLoader):
             # freeze_modules(modules=self.__g_network, invert=True)
             target = torch.zeros([self.batch_size, self.__n_classes + 2]).to(fake.device)
             target[:, -2] = 1.0
-            samples.append({'data': fake.detach(), 'target': target, 'latent': noise, 'valid': target[:,-1]})
+            samples.append({'data': fake.detach(), 'target': target, 'latent': noise, 'valid': target[:, -1]})
 
         return samples
 

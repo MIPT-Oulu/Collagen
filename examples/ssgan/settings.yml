@@ -8,18 +8,18 @@ train:
         target_key: "target"
       real_unlabeled_train:
         cate: ItemLoader
-        num_samples: 5
+        num_samples: 1
         data_key: "data"
         target_key: "valid"
       fake_unlabeled_gen:
         cate: SSFakeSampler
-        num_samples: 5
+        num_samples: 1
         data_key: "data"
         target_key: "valid"
     G:
       fake_unlabeled_latent:
         cate: SSFakeSampler
-        num_samples: 5
+        num_samples: 1
         data_key: "latent"
         target_key: "valid"
   meters:
@@ -32,6 +32,11 @@ eval:
         num_samples: 1
         data_key: "data"
         target_key: "target"
+      real_unlabeled_val:
+        cate: ItemLoader
+        num_samples: 1
+        data_key: "data"
+        target_key: "valid"
       fake_unlabeled_gen:
         cate: SSFakeSampler
         num_samples: 1
