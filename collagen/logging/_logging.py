@@ -1,6 +1,4 @@
-from tensorboardX import SummaryWriter
-
-from collagen.core._callback import Callback
+from collagen.callbacks import Callback
 
 
 class Logging(Callback):
@@ -25,7 +23,7 @@ class MeterLogging(Logging):
     def on_batch_end(self, *args, **kwargs):
         pass
 
-    def on_epoch_end(self, epoch, strategy, **kwargs):
-        for cb in strategy.get_callbacks_by_name("minibatch"):
+    def on_epoch_end(self, epoch, strategy, stage, **kwargs):
+        for cb in strategy.get_callbacks_by_name("minibatch", stage=stage):
             if cb.get_type() == "meter":
                 self.__summary_writer.add_scalar(tag=cb.get_name(), scalar_value=cb.current(), global_step=epoch)

@@ -139,26 +139,32 @@ class SSAccuracyMeter(Meter):
         self.__correct_count = 0.0
 
     def on_minibatch_end(self, target, output, device=None, **kwargs):
-        n = target.shape[0]
+        if len(target.shape) > 1 and target.shape[1] > 1:
+            n = target.shape[0]
+            target_cls = target[:,:-1].float()
+            output_cls = output[:,:-1].float()
+            target_valid = target[:, -1].float()
+            if device is None:
+                device = output.device
+                target_on_device = target_cls.to(device)
+                target_valid_on_device = target_valid.to(device)
+                output_on_device = output_cls
+            else:
+                target_on_device = target_cls.to(device)
+                target_valid_on_device = target_valid.to(device)
+                output_on_device = output_cls.to(device)
 
-        if device is None:
-            device = output.device
-            target_on_device = target.to(device)
-            output_on_device = output
-        else:
-            target_on_device = target.to(device)
-            output_on_device = output.to(device)
+            if self.__sigmoid:
+                output_on_device = output_on_device.sigmoid()
 
-        if self.__sigmoid:
-            output_on_device = output_on_device.sigmoid()
+            discrete_output_on_device = output_on_device.argmax(dim=-1).view(n)
+            discrete_target_on_device = target_on_device.argmax(dim=-1).view(n)
 
-        _output_on_device = output_on_device.argmax(dim=-1).view(n)
-
-        cls = (_output_on_device.type(target_on_device.type()) == target_on_device[:, 1]).float()
-        fp = (target_on_device[:, 0].float()*cls).float().sum()
-        total = target_on_device[:, 0].sum().float()
-        self.__correct_count += fp
-        self.__data_count += total
+            cls = (discrete_output_on_device.byte() == discrete_target_on_device.byte()).float()
+            fp = (target_valid_on_device*cls).sum()
+            total = target_valid_on_device.sum().float()
+            self.__correct_count += fp
+            self.__data_count += total
 
     def on_epoch_end(self, epoch, n_epochs, *args, **kwargs):
         self.__accuracy = self.current()
@@ -186,22 +192,39 @@ class SSValidityMeter(Meter):
         self.__correct_count = 0.0
 
     def on_minibatch_end(self, target, output, device=None, **kwargs):
+        if len(target.shape) > 1 and target.shape[1] > 1:
+            target_valid = target[:,-1]
+        elif len(target.shape) == 1:
+            target_valid = target
+        else:
+            raise ValueError("Not support target shape like {}".format(target.shape))
+
+        if len(output.shape) > 1 and output.shape[1] > 1:
+            output_valid = output[:,-1]
+        elif len(output.shape) == 1:
+            output_valid = output
+        else:
+            raise ValueError("Not support output shape like {}".format(output.shape))
+
         n = target.shape[0]
 
         if device is None:
             device = output.device
-            target_on_device = target.to(device)
-            output_on_device = output
+            target_on_device = target_valid.to(device)
+            output_on_device = output_valid
         else:
-            target_on_device = target.to(device)
-            output_on_device = output.to(device)
+            target_on_device = target_valid.to(device)
+            output_on_device = output_valid.to(device)
 
         if self.__sigmoid:
             output_on_device = output_on_device.sigmoid()
 
-        valid = ((output_on_device[:, 0] > self.__threshold) == target_on_device[:, 0].byte()).float()
-        self.__correct_count += valid.sum()
+        valid = ((output_on_device > self.__threshold) == target_on_device.byte()).float()
+        fp = valid.sum()
+        self.__correct_count += fp
         self.__data_count += n
+        acc = self.__correct_count/self.__data_count
+        acc1 = acc
 
     def on_epoch_end(self, epoch, n_epochs, *args, **kwargs):
         self.__accuracy = self.current()

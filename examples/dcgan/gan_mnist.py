@@ -1,112 +1,21 @@
-from collections import OrderedDict
-from typing import Tuple
-import tqdm
-import torch
-from docutils.nodes import comment
 from torch.nn import BCELoss
 from torch import optim
-from torchvision.utils import make_grid
 from tensorboardX import SummaryWriter
 
-from collagen.core import Callback, Session, Module
+from collagen.core import Module, Callback
+from collagen.callbacks import OnGeneratorBatchFreezer, OnDiscriminatorBatchFreezer, BackwardCallback
+from collagen.callbacks import ProgressbarVisualizer, TensorboardSynthesisVisualizer, GeneratorLoss
 from collagen.data import DataProvider, ItemLoader, GANFakeSampler, GaussianNoiseSampler
 from collagen.strategies import GANStrategy
 from collagen.metrics import RunningAverageMeter, AccuracyThresholdMeter
-from collagen.data.utils import get_mnist
+from collagen.data.utils import get_mnist, auto_detect_device
 from collagen.logging import MeterLogging
+
 from examples.dcgan.ex_utils import init_args, parse_item_mnist_gan, init_mnist_transforms
 from examples.dcgan.ex_utils import Discriminator, Generator
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = auto_detect_device()
 
-
-class GeneratorLoss(torch.nn.Module):
-    def __init__(self, d_network, d_loss):
-        super(GeneratorLoss, self).__init__()
-        self.__d_network = d_network
-        self.__d_loss = d_loss
-
-    def forward(self, img: torch.Tensor, target: torch.Tensor):
-        output = self.__d_network(img)
-        loss = self.__d_loss(output, 1 - target)
-        return loss
-
-
-class BackwardCallback(Callback):
-    def __init__(self, retain_graph=True, create_graph=False):
-        super().__init__()
-        self.__retain_graph = retain_graph
-        self.__create_graph = create_graph
-
-    def on_backward_begin(self, session: Session, **kwargs):
-        session.set_backward_param(retain_graph=self.__retain_graph, create_graph=self.__create_graph)
-
-
-class ProgressbarCallback(Callback):
-    def __init__(self, update_freq=1):
-        self.__type = "progressbar"
-        super().__init__(type=self.__type)
-        self.__count = 0
-        self.__update_freq = update_freq
-        if not isinstance(self.__update_freq, int) or self.__update_freq < 1:
-            raise ValueError(
-                "`update_freq` must be `int` and greater than 0, but found {} {}".format(type(self.__update_freq),
-                                                                                         self.__update_freq))
-
-    def _check_freq(self):
-        return self.__count % self.__update_freq == 0
-
-    def on_batch_end(self, strategy: GANStrategy, epoch: int, progress_bar: tqdm, **kwargs):
-        self.__count += 1
-        if self._check_freq():
-            list_metrics_desc = []
-            postfix_progress = OrderedDict()
-            for cb in strategy.get_callbacks_by_name("minibatch"):
-                if cb.get_type() == "meter":
-                    list_metrics_desc.append(str(cb))
-                    postfix_progress[cb.get_name()] = f'{cb.current():.03f}'
-
-            progress_bar.set_postfix(ordered_dict=postfix_progress, refresh=True)
-
-
-class DiscriminatorFreezerCallback(Callback):
-    def __init__(self, d_module: Module):
-        super().__init__(type="freezer")
-        self.__module: Module = d_module
-
-    def on_gan_g_batch_begin(self, *args, **kwargs):
-        self._freeze()
-
-    def on_gan_g_batch_end(self, *args, **kwargs):
-        self._unfreeze()
-
-    def _freeze(self):
-        for param in self.__module.parameters():
-            param.requires_grad = False
-
-    def _unfreeze(self):
-        for param in self.__module.parameters():
-            param.requires_grad = True
-
-
-class GeneratorFreezerCallback(Callback):
-    def __init__(self, g_module: Module):
-        super().__init__(type="freezer")
-        self.__module: Module = g_module
-
-    def on_gan_d_batch_begin(self, *args, **kwargs):
-        self._freeze()
-
-    def on_gan_d_batch_end(self, *args, **kwargs):
-        self._unfreeze()
-
-    def _freeze(self):
-        for param in self.__module.parameters():
-            param.requires_grad = False
-
-    def _unfreeze(self):
-        for param in self.__module.parameters():
-            param.requires_grad = True
 
 class CalmDownDiscCallback(Callback):
     def __init__(self, d_module: Module):
@@ -115,32 +24,6 @@ class CalmDownDiscCallback(Callback):
 
     def on_minibatch_begin(self, **kwargs):
         pass
-
-class TensorboardSynthesisVisualizerCallback(Callback):
-    def __init__(self, writer, generator_sampler: GANFakeSampler, key_name: str = "data", tag: str = "Generated", grid_shape: Tuple[int] = (10, 10)):
-        super().__init__(type="visualizer")
-        self.__generator_sampler = generator_sampler
-
-        if len(grid_shape) != 2:
-            raise ValueError("`grid_shape` must have 2 dim, but found {}".format(len(grid_shape)))
-
-        self.__writer = writer
-        self.__key_name = key_name
-        self.__grid_shape = grid_shape
-        self.__num_images = grid_shape[0] * grid_shape[1]
-        self.__num_batches = self.__num_images // self.__generator_sampler.batch_size + 1
-        self.__tag = tag
-
-    def on_epoch_end(self, epoch, n_epochs, **kwargs):
-        sampled_data = self.__generator_sampler.sample(self.__num_batches)
-        images = []
-        for i, dt in enumerate(sampled_data):
-            if i < self.__num_images:
-                images += list(torch.unbind(dt[self.__key_name], dim=0))
-            else:
-                break
-        grid_images = make_grid(images[:self.__num_images], nrow=self.__grid_shape[0])
-        self.__writer.add_images(self.__tag, img_tensor=grid_images, global_step=epoch, dataformats='CHW')
 
 
 if __name__ == "__main__":
@@ -176,19 +59,19 @@ if __name__ == "__main__":
     data_provider = DataProvider(item_loaders)
 
     # Callbacks
-    g_callbacks = (RunningAverageMeter(prefix="g", name="loss"),)
-                   # DiscriminatorFreezerCallback(d_module=d_network))
+    g_callbacks = (RunningAverageMeter(prefix="g", name="loss"),
+                   OnGeneratorBatchFreezer(modules=d_network))
 
     d_callbacks = (RunningAverageMeter(prefix="d", name="loss"),
                    AccuracyThresholdMeter(threshold=0.5, sigmoid=False, prefix="d", name="acc"),
                    BackwardCallback(retain_graph=True),
-                   GeneratorFreezerCallback(g_module=g_network))
+                   OnDiscriminatorBatchFreezer(modules=g_network))
 
-    st_callbacks = (ProgressbarCallback(update_freq=1),
+    st_callbacks = (ProgressbarVisualizer(update_freq=1),
                     MeterLogging(writer=summary_writer),
-                    TensorboardSynthesisVisualizerCallback(generator_sampler=item_loaders['fake'],
-                                                           grid_shape=args.grid_shape,
-                                                           writer=summary_writer))
+                    TensorboardSynthesisVisualizer(generator_sampler=item_loaders['fake'],
+                                                   grid_shape=args.grid_shape,
+                                                   writer=summary_writer))
 
     # Strategy
     num_samples_dict = {'real': 1, 'fake': 1}
