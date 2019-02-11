@@ -8,7 +8,7 @@ import torch
 from tqdm import tqdm
 
 
-class GANStrategy(object):
+class SSGANStrategy(object):
     """
         Implements a part of the training loop by passing the available batches through the model.
 

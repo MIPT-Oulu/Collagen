@@ -1,5 +1,6 @@
 import copy
 import torch
+from typing import Tuple
 
 
 class ApplyTransform(object):
@@ -127,3 +128,16 @@ def cast_tensor(x, to='float'):
         return x.long()
     else:
         raise NotImplementedError
+
+
+def freeze_modules(modules: torch.nn.Module or Tuple[torch.nn.Module], invert=False):
+    requires_grad = invert
+    _modules = to_tuple(modules)
+    for md in _modules:
+        # md.train(requires_grad)
+        for param in md.parameters():
+            param.requires_grad = requires_grad
+
+
+def auto_detect_device():
+    return torch.device("cuda" if torch.cuda.is_available() else "cpu")

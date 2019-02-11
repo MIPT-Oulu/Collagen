@@ -1,23 +1,25 @@
 from collections import OrderedDict
-from typing import Tuple
 import tqdm
 import torch
+import yaml
 from torch.nn import BCELoss
 from torch import optim
-from torchvision.utils import make_grid
 from tensorboardX import SummaryWriter
 
-from collagen.core import Callback, Session
-from collagen.data import DataProvider, ItemLoader, GANFakeSampler
+from collagen.core import Callback, Session, Trainer
+from collagen.callbacks import OnGeneratorBatchFreezer, OnDiscriminatorBatchFreezer, ClipGradCallback
+from collagen.callbacks import ProgressbarVisualizer, TensorboardSynthesisVisualizer, GeneratorLoss, OnSamplingFreezer
+from collagen.data import DataProvider, ItemLoader, GANFakeSampler, GaussianNoiseSampler, SSFoldSplit
+from collagen.data.utils import auto_detect_device
 from collagen.strategies import GANStrategy
-from collagen.metrics import RunningAverageMeter, AccuracyThresholdMeter
+from collagen.metrics import RunningAverageMeter
 from collagen.data.utils import get_mnist
 from collagen.logging import MeterLogging
+
 from examples.dcgan.ex_utils import init_args, parse_item_mnist_gan, init_mnist_transforms
 from examples.dcgan.ex_utils import Discriminator, Generator
 
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = auto_detect_device()
 
 
 class GeneratorLoss(torch.nn.Module):
@@ -37,6 +39,7 @@ class BackwardCallback(Callback):
         super().__init__()
         self.__retain_graph = retain_graph
         self.__create_graph = create_graph
+
     def on_backward_begin(self, session: Session, **kwargs):
         session.set_backward_param(retain_graph=self.__retain_graph, create_graph=self.__create_graph)
 
@@ -46,14 +49,16 @@ class ProgressbarCallback(Callback):
         self.__type = "progressbar"
         super().__init__(type=self.__type)
         self.__count = 0
-        self.__update_freq=update_freq
+        self.__update_freq = update_freq
         if not isinstance(self.__update_freq, int) or self.__update_freq < 1:
-            raise ValueError("`update_freq` must be `int` and greater than 0, but found {} {}".format(type(self.__update_freq), self.__update_freq))
+            raise ValueError(
+                "`update_freq` must be `int` and greater than 0, but found {} {}".format(type(self.__update_freq),
+                                                                                         self.__update_freq))
 
     def _check_freq(self):
         return self.__count % self.__update_freq == 0
 
-    def on_batch_end(self, strategy: GANStrategy, epoch:int, progress_bar: tqdm, callbacks: Callback, **kwargs):
+    def on_batch_end(self, strategy: GANStrategy, epoch: int, progress_bar: tqdm, callbacks: Callback, **kwargs):
         self.__count += 1
         if self._check_freq():
             list_metrics_desc = []
@@ -66,31 +71,23 @@ class ProgressbarCallback(Callback):
             progress_bar.set_postfix(ordered_dict=postfix_progress, refresh=True)
 
 
-class GeneratorCallback(Callback):
-    def __init__(self, generator_sampler: GANFakeSampler, tag:str = "generated", log_dir:str = None, comment:str = "", grid_shape: Tuple[int] = (6,6)):
-        super().__init__(type="visualizer")
-        self.__generator_sampler = generator_sampler
-
-        if len(grid_shape) != 2:
-            raise ValueError("`grid_shape` must have 2 dim, but found {}".format(len(grid_shape)))
-
-        self.__writer = SummaryWriter(log_dir=log_dir, comment=comment)
-
-        self.__grid_shape = grid_shape
-        self.__num_images = grid_shape[0]*grid_shape[1]
-        self.__tag = tag
-
-    def on_epoch_end(self, *args, **kwargs):
-        images = self.__generator_sampler.sample(self.__num_images)
-        grid_images = make_grid(images, nrow=self.__grid_shape[0], padding=3)
-        self.__writer.add_images(self.__tag, img_tensor=grid_images, global_step=self.__epoch)
-
-
 if __name__ == "__main__":
+    # Setup configs
     args = init_args()
+    n_classes = 10
 
-    # Data
+    # Tensorboard visualization
+    log_dir = args.log_dir
+    comment = args.comment
+    summary_writer = SummaryWriter(log_dir=log_dir, comment=comment)
+
+    # Data provider
     train_ds, classes = get_mnist(data_folder=args.save_data, train=True)
+    splitter = SSFoldSplit(train_ds, n_ss_folds=3, n_folds=5, target_col="target", random_state=args.seed,
+                           labeled_train_size_per_class=1000, unlabeled_train_size_per_class=2000,
+                           equal_target=True, equal_unlabeled_target=True, shuffle=True)
+
+    train_labeled_data, val_labeled_data, train_unlabeled_data, val_unlabeled_data = next(splitter)
 
     # Initializing Discriminator
     d_network = Discriminator(nc=1, ndf=args.d_net_features).to(device)
@@ -105,38 +102,81 @@ if __name__ == "__main__":
     # Data provider
     item_loaders = dict()
 
-    item_loaders['real'] = ItemLoader(meta_data=train_ds,
-                                      transform=init_mnist_transforms()[1],
-                                      parse_item_cb=parse_item_mnist_gan,
-                                      batch_size=args.bs, num_workers=args.num_threads)
+    with open("settings.yml", "r") as f:
+        sampling_config = yaml.load(f)
+
+    item_loaders['real_train'] = ItemLoader(meta_data=train_labeled_data,
+                                            transform=init_mnist_transforms()[1],
+                                            parse_item_cb=parse_item_mnist_gan,
+                                            batch_size=args.bs, num_workers=args.num_threads)
 
     item_loaders['fake'] = GANFakeSampler(g_network=g_network,
-                                          batch_size=args.bs,
-                                          latent_size=args.latent_size)
+                                                batch_size=args.bs,
+                                                latent_size=args.latent_size)
+
+    item_loaders['real_eval'] = ItemLoader(meta_data=val_labeled_data,
+                                           transform=init_mnist_transforms()[1],
+                                           parse_item_cb=parse_item_mnist_gan,
+                                           batch_size=args.bs, num_workers=args.num_threads)
+
+
+
+    item_loaders['noise'] = GaussianNoiseSampler(batch_size=args.bs,
+                                                 latent_size=args.latent_size,
+                                                 device=device, n_classes=n_classes)
 
     data_provider = DataProvider(item_loaders)
 
     # Callbacks
-    g_callbacks = (RunningAverageMeter(prefix="g", name="loss"),)
-    d_callbacks = (RunningAverageMeter(prefix="d", name="loss"),
-                   AccuracyThresholdMeter(threshold=0.5, sigmoid=False, prefix="d", name="acc"),
-                   BackwardCallback(retain_graph=True))
-    st_callbacks = (ProgressbarCallback(update_freq=1),
-                    MeterLogging(log_dir="runs/tbx", comment="dcgan"),
-                    GeneratorCallback(generator_sampler=g_network, log_dir="runs/tbx", grid_shape=(4,4)))
+    g_callbacks_train = (RunningAverageMeter(prefix="train/G", name="loss"),
+                         OnGeneratorBatchFreezer(modules=d_network),
+                         ClipGradCallback(g_network, mode="norm", max_norm=0.1, norm_type=2))
+
+    g_callbacks_eval = RunningAverageMeter(prefix="eval/G", name="loss")
+
+    d_callbacks_train = (RunningAverageMeter(prefix="train/D", name="loss"),
+                         OnDiscriminatorBatchFreezer(modules=g_network))
+
+    d_callbacks_eval = (RunningAverageMeter(prefix="eval/D", name="loss"),)
+
+    st_callbacks = (ProgressbarVisualizer(update_freq=1),
+                    MeterLogging(writer=summary_writer),
+                    OnSamplingFreezer(modules=(g_network, d_network)),
+                    TensorboardSynthesisVisualizer(generator_sampler=item_loaders['fake'],
+                                                   writer=summary_writer,
+                                                   grid_shape=args.grid_shape))
+
+    # Sessions
+    d_session = Session(module=d_network,
+                        optimizer=d_optim,
+                        loss=d_crit)
+
+    g_session = Session(module=g_network,
+                        optimizer=g_optim,
+                        loss=g_crit)
+
+    # Trainers
+    d_trainer = Trainer(data_provider=data_provider,
+                        train_loader_names=tuple(sampling_config["train"]["data_provider"]["D"].keys()),
+                        val_loader_names=tuple(sampling_config["eval"]["data_provider"]["D"].keys()),
+                        session=d_session,
+                        train_callbacks=d_callbacks_train,
+                        val_callbacks=d_callbacks_eval)
+
+    g_trainer = Trainer(data_provider=data_provider,
+                        train_loader_names=tuple(sampling_config["train"]["data_provider"]["G"].keys()),
+                        val_loader_names=tuple(sampling_config["eval"]["data_provider"]["G"].keys()),
+                        session=g_session,
+                        train_callbacks=g_callbacks_train,
+                        val_callbacks=g_callbacks_eval)
 
     # Strategy
-    num_samples_dict = {'real': 1, 'fake': 30}
     dcgan = GANStrategy(data_provider=data_provider,
-                        g_loader_names=('fake'), d_loader_names=('real', 'fake'),
-                        g_criterion=g_crit, d_criterion=d_crit,
-                        g_model=g_network, d_model=d_network,
-                        g_optimizer=g_optim, d_optimizer=d_optim,
-                        g_data_key='latent', d_data_key=('data', 'data'),
-                        g_target_key='target', d_target_key='target',
-                        g_callbacks=g_callbacks, d_callbacks=d_callbacks,
+                        data_sampling_config=sampling_config,
+                        d_trainer=d_trainer,
+                        g_trainer=g_trainer,
+                        n_epochs=args.n_epochs,
                         callbacks=st_callbacks,
-                        n_epochs=args.n_epochs, device=args.device,
-                        num_samples_dict=num_samples_dict)
+                        device=args.device)
 
     dcgan.run()
