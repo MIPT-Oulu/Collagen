@@ -1,4 +1,5 @@
 from collagen.core import Callback
+from sklearn.metrics import cohen_kappa_score
 from collagen.data.utils import to_cpu
 
 
@@ -23,7 +24,6 @@ class Meter(Callback):
 class RunningAverageMeter(Meter):
     def __init__(self, name: str = "loss", prefix=""):
         super().__init__(name=name, prefix=prefix)
-        self.__name = name
         self.__value = 0
         self.__count = 0
         self.__avg_loss = None
@@ -48,7 +48,6 @@ class RunningAverageMeter(Meter):
 class AccuracyMeter(Meter):
     def __init__(self, name: str = "categorical_accuracy", prefix=""):
         super().__init__(name=name, prefix=prefix)
-        self.__name = name
         self.__data_count = 0.0
         self.__correct_count = 0.0
         self.__accuracy = None
@@ -86,7 +85,6 @@ class AccuracyMeter(Meter):
 class AccuracyThresholdMeter(Meter):
     def __init__(self, name: str = "binary_accuracy", threshold: float = 0.5, sigmoid: bool = False, prefix=""):
         super().__init__(name=name, prefix=prefix)
-        self.__name: str = name
         self.__threshold: int = threshold
         self.__sigmoid: bool = sigmoid
         self.__data_count = 0.0
@@ -128,7 +126,6 @@ class AccuracyThresholdMeter(Meter):
 class SSAccuracyMeter(Meter):
     def __init__(self, name: str = "ssl_accuracy", sigmoid: bool = False, prefix=""):
         super().__init__(name=name, prefix=prefix)
-        self.__name: str = name
         self.__sigmoid: bool = sigmoid
         self.__data_count = 0.0
         self.__correct_count = 0.0
@@ -180,7 +177,6 @@ class SSAccuracyMeter(Meter):
 class SSValidityMeter(Meter):
     def __init__(self, name: str = "ssl_validity", threshold: float = 0.5, sigmoid: bool = False, prefix=""):
         super().__init__(name=name, prefix=prefix)
-        self.__name: str = name
         self.__sigmoid: bool = sigmoid
         self.__threshold = threshold
         self.__data_count = 0.0
@@ -235,3 +231,42 @@ class SSValidityMeter(Meter):
         else:
             acc = 0.0
         return to_cpu(acc, use_numpy=True)
+
+
+class KappaMeter(Meter):
+    def __init__(self, name: str = "kappa", prefix="", weight_type="quadratic"):
+        super().__init__(name=name, prefix=prefix)
+        self.__predicts = []
+        self.__corrects = []
+        self.__kappa = None
+        self.__weight_type = weight_type
+
+    def on_epoch_begin(self, epoch, **kwargs):
+        self.__predicts = []
+        self.__corrects = []
+
+    def on_minibatch_end(self, target, output, **kwargs):
+        if len(target.shape) == 2:
+            target_cpu = to_cpu(target.argmax(dim=1), use_numpy=True)
+        elif len(target.shape) == 1:
+            target_cpu = to_cpu(target, use_numpy=True)
+        else:
+            raise ValueError("Only support dims 1 or 2, but got {}".format(len(target.shape)))
+
+        if len(output.shape) == 2:
+            output_cpu = to_cpu(output.argmax(dim=1), use_numpy=True)
+        elif len(output.shape) == 1:
+            output_cpu = to_cpu(output, use_numpy=True)
+        else:
+            raise ValueError("Only support dims 1 or 2, but got {}".format(len(output.shape)))
+
+        self.__predicts += output_cpu.tolist()
+        self.__corrects += target_cpu.tolist()
+
+    def on_epoch_end(self, *args, **kwargs):
+        self.__kappa = self.current()
+
+    def current(self):
+        if len(self.__corrects) != len(self.__predicts):
+            raise ValueError("Predicts and corrects must match, but got {} vs {}".format(len(self.__corrects), len(self.__predicts)))
+        return cohen_kappa_score(self.__corrects, self.__predicts, weights=self.__weight_type)

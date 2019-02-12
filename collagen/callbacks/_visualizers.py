@@ -12,9 +12,10 @@ from collagen.metrics import plot_confusion_matrix
 
 
 class ConfusionMatrixVisualizer(Callback):
-    def __init__(self, writer, labels: list or None = None, tag="confusion_matrix"):
+    def __init__(self, writer, labels: list or None = None, tag="confusion_matrix", normalize = False):
         super().__init__(type="visualizer")
         self._labels = labels
+        self._normalize = normalize
         self.__epoch = 0
         self._writer = writer
         self._tag = tag
@@ -48,7 +49,7 @@ class ConfusionMatrixVisualizer(Callback):
         self._predicts += [self._labels[i] for i in to_cpu(decoded_pred_cls, use_numpy=True).tolist()]
 
     def on_epoch_end(self, *args, **kwargs):
-        fig = plot_confusion_matrix(np.array(self._corrects), np.array(self._predicts), labels=self._labels)
+        fig = plot_confusion_matrix(np.array(self._corrects), np.array(self._predicts), labels=self._labels, normalize=self._normalize)
         self._writer.add_figure(self._tag, fig, global_step=self.__epoch)
 
 
