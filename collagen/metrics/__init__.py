@@ -11,9 +11,9 @@ from ._meters import KappaMeter
 def plot_confusion_matrix(correct_labels, predict_labels, labels, normalize=False):
     cm = confusion_matrix(correct_labels, predict_labels, labels=labels)
     if normalize:
-        cm = cm.astype('float')*100 / cm.sum(axis=1)[:, np.newaxis]
+        cm = cm.astype('float')*100.0 / cm.sum(axis=1)[:, np.newaxis]
         cm = np.nan_to_num(cm, copy=True)
-        cm = cm.astype('int')
+        cm = np.round(cm).astype('int')
 
     np.set_printoptions(precision=2)
 

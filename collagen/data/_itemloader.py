@@ -155,8 +155,8 @@ class SSGANFakeSampler(ItemLoader):
             # freeze_modules(modules=self.__g_network)
             fake: torch.Tensor = self.__g_network(noise_on_device)
             # freeze_modules(modules=self.__g_network, invert=True)
-            target = torch.zeros([self.batch_size, self.__n_classes + 2]).to(fake.device)
-            target[:, -2] = 1.0
+            target = torch.zeros([self.batch_size, self.__n_classes + 1]).to(fake.device)
+            # target[:, -2] = 1.0
             samples.append({'data': fake.detach(), 'target': target, 'latent': noise, 'valid': target[:, -1]})
 
         return samples
@@ -177,8 +177,8 @@ class GaussianNoiseSampler(ItemLoader):
         samples = []
         for _ in range(k):
             noise = torch.randn(self.batch_size, self.latent_size).to(self.device)
-            target = torch.zeros([self.batch_size, self.__n_classes + 2]).to(self.device)
-            target[:, -2] = 1.0
+            target = torch.zeros([self.batch_size, self.__n_classes + 1]).to(self.device)
+            # target[:, -2] = 1.0
             samples.append({'latent': noise, 'target': target, 'valid': target[:, -1]})
 
         return samples
