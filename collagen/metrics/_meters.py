@@ -234,31 +234,34 @@ class SSValidityMeter(Meter):
 
 
 class KappaMeter(Meter):
-    def __init__(self, name: str = "kappa", prefix="", weight_type="quadratic"):
+    def __init__(self, name: str = "kappa", parse_classes = None, prefix="", weight_type="quadratic"):
         super().__init__(name=name, prefix=prefix)
         self.__predicts = []
         self.__corrects = []
         self.__kappa = None
         self.__weight_type = weight_type
-
-    def on_epoch_begin(self, epoch, **kwargs):
-        self.__predicts = []
-        self.__corrects = []
-
-    def on_minibatch_end(self, target, output, **kwargs):
-        if len(target.shape) == 2:
-            target_cpu = to_cpu(target.argmax(dim=1), use_numpy=True)
-        elif len(target.shape) == 1:
-            target_cpu = to_cpu(target, use_numpy=True)
+        if parse_classes is None:
+            self.__parse_classes = self._default_parse_classes
         else:
-            raise ValueError("Only support dims 1 or 2, but got {}".format(len(target.shape)))
+            self.__parse_classes = parse_classes
 
+    def _default_parse_classes(self, output):
         if len(output.shape) == 2:
             output_cpu = to_cpu(output.argmax(dim=1), use_numpy=True)
         elif len(output.shape) == 1:
             output_cpu = to_cpu(output, use_numpy=True)
         else:
             raise ValueError("Only support dims 1 or 2, but got {}".format(len(output.shape)))
+
+        return output_cpu
+
+    def on_epoch_begin(self, epoch, **kwargs):
+        self.__predicts = []
+        self.__corrects = []
+
+    def on_minibatch_end(self, target, output, **kwargs):
+        target_cpu = self.__parse_classes(target)
+        output_cpu = self.__parse_classes(output)
 
         self.__predicts += output_cpu.tolist()
         self.__corrects += target_cpu.tolist()
