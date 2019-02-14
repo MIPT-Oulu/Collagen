@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import torch
+import torch.nn as nn
 from torch.utils.data.sampler import SequentialSampler
 from torch.utils.data.dataloader import default_collate
 
@@ -115,6 +116,32 @@ class ItemLoader(object):
 
             samples.append(batch)
 
+        return samples
+
+
+class FeatureMatchingSampler(ItemLoader):
+    def __init__(self, model: nn.Module, latent_size: int, data_key: str = "data", meta_data: pd.DataFrame or None = None,
+                 parse_item_cb: callable or None = None,
+                 root: str or None = None, batch_size: int = 1, num_workers: int = 0, shuffle: bool = False,
+                 pin_memory: bool = False, collate_fn: callable = default_collate, transform: callable or None = None,
+                 sampler: torch.utils.data.sampler.Sampler or None = None, batch_sampler=None,
+                 drop_last: bool = True, timeout: int = 0):
+        super().__init__(meta_data=meta_data, parse_item_cb=parse_item_cb, root=root, batch_size=batch_size,
+                         num_workers=num_workers, shuffle=shuffle, pin_memory=pin_memory, collate_fn=collate_fn,
+                         transform=transform, sampler=sampler, batch_sampler=batch_sampler, drop_last=drop_last, timeout=timeout)
+        self.__model: nn.Module = model
+        self.__latent_size: int = latent_size
+        self.__data_key = data_key
+
+    def sample(self, k=1):
+        samples = []
+        real_imgs_list = super().sample(k)
+        for i in range(k):
+            real_imgs = real_imgs_list[i][self.__data_key]
+            features = self.__model.get_features(real_imgs)
+            noise = torch.randn(self.batch_size, self.__latent_size)
+            noise_on_device = noise.to(next(self.__model.parameters()).device)
+            samples.append({'real_features': features.detach(), 'latent': noise_on_device})
         return samples
 
 
