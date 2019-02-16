@@ -263,8 +263,9 @@ class KappaMeter(Meter):
         target_cpu = self.__parse_classes(target)
         output_cpu = self.__parse_classes(output)
 
-        self.__predicts += output_cpu.tolist()
-        self.__corrects += target_cpu.tolist()
+        if target_cpu is not None and output_cpu is not None and target_cpu.shape == output_cpu.shape:
+            self.__predicts += output_cpu.tolist()
+            self.__corrects += target_cpu.tolist()
 
     def on_epoch_end(self, *args, **kwargs):
         self.__kappa = self.current()
@@ -272,4 +273,5 @@ class KappaMeter(Meter):
     def current(self):
         if len(self.__corrects) != len(self.__predicts):
             raise ValueError("Predicts and corrects must match, but got {} vs {}".format(len(self.__corrects), len(self.__predicts)))
-        return cohen_kappa_score(self.__corrects, self.__predicts, weights=self.__weight_type)
+        kappa_score = cohen_kappa_score(self.__corrects, self.__predicts, weights=self.__weight_type)
+        return kappa_score
