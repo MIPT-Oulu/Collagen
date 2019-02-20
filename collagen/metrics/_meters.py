@@ -4,10 +4,11 @@ from collagen.data.utils import to_cpu
 
 
 class Meter(Callback):
-    def __init__(self, name: str = "unknown", prefix: str = ""):
+    def __init__(self, name: str = "unknown", prefix: str = "", query_name=None):
         super().__init__(type="meter")
         self.__name = name
         self.__prefix = prefix
+        self.__query_name = query_name
 
     def current(self):
         return None
@@ -17,13 +18,29 @@ class Meter(Callback):
         value = self.current()
         return "{0}: {1:.3f}".format(name, value)
 
+    def _query_loss(self, loss):
+        if isinstance(loss, float):
+            loss_value += loss
+        elif isinstance(loss, tuple):
+            if len(loss) > 1 and self.__query_name in loss[1]:
+                loss_value += loss[self.__query_name]
+            else:
+                loss_value += loss[0]
+        else:
+            loss_value = None
+        return loss_value
+
+    @property
+    def query_name(self):
+        return self.__query_name
+
     def get_name(self):
         return self.__prefix + ("/" if self.__prefix else "") + self.__name
 
 
 class RunningAverageMeter(Meter):
-    def __init__(self, name: str = "loss", prefix=""):
-        super().__init__(name=name, prefix=prefix)
+    def __init__(self, name: str = "loss", prefix="", query_name=None):
+        super().__init__(name=name, prefix=prefix, query_name=query_name)
         self.__value = 0
         self.__count = 0
         self.__avg_loss = None
@@ -32,9 +49,11 @@ class RunningAverageMeter(Meter):
         self.__value = 0
         self.__count = 0
 
-    def on_minibatch_end(self, loss, **kwargs):
-        self.__value += loss
-        self.__count += 1
+    def on_minibatch_end(self, loss, session, **kwargs):
+        loss_value = session.loss.get_loss_by_name(self.query_name)
+        if loss_value is not None:
+            self.__value += loss_value
+            self.__count += 1
 
     def on_epoch_end(self, *args, **kwargs):
         self.__avg_loss = self.current()
