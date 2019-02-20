@@ -135,7 +135,7 @@ class SSAccuracyMeter(Meter):
         self.__data_count = 0.0
         self.__correct_count = 0.0
 
-    def on_minibatch_end(self, target, output, device=None, **kwargs):
+    def _calc_metric(self, target, output, device=None, **kwargs):
         if len(target.shape) > 1 and target.shape[1] > 1:
             n = target.shape[0]
             target_cls = target[:,:-1].float()
@@ -162,6 +162,9 @@ class SSAccuracyMeter(Meter):
             total = target_valid_on_device.sum().float()
             self.__correct_count += fp
             self.__data_count += total
+
+    def on_minibatch_end(self, target, output, device=None, **kwargs):
+        self._calc_metric(target, output, device, **kwargs)
 
     def on_epoch_end(self, epoch, n_epochs, *args, **kwargs):
         self.__accuracy = self.current()

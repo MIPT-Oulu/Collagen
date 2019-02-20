@@ -167,24 +167,39 @@ class GANFakeSampler(ItemLoader):
 
 
 class SSGANFakeSampler(ItemLoader):
-    def __init__(self, g_network, batch_size, latent_size, n_classes):
+    def __init__(self, g_network, batch_size, latent_size, n_classes, use_aux_target=False, same_class_batch=False):
         super().__init__(meta_data=None, parse_item_cb=None)
         self.__latent_size = latent_size
         self.batch_size = batch_size
         self.__g_network = g_network
         self.__n_classes = n_classes
+        self.__use_aux_target = use_aux_target
+        self.__sample_class_batch = same_class_batch
 
     def sample(self, k=1):
         samples = []
-        for _ in range(k):
-            noise = torch.randn(self.batch_size, self.__latent_size)
+        for i in range(k):
+            in_channels = self.__latent_size + self.__n_classes if self.__use_aux_target else self.__latent_size
+            noise = torch.randn(self.batch_size, in_channels)
             noise_on_device = noise.to(next(self.__g_network.parameters()).device)
-            # freeze_modules(modules=self.__g_network)
+
             fake: torch.Tensor = self.__g_network(noise_on_device)
-            # freeze_modules(modules=self.__g_network, invert=True)
+
             target = torch.zeros([self.batch_size, self.__n_classes + 1]).to(fake.device)
-            # target[:, -2] = 1.0
-            samples.append({'data': fake.detach(), 'target': target, 'latent': noise, 'valid': target[:, -1]})
+
+            if self.__use_aux_target:
+                if self.__sample_class_batch:
+                    target_cls = torch.ones([self.batch_size, 1], dtype=torch.int64)*(i%self.__n_classes)
+                else:
+                    target_cls = torch.randint(self.__n_classes, size=(self.batch_size, 1))
+                target_val = torch.zeros([self.batch_size, 1], dtype=torch.int64)
+                target_aux = torch.cat((target_cls, target_val), dim=1)
+
+            samples.append({'data': fake.detach(),
+                            'target': target,
+                            'latent': noise,
+                            'valid': target[:, -1],
+                            'aux_target': target_aux if self.__use_aux_target else None})
 
         return samples
 
