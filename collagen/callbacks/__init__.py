@@ -2,6 +2,7 @@ from typing import Tuple
 from torch.nn.utils import clip_grad_value_, clip_grad_norm_
 from collagen.core import Callback, Module
 from collagen.data.utils import to_tuple
+from ._lr_schedulers import LRScheduler
 from ._visualizers import ProgressbarVisualizer, TensorboardSynthesisVisualizer
 from ._visualizers import plot_confusion_matrix, ConfusionMatrixVisualizer
 from ._gan_callbacks import OnDiscriminatorBatchFreezer, OnGeneratorBatchFreezer, GeneratorLoss, OnSamplingFreezer
