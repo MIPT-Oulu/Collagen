@@ -8,7 +8,7 @@ class Meter(Callback):
         super().__init__(type="meter")
         self.__name = name
         self.__prefix = prefix
-        self.__query_name = query_name
+        self.__query_name = query_name if query_name is not None else self.__name
 
     def current(self):
         return None
@@ -20,12 +20,12 @@ class Meter(Callback):
 
     def _query_loss(self, loss):
         if isinstance(loss, float):
-            loss_value += loss
+            loss_value = loss
         elif isinstance(loss, tuple):
             if len(loss) > 1 and self.__query_name in loss[1]:
-                loss_value += loss[self.__query_name]
+                loss_value = loss[self.__query_name]
             else:
-                loss_value += loss[0]
+                loss_value = loss[0]
         else:
             loss_value = None
         return loss_value
@@ -50,7 +50,10 @@ class RunningAverageMeter(Meter):
         self.__count = 0
 
     def on_minibatch_end(self, loss, session, **kwargs):
-        loss_value = session.loss.get_loss_by_name(self.query_name)
+        if hasattr(session.loss, 'get_loss_by_name'):
+            loss_value = session.loss.get_loss_by_name(self.query_name)
+        else:
+            loss_value = loss
         if loss_value is not None:
             self.__value += loss_value
             self.__count += 1
