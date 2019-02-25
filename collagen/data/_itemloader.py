@@ -141,7 +141,7 @@ class FeatureMatchingSampler(ItemLoader):
             features = self.__model.get_features(real_imgs)
             noise = torch.randn(self.batch_size, self.__latent_size)
             noise_on_device = noise.to(next(self.__model.parameters()).device)
-            samples.append({'real_features': features.detach(), 'latent': noise_on_device})
+            samples.append({'real_features': features.detach(), 'real_data': real_imgs, 'latent': noise_on_device})
         return samples
 
 

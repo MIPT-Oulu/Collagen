@@ -194,8 +194,15 @@ class Session(object):
                 target = target[0]
 
             # Transfer input and target into proper device
-            batch_on_device = batch.to(module_device)
-            target_on_device = target.to(module_device)
+            if isinstance(batch, tuple) or isinstance(batch, list):
+                batch_on_device = tuple([b.to(module_device) for b in batch])
+            else:
+                batch_on_device = batch.to(module_device)
+
+            if isinstance(target, tuple) or isinstance(target, list):
+                target_on_device = tuple([t.to(module_device) for t in target])
+            else:
+                target_on_device = target.to(module_device)
 
             # Forward
             for cb in callbacks:

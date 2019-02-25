@@ -98,5 +98,7 @@ class DataProvider(object):
     def get_loader_by_name(self, name):
         if name in self.__loaders:
             return self.__loaders[name]
+        elif isinstance(name, tuple) or isinstance(name, list):
+            return tuple([self.__loaders[s] for s in name])
         else:
             raise ValueError("`{}` not found in list of loader names".format(name))

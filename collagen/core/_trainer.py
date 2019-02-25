@@ -105,12 +105,16 @@ class Trainer(object):
                                           batches_count=self.__train_batches_count,
                                           batch=batch,
                                           data_key=data_key[ind],
-                                          target_key=target_key,
+                                          target_key=target_key[ind],
                                           session=self.__session)
 
                 input_data = batch[data_key[ind]]
                 # target = tuple([cast_tensor(batch[key_i], cast_target) for key_i in target_key])
-                target = cast_tensor(batch[target_key[ind]], cast_target)
+                if isinstance(target_key[ind], str):
+                    target = cast_tensor(batch[target_key[ind]], cast_target)
+                elif isinstance(target_key[ind], list) or isinstance(target_key[ind], tuple):
+                    target = tuple([cast_tensor(batch[key_i], cast_target) for key_i in target_key[ind]])
+
                 loss, train_result = self.__session.train_step(input_data,
                                                                target,
                                                                accumulate_grad=accumulate_grad,
@@ -134,12 +138,16 @@ class Trainer(object):
                                       batches_count=self.__train_batches_count,
                                       batch=batch,
                                       data_key=data_key[ind],
-                                      target_key=target_key,
+                                      target_key=target_key[ind],
                                       session=self.__session)
 
             input_data = batch[data_key[ind]]
-            # target = tuple([cast_tensor(batch[key_i], cast_target) for key_i in target_key])
-            target = cast_tensor(batch[target_key[ind]], cast_target)
+
+            if isinstance(target_key[ind], str):
+                target = cast_tensor(batch[target_key[ind]], cast_target)
+            elif isinstance(target_key[ind], list) or isinstance(target_key[ind], tuple):
+                target = tuple([cast_tensor(batch[key_i], cast_target) for key_i in target_key[ind]])
+
             loss, train_result = self.__session.train_step(input_data,
                                                            target,
                                                            accumulate_grad=False,
@@ -197,13 +205,16 @@ class Trainer(object):
                                           batches_count=self.__eval_batches_count,
                                           batch=batch,
                                           data_key=data_key[ind],
-                                          target_key=target_key,
+                                          target_key=target_key[ind],
                                           session=self.__session)
 
                 input_data = batch[data_key[ind]]
-                target = tuple([cast_tensor(batch[key_i], cast_target) for key_i in target_key])
+                if isinstance(target_key[ind], str):
+                    target = cast_tensor(batch[target_key[ind]], cast_target)
+                elif isinstance(target_key[ind], list) or isinstance(target_key[ind], tuple):
+                    target = tuple([cast_tensor(batch[key_i], cast_target) for key_i in target_key[ind]])
                 loss, eval_result = self.__session.eval_step(input_data,
-                                                             target[ind],
+                                                             target,
                                                              return_out=True,
                                                              callbacks=self.__val_callbacks)
                 self.__eval_batches_count += 1
@@ -214,7 +225,7 @@ class Trainer(object):
                                         loss=loss,
                                         input=input_data,
                                         output=eval_result,
-                                        target=target[ind],
+                                        target=target,
                                         data_key=data_key[ind],
                                         target_key=target_key[ind],
                                         session=self.__session)
@@ -229,10 +240,14 @@ class Trainer(object):
                                       session=self.__session)
 
             input_data = batch[data_key[ind]]
-            target = tuple([cast_tensor(batch[key_i], cast_target) for key_i in target_key])
+            if isinstance(target_key[ind], str):
+                target = cast_tensor(batch[target_key[ind]], cast_target)
+            elif isinstance(target_key[ind], list) or isinstance(target_key[ind], tuple):
+                target = tuple([cast_tensor(batch[key_i], cast_target) for key_i in target_key[ind]])
+
             # target = cast_tensor(batch[key_i], cast_target)
             loss, eval_result = self.__session.eval_step(input_data,
-                                                         target[ind],
+                                                         target,
                                                          return_out=True,
                                                          callbacks=self.__val_callbacks)
             self.__eval_batches_count += 1
@@ -243,7 +258,7 @@ class Trainer(object):
                                     loss=loss,
                                     input=input_data,
                                     output=eval_result,
-                                    target=target[ind],
+                                    target=target,
                                     data_key=data_key[ind],
                                     target_key=target_key[ind],
                                     session=self.__session)
