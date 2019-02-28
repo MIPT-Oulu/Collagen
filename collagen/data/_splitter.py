@@ -49,7 +49,7 @@ class FoldSplit(Splitter):
 
 class SSFoldSplit(Splitter):
     def __init__(self, ds: pd.DataFrame, n_ss_folds: int = 3, n_folds: int = 5, target_col: str = 'target',
-                 random_state: int or None = None,
+                 random_state: int or None = None, unlabeled_target_col: str = '5means_classes',
                  labeled_train_size_per_class: int = None, unlabeled_train_size_per_class: int = None,
                  labeled_train_size: int = None, unlabeled_train_size: int = None,
                  equal_target: bool = True, equal_unlabeled_target: bool = True, shuffle: bool = True):
