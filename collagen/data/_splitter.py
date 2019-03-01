@@ -3,17 +3,35 @@ from sklearn.utils import resample
 from collagen.data import ItemLoader
 from random import shuffle as shuffle_list
 import pandas as pd
+import dill as pickle
 
 
 class Splitter(object):
     def __init__(self):
+        self.__ds_chunks = None
+        self.__folds_iter = None
         pass
 
     def __next__(self):
-        raise NotImplementedError
+        if self.__folds_iter is None:
+            raise NotImplementedError
+        else:
+            next(self.__folds_iter)
 
     def __iter__(self):
-        raise NotImplementedError
+        if self.__ds_chunks is None:
+            raise NotImplementedError
+        else:
+            return self
+
+    def dump(self, filename):
+        with open(filename, "wb") as f:
+            pickle.dump(self.__ds_chunks, f)
+
+    def load(self, filename):
+        with open(filename, "rb") as f:
+            self.__ds_chunks = pickle.load(f)
+            self.__folds_iter = iter(self.__ds_chunks)
 
 
 class FoldSplit(Splitter):
@@ -60,7 +78,7 @@ class SSFoldSplit(Splitter):
         master_splitter = model_selection.StratifiedKFold(n_splits=n_ss_folds, random_state=random_state)
         unlabeled_idx, labeled_idx = next(master_splitter.split(ds, ds[target_col]))
         unlabeled_ds = ds.iloc[unlabeled_idx]
-        u_groups = ds[target_col].iloc[unlabeled_idx]
+        # u_groups = ds[unlabeled_target_col].iloc[unlabeled_idx]
         labeled_ds = ds.iloc[labeled_idx]
         l_groups = ds[target_col].iloc[labeled_idx]
 
@@ -68,7 +86,8 @@ class SSFoldSplit(Splitter):
             raise ValueError('Input labeled train size {} is larger than actual labeled train size {}'.format(labeled_train_size, len(labeled_idx)))
 
         if unlabeled_train_size is not None and unlabeled_train_size > len(unlabeled_idx):
-            raise ValueError('Input unlabeled train size {} is larger than actual unlabeled train size {}'.format(unlabeled_train_size, len(unlabeled_idx)))
+            unlabeled_train_size = len(unlabeled_idx)
+            # raise ValueError('Input unlabeled train size {} is larger than actual unlabeled train size {}'.format(unlabeled_train_size, len(unlabeled_idx)))
 
         # Split labeled data using GroupKFold
         # Split unlabeled data using GroupKFold
@@ -76,8 +95,12 @@ class SSFoldSplit(Splitter):
         self.__ds_chunks = []
 
         # split of unlabeled data
-        unlabeled_splitter = model_selection.StratifiedKFold(n_splits=n_folds, random_state=random_state+1)
-        unlabeled_spl_iter = unlabeled_splitter.split(unlabeled_ds, unlabeled_ds[target_col])
+        if equal_unlabeled_target:
+            unlabeled_splitter = model_selection.StratifiedKFold(n_splits=n_folds, random_state=random_state+1)
+            unlabeled_spl_iter = unlabeled_splitter.split(unlabeled_ds, unlabeled_ds[unlabeled_target_col])
+        else:
+            unlabeled_splitter = model_selection.KFold(n_splits=n_folds, random_state=random_state + 1)
+            unlabeled_spl_iter = unlabeled_splitter.split(unlabeled_ds)
 
         labeled_splitter = model_selection.StratifiedKFold(n_splits=n_folds, random_state=random_state+2)
         labeled_spl_iter = labeled_splitter.split(labeled_ds, labeled_ds[target_col])
@@ -85,7 +108,8 @@ class SSFoldSplit(Splitter):
         for i in range(n_folds):
             u_train, u_test = next(unlabeled_spl_iter)
             l_train, l_test = next(labeled_spl_iter)
-            u_train_target = unlabeled_ds.iloc[u_train][target_col]
+            if equal_unlabeled_target:
+                u_train_target = unlabeled_ds.iloc[u_train][unlabeled_target_col]
             l_train_target = labeled_ds.iloc[l_train][target_col]
             l_train_data = labeled_ds.iloc[l_train]
 
@@ -108,14 +132,13 @@ class SSFoldSplit(Splitter):
                     chosen_l_train = l_train
                 filtered_l_train_idx = labeled_ds.iloc[chosen_l_train]
             # Sample unlabeled_train_size of labeled data
-            # TODO: Use clustering instead
             if equal_unlabeled_target:
-                u_train_target = unlabeled_ds.iloc[u_train][target_col]
+                u_train_target = unlabeled_ds.iloc[u_train][unlabeled_target_col]
                 u_train_data = unlabeled_ds.iloc[u_train]
                 ideal_labeled_targets = list(set(u_train_target.tolist()))
                 chosen_u_train = []
                 for lt in ideal_labeled_targets:
-                    filtered_rows = u_train_data[u_train_data[target_col] == lt]
+                    filtered_rows = u_train_data[u_train_data[unlabeled_target_col] == lt]
                     filtered_rows_idx = filtered_rows.index
                     chosen_u_train_by_target = resample(filtered_rows_idx, n_samples=unlabeled_train_size_per_class,
                                                         replace=True, random_state=random_state)
@@ -123,9 +146,10 @@ class SSFoldSplit(Splitter):
                 filtered_u_train_idx = u_train_data.loc[chosen_u_train]
             else:
                 if unlabeled_train_size is not None:
-                    chosen_u_train, _ = model_selection.train_test_split(u_train, train_size=unlabeled_train_size,
-                                                                         random_state=random_state, shuffle=shuffle,
-                                                                         stratify=u_train_target)
+                    # chosen_u_train, _ = model_selection.train_test_split(u_train, train_size=unlabeled_train_size,
+                    #                                                      random_state=random_state, shuffle=shuffle)
+                    is_replace = unlabeled_train_size > len(u_train)
+                    chosen_u_train = resample(u_train, n_samples=unlabeled_train_size, replace=is_replace, random_state=random_state)
                 else:
                     chosen_u_train = u_train
                 filtered_u_train_idx = unlabeled_ds.iloc[chosen_u_train]
@@ -137,6 +161,22 @@ class SSFoldSplit(Splitter):
                                      filtered_u_train_idx, unlabeled_ds.iloc[u_test]))
 
         self.__folds_iter = iter(self.__ds_chunks)
+
+    def _sampling(self, l_train_data, l_train_target, target_col, labeled_train_size_per_class, random_state):
+        labeled_targets = list(set(l_train_target.tolist()))
+        chosen_l_train = []
+        for lt in labeled_targets:
+            filtered_rows = l_train_data[l_train_data[target_col] == lt]
+            filtered_rows_idx = filtered_rows.index
+            chosen_l_train_by_target = resample(filtered_rows_idx, n_samples=labeled_train_size_per_class, replace=True,
+                                                random_state=random_state)
+            chosen_l_train += chosen_l_train_by_target.tolist()
+        filtered_l_train_idx = l_train_data.loc[chosen_l_train]
+        return chosen_l_train, filtered_l_train_idx
+
+    def dump(self, filename):
+        with open(filename, "wb") as f:
+            pickle.dump(self.__ds_chunks, f)
 
     def __next__(self):
         return next(self.__folds_iter)
