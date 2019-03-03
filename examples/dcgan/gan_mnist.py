@@ -10,7 +10,7 @@ from collagen.core import Callback, Session, Trainer
 from collagen.callbacks import OnGeneratorBatchFreezer, OnDiscriminatorBatchFreezer, ClipGradCallback
 from collagen.callbacks import ProgressbarVisualizer, TensorboardSynthesisVisualizer, GeneratorLoss, OnSamplingFreezer
 from collagen.data import DataProvider, ItemLoader, GANFakeSampler, GaussianNoiseSampler, SSFoldSplit
-from collagen.data.utils import auto_detect_device
+from collagen.core.utils import auto_detect_device
 from collagen.strategies import GANStrategy
 from collagen.metrics import RunningAverageMeter
 from collagen.data.utils import get_mnist
@@ -47,7 +47,7 @@ class BackwardCallback(Callback):
 class ProgressbarCallback(Callback):
     def __init__(self, update_freq=1):
         self.__type = "progressbar"
-        super().__init__(type=self.__type)
+        super().__init__(ctype=self.__type)
         self.__count = 0
         self.__update_freq = update_freq
         if not isinstance(self.__update_freq, int) or self.__update_freq < 1:
@@ -64,9 +64,9 @@ class ProgressbarCallback(Callback):
             list_metrics_desc = []
             postfix_progress = OrderedDict()
             for cb in callbacks:
-                if cb.get_type() == "meter":
+                if cb.ctype == "meter":
                     list_metrics_desc.append(str(cb))
-                    postfix_progress[cb.get_name()] = f'{cb.current():.03f}'
+                    postfix_progress[cb.desc] = f'{cb.current():.03f}'
 
             progress_bar.set_postfix(ordered_dict=postfix_progress, refresh=True)
 
@@ -118,8 +118,6 @@ if __name__ == "__main__":
                                            transform=init_mnist_transforms()[1],
                                            parse_item_cb=parse_item_mnist_gan,
                                            batch_size=args.bs, num_workers=args.num_threads)
-
-
 
     item_loaders['noise'] = GaussianNoiseSampler(batch_size=args.bs,
                                                  latent_size=args.latent_size,

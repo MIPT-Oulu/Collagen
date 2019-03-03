@@ -5,13 +5,13 @@ from os import mkdir, remove
 from typing import Tuple
 import torch
 from collagen.core import Callback
-from collagen.data.utils import to_tuple
+from collagen.core.utils import to_tuple
 
 
 class ModelSaver(Callback):
     def __init__(self, metric_names: Tuple[str] or str, conditions: Tuple[str] or str, model: nn.Module,
                  save_dir: str, prefix: str = "", keep_best_only: bool = True):
-        super().__init__(type="saver")
+        super().__init__(ctype="saver")
         self.__metric_names = to_tuple(metric_names)
         self.__conditions = to_tuple(conditions)
         self.__prefix = prefix if prefix else "model"
@@ -54,8 +54,8 @@ class ModelSaver(Callback):
     def on_epoch_end(self, epoch, stage, strategy, **kwargs):
         improved_metrics = dict()
         for cb in strategy.get_callbacks_by_name("minibatch", stage=stage):
-            cb_name = cb.get_name()
-            if cb.get_type() == "meter" and cb_name in self.__best_metrics:
+            cb_name = cb.desc
+            if cb.ctype == "meter" and cb_name in self.__best_metrics:
                 cb_value = cb.current()
                 if self.__check_cond(value=cb_value, metric_name=cb_name):
                     improved_metrics[cb_name] = cb_value

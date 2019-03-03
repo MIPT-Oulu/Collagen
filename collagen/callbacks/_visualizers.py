@@ -7,13 +7,13 @@ from typing import Tuple
 from collagen.core import Callback
 from collagen.strategies import Strategy
 from torchvision.utils import make_grid
-from collagen.data.utils import to_cpu
+from collagen.core.utils import to_cpu
 from collagen.metrics import plot_confusion_matrix
 
 
 class ConfusionMatrixVisualizer(Callback):
     def __init__(self, writer, labels: list or None = None, tag="confusion_matrix", normalize = False):
-        super().__init__(type="visualizer")
+        super().__init__(ctype="visualizer")
         self._labels = labels
         self._normalize = normalize
         self.__epoch = 0
@@ -55,7 +55,7 @@ class ConfusionMatrixVisualizer(Callback):
 
 class ProgressbarVisualizer(Callback):
     def __init__(self, update_freq=1):
-        super().__init__(type="visualizer")
+        super().__init__(ctype="visualizer")
         self.__count = 0
         self.__update_freq = update_freq
         if not isinstance(self.__update_freq, int) or self.__update_freq < 1:
@@ -72,9 +72,9 @@ class ProgressbarVisualizer(Callback):
             list_metrics_desc = []
             postfix_progress = OrderedDict()
             for cb in strategy.get_callbacks_by_name("minibatch", stage=stage):
-                if cb.get_type() == "meter":
+                if cb.ctype == "meter":
                     list_metrics_desc.append(str(cb))
-                    postfix_progress[cb.get_name()] = f'{cb.current():.03f}'
+                    postfix_progress[cb.desc] = f'{cb.current():.03f}'
 
             progress_bar.set_postfix(ordered_dict=postfix_progress, refresh=True)
 
@@ -82,7 +82,7 @@ class ProgressbarVisualizer(Callback):
 class TensorboardSynthesisVisualizer(Callback):
     def __init__(self, writer, generator_sampler, key_name: str = "data", tag: str = "Generated",
                  grid_shape: Tuple[int] = (10, 10), split_channel=True, zero_center=True):
-        super().__init__(type="visualizer")
+        super().__init__(ctype="visualizer")
         self.__generator_sampler = generator_sampler
         self.__split_channel = split_channel
 

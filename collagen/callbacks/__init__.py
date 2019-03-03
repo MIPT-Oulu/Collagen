@@ -1,7 +1,7 @@
 from typing import Tuple
 from torch.nn.utils import clip_grad_value_, clip_grad_norm_
 from collagen.core import Callback, Module
-from collagen.data.utils import to_tuple
+from collagen.core.utils import to_tuple
 from ._lr_schedulers import LRScheduler
 from ._visualizers import ProgressbarVisualizer, TensorboardSynthesisVisualizer
 from ._visualizers import plot_confusion_matrix, ConfusionMatrixVisualizer
@@ -22,7 +22,7 @@ class ClipGradCallback(Callback):
     modes = ["norm", "value"]
 
     def __init__(self, modules: Tuple[Module] or Module, mode: str = "norm", **kwargs):
-        super().__init__(type="tuner")
+        super().__init__(ctype="tuner")
         if mode not in self.modes:
             raise ValueError("Mode must be in {}".format(self.modes))
 

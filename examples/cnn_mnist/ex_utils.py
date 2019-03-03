@@ -12,7 +12,7 @@ import solt.core as slc
 import solt.transforms as slt
 
 from collagen.data.utils import ApplyTransform, Normalize, Compose
-from collagen.data.utils import to_cpu
+from collagen.core.utils import to_cpu
 from collagen.core import Module, Callback
 
 

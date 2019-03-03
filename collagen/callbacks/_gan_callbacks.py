@@ -1,13 +1,13 @@
 from typing import Tuple
-from torch.nn import BCELoss, Module
+from torch.nn import Module
 from torch import Tensor
 from collagen.core import Module, Callback
-from collagen.data.utils import to_tuple, freeze_modules
+from collagen.core.utils import to_tuple, freeze_modules
 
 
 class OnGeneratorBatchFreezer(Callback):
     def __init__(self, modules: Module or Tuple[Module]):
-        super().__init__(type="freezer")
+        super().__init__(ctype="freezer")
         self.__modules: Tuple[Module] = to_tuple(modules)
 
     def on_gan_g_batch_begin(self, *args, **kwargs):
@@ -19,7 +19,7 @@ class OnGeneratorBatchFreezer(Callback):
 
 class OnDiscriminatorBatchFreezer(Callback):
     def __init__(self, modules: Module or Tuple[Module]):
-        super().__init__(type="freezer")
+        super().__init__(ctype="freezer")
         self.__modules: Tuple[Module] = to_tuple(modules)
 
     def on_gan_d_batch_begin(self, *args, **kwargs):
@@ -31,7 +31,7 @@ class OnDiscriminatorBatchFreezer(Callback):
 
 class OnSamplingFreezer(Callback):
     def __init__(self, modules: Module or Tuple[Module]):
-        super().__init__(type="freezer")
+        super().__init__(ctype="freezer")
         self.__modules: Tuple[Module] = to_tuple(modules)
 
     def on_sample_begin(self, *args, **kwargs):

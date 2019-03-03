@@ -1,7 +1,6 @@
-from collagen.core import Trainer
-from collagen.core import Callback
+from collagen.core import Trainer, Callback
+from collagen.core.utils import to_tuple
 from collagen.data import DataProvider
-from collagen.data.utils import to_tuple
 
 from typing import Tuple
 import torch

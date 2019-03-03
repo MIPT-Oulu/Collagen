@@ -4,13 +4,14 @@ from tensorboardX import SummaryWriter
 import yaml
 
 from collagen.core import Module, Session, Trainer
+from collagen.core.utils import auto_detect_device, to_cpu
 from collagen.callbacks import OnGeneratorBatchFreezer, OnDiscriminatorBatchFreezer, OnSamplingFreezer
 from collagen.callbacks import ProgressbarVisualizer, TensorboardSynthesisVisualizer, ClipGradCallback
 from collagen.callbacks import ConfusionMatrixVisualizer
 from collagen.data import DataProvider, ItemLoader, SSGANFakeSampler, SSFoldSplit
 from collagen.strategies import SSGANStrategy
 from collagen.metrics import RunningAverageMeter, SSAccuracyMeter, SSValidityMeter
-from collagen.data.utils import get_mnist, auto_detect_device, to_cpu
+from collagen.data.utils import get_mnist
 from collagen.logging import MeterLogging
 
 from examples.ssgan.ex_utils import init_args, parse_item_mnist_ssgan, init_mnist_transforms
@@ -88,7 +89,7 @@ if __name__ == "__main__":
     n_folds = 5
     splitter = SSFoldSplit(train_ds, n_ss_folds=3, n_folds=n_folds, target_col="target", random_state=args.seed,
                             labeled_train_size_per_class=1000, unlabeled_train_size_per_class=2000,
-                            equal_target=True, equal_unlabeled_target=True, shuffle=True)
+                            equal_target=True, equal_unlabeled_target=False, shuffle=True)
 
     summary_writer = SummaryWriter(log_dir=log_dir, comment=comment)
 
