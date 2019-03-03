@@ -5,7 +5,7 @@ from boto.s3 import prefix
 
 from collagen.data import ItemLoader, DataProvider
 from collagen.data import FoldSplit
-from collagen.data.utils import auto_detect_device
+from collagen.core.utils import auto_detect_device
 from collagen.strategies import Strategy
 from collagen.metrics import RunningAverageMeter, AccuracyMeter
 from collagen.callbacks import ProgressbarVisualizer

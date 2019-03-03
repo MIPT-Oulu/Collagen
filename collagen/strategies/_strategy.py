@@ -4,9 +4,9 @@ from typing import Tuple
 import torch
 from tqdm import tqdm
 from collagen.core import Trainer, Session, Module
+from collagen.core.utils import to_tuple
 from collagen.core import Callback
 from collagen.data import DataProvider, ItemLoader, Splitter
-from collagen.data.utils import to_tuple
 
 
 class Strategy(object):

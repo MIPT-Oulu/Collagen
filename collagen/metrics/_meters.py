@@ -1,20 +1,20 @@
 from collagen.core import Callback
 from sklearn.metrics import cohen_kappa_score
-from collagen.data.utils import to_cpu
+from collagen.core.utils import to_cpu
 
 
 class Meter(Callback):
-    def __init__(self, name: str = "unknown", prefix: str = "", desc_name=""):
-        super().__init__(type="meter")
+    def __init__(self, name: str = "unknown", prefix: str = "", desc_name=None):
+        super().__init__(ctype="meter")
         self.__name = name
         self.__prefix = prefix
-        self.__desc_name = desc_name if desc_name else self.__name
+        self.__desc_name = desc_name
 
     def current(self):
         return None
 
     def __str__(self):
-        name = self.get_name()
+        name = self.desc
         value = self.current()
         return "{0}: {1:.3f}".format(name, value)
 
@@ -22,8 +22,8 @@ class Meter(Callback):
         if isinstance(loss, float):
             loss_value = loss
         elif isinstance(loss, tuple):
-            if len(loss) > 1 and self.__desc_name in loss[1]:
-                loss_value = loss[self.__desc_name]
+            if len(loss) > 1 and self.name in loss[1]:
+                loss_value = loss[self.name]
             else:
                 loss_value = loss[0]
         else:
@@ -34,8 +34,9 @@ class Meter(Callback):
     def name(self):
         return self.__name
 
-    def get_name(self):
-        return self.__prefix + ("/" if self.__prefix else "") + self.__desc_name
+    @property
+    def desc(self):
+        return self.__prefix + ("/" if self.__prefix else "") + self.name if self.__desc_name is None else self.__desc_name
 
 
 class RunningAverageMeter(Meter):

@@ -3,7 +3,7 @@ from collagen.callbacks import Callback
 
 class Logging(Callback):
     def __init__(self):
-        super().__init__(type="logger")
+        super().__init__(ctype="logger")
         pass
 
     def on_batch_end(self, *args, **kwargs):
@@ -25,8 +25,8 @@ class MeterLogging(Logging):
 
     def on_epoch_end(self, epoch, strategy, stage, **kwargs):
         for cb in strategy.get_callbacks_by_name("minibatch", stage=stage):
-            if cb.get_type() == "meter":
-                self.__summary_writer.add_scalar(tag=cb.get_name(), scalar_value=cb.current(), global_step=epoch)
+            if cb.ctype == "meter":
+                self.__summary_writer.add_scalar(tag=cb.desc, scalar_value=cb.current(), global_step=epoch)
 
 
 class LRLogging(Logging):
@@ -41,5 +41,5 @@ class LRLogging(Logging):
 
     def on_epoch_end(self, epoch, strategy, stage, **kwargs):
         for cb in strategy.get_callbacks_by_name("minibatch", stage=stage):
-            if cb.get_type() == "lr_scheduler":
-                self.__summary_writer.add_scalar(tag=cb.get_name(), scalar_value=cb.current(), global_step=epoch)
+            if cb.ctype == "lr_scheduler":
+                self.__summary_writer.add_scalar(tag=cb.desc, scalar_value=cb.current(), global_step=epoch)

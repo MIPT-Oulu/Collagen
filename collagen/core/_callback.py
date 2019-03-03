@@ -1,13 +1,11 @@
 class Callback(object):
-    def __init__(self, type = None, *args, **kwargs):
-        self.__type = type
+    def __init__(self, ctype=None, *args, **kwargs):
+        self.__ctype = ctype
         self.state_dict = {}
 
-    def get_type(self):
-        return self.__type
-
-    def get_name(self):
-        pass
+    @property
+    def ctype(self):
+        return self.__ctype
 
     def on_epoch_begin(self, *args, **kwargs):
         pass
