@@ -111,8 +111,8 @@ if __name__ == "__main__":
                                             batch_size=args.bs, num_workers=args.num_threads)
 
     item_loaders['fake'] = GANFakeSampler(g_network=g_network,
-                                                batch_size=args.bs,
-                                                latent_size=args.latent_size)
+                                          batch_size=args.bs,
+                                          latent_size=args.latent_size)
 
     item_loaders['real_eval'] = ItemLoader(meta_data=val_labeled_data,
                                            transform=init_mnist_transforms()[1],

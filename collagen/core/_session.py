@@ -100,7 +100,7 @@ class Session(object):
             Useful if the batch size are too small because of the input size.
         return_out : bool
             Whether to return output
-        callbacks : Tuple[callable] or List [callable] or None
+        callbacks : Tuple[callable] or List[callable] or None
             Callbacks to be used during the training.
         Returns
         -------

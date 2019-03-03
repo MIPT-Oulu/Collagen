@@ -9,7 +9,7 @@ from collagen.callbacks import OnGeneratorBatchFreezer, OnDiscriminatorBatchFree
 from collagen.callbacks import ProgressbarVisualizer, TensorboardSynthesisVisualizer, ClipGradCallback
 from collagen.callbacks import ConfusionMatrixVisualizer
 from collagen.data import DataProvider, ItemLoader, SSGANFakeSampler, SSFoldSplit
-from collagen.strategies import SSGANStrategy
+from collagen.strategies import GANStrategy
 from collagen.metrics import RunningAverageMeter, SSAccuracyMeter, SSValidityMeter
 from collagen.data.utils import get_mnist
 from collagen.logging import MeterLogging
@@ -88,8 +88,8 @@ if __name__ == "__main__":
     train_ds, classes = get_mnist(data_folder=args.save_data, train=True)
     n_folds = 5
     splitter = SSFoldSplit(train_ds, n_ss_folds=3, n_folds=n_folds, target_col="target", random_state=args.seed,
-                            labeled_train_size_per_class=1000, unlabeled_train_size_per_class=2000,
-                            equal_target=True, equal_unlabeled_target=False, shuffle=True)
+                           labeled_train_size_per_class=1000, unlabeled_train_size_per_class=2000,
+                           equal_target=True, equal_unlabeled_target=False, shuffle=True)
 
     summary_writer = SummaryWriter(log_dir=log_dir, comment=comment)
 
@@ -194,12 +194,12 @@ if __name__ == "__main__":
                         val_callbacks=g_callbacks_eval)
 
     # Strategy
-    ssgan = SSGANStrategy(data_provider=data_provider,
-                          data_sampling_config=sampling_config,
-                          d_trainer=d_trainer,
-                          g_trainer=g_trainer,
-                          n_epochs=args.n_epochs,
-                          callbacks=st_callbacks,
-                          device=args.device)
+    ssgan = GANStrategy(data_provider=data_provider,
+                        data_sampling_config=sampling_config,
+                        d_trainer=d_trainer,
+                        g_trainer=g_trainer,
+                        n_epochs=args.n_epochs,
+                        callbacks=st_callbacks,
+                        device=args.device)
 
     ssgan.run()
