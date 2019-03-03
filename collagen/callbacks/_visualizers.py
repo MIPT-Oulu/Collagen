@@ -12,7 +12,21 @@ from collagen.metrics import plot_confusion_matrix
 
 
 class ConfusionMatrixVisualizer(Callback):
-    def __init__(self, writer, labels: list or None = None, tag="confusion_matrix", normalize = False):
+    def __init__(self, writer, labels: list or None = None, tag="confusion_matrix", normalize=False):
+        """ConfusionMatrixVisualizer class, which is a callback calculating accuracy after each forwarding step and
+        exporting confusion matrix to TensorboardX at the end of each epoch
+
+        Parameters
+        ----------
+        writer: TensorboardX SummaryWriter
+            Writes confusion matrix figure into TensorboardX
+        labels: list or None
+            List of collected labels which are summarized in confusion matrix
+        tag: str
+            Tag of confusion matrix in TensorboardX
+        normalize: bool
+            If `True` display accurate percentage, otherwise, display accurate quantity
+        """
         super().__init__(ctype="visualizer")
         self._labels = labels
         self._normalize = normalize
@@ -55,6 +69,13 @@ class ConfusionMatrixVisualizer(Callback):
 
 class ProgressbarVisualizer(Callback):
     def __init__(self, update_freq=1):
+        """Visualizes progressbar after a specific number of batches
+
+        Parameters
+        ----------
+        update_freq: str
+            The number of batches to update progressbar (default: 1)
+        """
         super().__init__(ctype="visualizer")
         self.__count = 0
         self.__update_freq = update_freq
@@ -81,14 +102,33 @@ class ProgressbarVisualizer(Callback):
 
 class TensorboardSynthesisVisualizer(Callback):
     def __init__(self, writer, generator_sampler, key_name: str = "data", tag: str = "Generated",
-                 grid_shape: Tuple[int] = (10, 10), split_channel=True, zero_center=True):
+                 grid_shape: Tuple[int] = (10, 10), split_channel=True, transform=None):
+        """Visualizes synthesized images in TensorboardX
+
+        Parameters
+        ----------
+        writer: TensorboardX SummaryWriter
+            Writes metrics into TensorboardX
+        generator_sampler: ItemLoader
+            Loads item including synthesized image
+        key_name: str
+            Key corresponding to synthesized image in loaded samples from :attr:generator_sampler`
+        tag: str
+            Tag of metric in TensorboardX
+        grid_shape: tuple
+            Shape of synthesized image grip (default: (10, 10))
+        split_channel: bool
+            Whether split synthesized image by channels and concatenate them horizontally
+        transform: function
+            Transforms synthesized image
+        """
         super().__init__(ctype="visualizer")
         self.__generator_sampler = generator_sampler
         self.__split_channel = split_channel
 
         if len(grid_shape) != 2:
             raise ValueError("`grid_shape` must have 2 dim, but found {}".format(len(grid_shape)))
-        self.__zero_center = zero_center
+        self.__transform = transform if transform is None else self._default_transform
         self.__writer = writer
         self.__key_name = key_name
         self.__grid_shape = grid_shape
@@ -96,14 +136,17 @@ class TensorboardSynthesisVisualizer(Callback):
         self.__num_batches = self.__num_images // self.__generator_sampler.batch_size + 1
         self.__tag = tag
 
+    @staticmethod
+    def _default_transform(x):
+        return (x+1.0)/2.0
+
     def on_epoch_end(self, epoch, n_epochs, **kwargs):
         sampled_data = self.__generator_sampler.sample(self.__num_batches)
         images = []
         for i, dt in enumerate(sampled_data):
             if i < self.__num_images:
                 for img in torch.unbind(dt[self.__key_name], dim=0):
-                    if self.__zero_center:
-                        img = (img + 1.0)/2.0
+                    img = self.__transform(img)
                     if len(img.shape) == 3 and img.shape[0] != 1 and img.shape[0] != 3:
                         if self.__split_channel:
                             separate_imgs = torch.unbind(img, dim=0)

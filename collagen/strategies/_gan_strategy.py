@@ -23,7 +23,25 @@ class GANStrategy(object):
                  n_epochs: int or None = 100,
                  callbacks: Tuple[Callback] or Callback = None,
                  device: str or None = "cuda"):
+        """Implements a part of the training GAN loop by passing the available batches through the model.
 
+        Parameters
+        ----------
+        data_provider: DataProvider
+            Provides batches of data to D and G models
+        data_sampling_config: dict
+            Configuration of itemloader names and corresponding quantities of samples
+        d_trainer: Trainer
+            Trainer of Discriminative model
+        g_trainer: Trainer
+            Trainer of Generative model
+        n_epochs: int
+            The number of epochs
+        callbacks: Callback or Tuple[Callback]
+            Callbacks at strategy-level
+        device: device
+            Device on which forwarding and backwarding take place
+        """
         self.__stage_names = ("train", "eval")
         self.__model_names = ("G", "D")
         self.__n_epochs = n_epochs
