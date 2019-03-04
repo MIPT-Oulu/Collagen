@@ -94,13 +94,9 @@ class SSFoldSplit(Splitter):
         self.__cv_folds_idx = []
         self.__ds_chunks = []
 
-        # split of unlabeled data
-        if equal_unlabeled_target:
-            unlabeled_splitter = model_selection.StratifiedKFold(n_splits=n_folds, random_state=random_state+1)
-            unlabeled_spl_iter = unlabeled_splitter.split(unlabeled_ds, unlabeled_ds[unlabeled_target_col])
-        else:
-            unlabeled_splitter = model_selection.KFold(n_splits=n_folds, random_state=random_state + 1)
-            unlabeled_spl_iter = unlabeled_splitter.split(unlabeled_ds)
+        # split of train/val data
+        unlabeled_splitter = model_selection.StratifiedKFold(n_splits=n_folds, random_state=random_state+1)
+        unlabeled_spl_iter = unlabeled_splitter.split(unlabeled_ds, unlabeled_ds[target_col])
 
         labeled_splitter = model_selection.StratifiedKFold(n_splits=n_folds, random_state=random_state+2)
         labeled_spl_iter = labeled_splitter.split(labeled_ds, labeled_ds[target_col])
