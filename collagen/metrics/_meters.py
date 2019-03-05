@@ -38,6 +38,9 @@ class Meter(Callback):
     def desc(self):
         return self.__prefix + ("/" if self.__prefix else "") + self.name if self.__desc_name is None else self.__desc_name
 
+    def __str__(self):
+        return self.desc
+
 
 class RunningAverageMeter(Meter):
     def __init__(self, name: str = "loss", prefix="", desc_name=None):

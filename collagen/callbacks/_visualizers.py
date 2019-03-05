@@ -73,7 +73,7 @@ class ProgressbarVisualizer(Callback):
 
         Parameters
         ----------
-        update_freq: str
+        update_freq: int
             The number of batches to update progressbar (default: 1)
         """
         super().__init__(ctype="visualizer")
@@ -128,7 +128,7 @@ class TensorboardSynthesisVisualizer(Callback):
 
         if len(grid_shape) != 2:
             raise ValueError("`grid_shape` must have 2 dim, but found {}".format(len(grid_shape)))
-        self.__transform = transform if transform is None else self._default_transform
+        self.__transform = self._default_transform if transform is None else transform
         self.__writer = writer
         self.__key_name = key_name
         self.__grid_shape = grid_shape

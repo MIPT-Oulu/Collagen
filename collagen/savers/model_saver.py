@@ -54,7 +54,7 @@ class ModelSaver(Callback):
     def on_epoch_end(self, epoch, stage, strategy, **kwargs):
         improved_metrics = dict()
         for cb in strategy.get_callbacks_by_name("minibatch", stage=stage):
-            cb_name = cb.desc
+            cb_name = str(cb)
             if cb.ctype == "meter" and cb_name in self.__best_metrics:
                 cb_value = cb.current()
                 if self.__check_cond(value=cb_value, metric_name=cb_name):
