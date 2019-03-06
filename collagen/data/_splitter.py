@@ -69,14 +69,14 @@ class SSFoldSplit(Splitter):
     def __init__(self, ds: pd.DataFrame, n_ss_folds: int = 3, n_folds: int = 5, target_col: str = 'target',
                  random_state: int or None = None, unlabeled_target_col: str = '5means_classes',
                  labeled_train_size_per_class: int = None, unlabeled_train_size_per_class: int = None,
-                 labeled_train_size: int = None, unlabeled_train_size: int = None,
+                 labeled_train_size: int = None, unlabeled_train_size: int = None, group_col: str = "ID",
                  equal_target: bool = True, equal_unlabeled_target: bool = True, shuffle: bool = True):
         super().__init__()
         if equal_target and labeled_train_size_per_class is None:
             raise ValueError("labeled_train_size_per_class must be determined when equal_target is True, but found None")
         # Master split into Label/Unlabel
-        master_splitter = model_selection.StratifiedKFold(n_splits=n_ss_folds, random_state=random_state)
-        unlabeled_idx, labeled_idx = next(master_splitter.split(ds, ds[target_col]))
+        master_splitter = model_selection.GroupKFold(n_splits=n_ss_folds)
+        unlabeled_idx, labeled_idx = next(master_splitter.split(ds, ds[target_col], groups=ds[group_col]))
         unlabeled_ds = ds.iloc[unlabeled_idx]
         # u_groups = ds[unlabeled_target_col].iloc[unlabeled_idx]
         labeled_ds = ds.iloc[labeled_idx]
@@ -95,11 +95,11 @@ class SSFoldSplit(Splitter):
         self.__ds_chunks = []
 
         # split of train/val data
-        unlabeled_splitter = model_selection.StratifiedKFold(n_splits=n_folds, random_state=random_state+1)
-        unlabeled_spl_iter = unlabeled_splitter.split(unlabeled_ds, unlabeled_ds[target_col])
+        unlabeled_splitter = model_selection.GroupKFold(n_splits=n_folds)
+        unlabeled_spl_iter = unlabeled_splitter.split(unlabeled_ds, unlabeled_ds[target_col], groups=unlabeled_ds[group_col])
 
-        labeled_splitter = model_selection.StratifiedKFold(n_splits=n_folds, random_state=random_state+2)
-        labeled_spl_iter = labeled_splitter.split(labeled_ds, labeled_ds[target_col])
+        labeled_splitter = model_selection.GroupKFold(n_splits=n_folds)
+        labeled_spl_iter = labeled_splitter.split(labeled_ds, labeled_ds[target_col], groups=labeled_ds[group_col])
 
         for i in range(n_folds):
             u_train, u_test = next(unlabeled_spl_iter)
