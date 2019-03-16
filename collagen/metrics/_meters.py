@@ -1,3 +1,5 @@
+import numpy as np
+from sklearn.metrics import balanced_accuracy_score
 from collagen.core import Callback
 from sklearn.metrics import cohen_kappa_score
 from collagen.core.utils import to_cpu
@@ -203,6 +205,56 @@ class SSAccuracyMeter(Meter):
         return to_cpu(acc, use_numpy=True)
 
 
+class SSBalancedAccuracyMeter(Meter):
+    def __init__(self, name: str = "ssl_balanced_accuracy", sigmoid: bool = False, prefix=""):
+        super().__init__(name=name, prefix=prefix)
+        self.__sigmoid: bool = sigmoid
+        self.__data_count = 0.0
+        self.__correct_count = 0.0
+        self.__accuracy = None
+        self.__corrects = []
+        self.__preds = []
+
+    def on_epoch_begin(self, epoch, *args, **kwargs):
+        self.__preds = []
+        self.__corrects = []
+
+    def _calc_metric(self, target, output, device=None, **kwargs):
+        if len(target.shape) > 1 and target.shape[1] > 1:
+            if self.__sigmoid:
+                output = output[:, -1].sigmoid()
+            target = to_cpu(target, use_numpy=True)
+            output = to_cpu(output, use_numpy=True)
+            n = target.shape[0]
+            target_cls = target[:,:-1]
+            output_cls = output[:,:-1]
+            target_valid = target[:, -1]
+
+            mask = target_valid == 1
+
+            target_cls = target_cls[mask, :]
+            output_cls = output_cls[mask, :]
+
+            target_cls_list = np.argmax(target_cls, axis=-1).tolist()
+            output_cls_list = np.argmax(output_cls, axis=-1).tolist()
+
+            self.__corrects += target_cls_list
+            self.__preds += output_cls_list
+
+    def on_minibatch_end(self, target, output, device=None, **kwargs):
+        self._calc_metric(target, output, device, **kwargs)
+
+    def on_epoch_end(self, epoch, n_epochs, *args, **kwargs):
+        self.__accuracy = self.current()
+
+    def current(self):
+        if len(self.__corrects) > 0:
+            acc = balanced_accuracy_score(y_true=self.__corrects, y_pred=self.__preds)
+        else:
+            acc = 0.0
+        return acc
+
+
 class SSValidityMeter(Meter):
     def __init__(self, name: str = "ssl_validity", threshold: float = 0.5, sigmoid: bool = False, prefix=""):
         super().__init__(name=name, prefix=prefix)
@@ -295,6 +347,8 @@ class KappaMeter(Meter):
         if target_cpu is not None and output_cpu is not None and target_cpu.shape == output_cpu.shape:
             self.__predicts += output_cpu.tolist()
             self.__corrects += target_cpu.tolist()
+        else:
+            raise ValueError("Target shape {} and output shape {} must match.".format(target_cpu.shape, output_cpu.shape))
 
     def on_epoch_end(self, *args, **kwargs):
         self.__kappa = self.current()
