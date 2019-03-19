@@ -74,3 +74,12 @@ class ModelSaver(Callback):
                 remove(self.__prev_model_path)
             self.__prev_model_path = model_fullname
 
+    def get_metric_by_name(self, name):
+        if name in self.__best_metrics:
+            return self.__best_metrics[name]["value"]
+        else:
+            return None
+
+    @property
+    def metric_names(self):
+        return self.__metric_names

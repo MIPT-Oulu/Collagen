@@ -110,6 +110,47 @@ class AccuracyMeter(Meter):
         return to_cpu(acc, use_numpy=True)
 
 
+class BalancedAccuracyMeter(Meter):
+    def __init__(self, name: str = "balanced_categorical_accuracy", prefix=""):
+        super().__init__(name=name, prefix=prefix)
+        self.__data_count = 0.0
+        self.__correct_count = 0.0
+        self.__accuracy = None
+        self.__corrects = []
+        self.__preds = []
+
+    def on_epoch_begin(self, epoch, *args, **kwargs):
+        self.__preds = []
+        self.__corrects = []
+
+    def _calc_metric(self, target, output, device=None, **kwargs):
+        target = to_cpu(target, use_numpy=True)
+        output = to_cpu(output, use_numpy=True)
+        n = target.shape[0]
+        if len(target.shape) > 1 and target.shape[1] > 1:
+            target_cls_list = np.argmax(target, axis=-1).tolist()
+        else:
+            target_cls_list = target.tolist()
+
+        output_cls_list = np.argmax(output, axis=-1).tolist()
+
+        self.__corrects += target_cls_list
+        self.__preds += output_cls_list
+
+    def on_minibatch_end(self, target, output, device=None, **kwargs):
+        self._calc_metric(target, output, device, **kwargs)
+
+    def on_epoch_end(self, epoch, n_epochs, *args, **kwargs):
+        self.__accuracy = self.current()
+
+    def current(self):
+        if len(self.__corrects) > 0:
+            acc = balanced_accuracy_score(y_true=self.__corrects, y_pred=self.__preds)
+        else:
+            acc = 0.0
+        return acc
+
+
 class AccuracyThresholdMeter(Meter):
     def __init__(self, name: str = "binary_accuracy", threshold: float = 0.5, sigmoid: bool = False, prefix=""):
         super().__init__(name=name, prefix=prefix)
@@ -347,8 +388,6 @@ class KappaMeter(Meter):
         if target_cpu is not None and output_cpu is not None and target_cpu.shape == output_cpu.shape:
             self.__predicts += output_cpu.tolist()
             self.__corrects += target_cpu.tolist()
-        else:
-            raise ValueError("Target shape {} and output shape {} must match.".format(target_cpu.shape, output_cpu.shape))
 
     def on_epoch_end(self, *args, **kwargs):
         self.__kappa = self.current()
