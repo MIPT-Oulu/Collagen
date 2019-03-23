@@ -1,7 +1,6 @@
 import torch
 import numpy as np
 import yaml
-from boto.s3 import prefix
 
 from collagen.data import ItemLoader, DataProvider
 from collagen.data import FoldSplit
@@ -29,7 +28,6 @@ if __name__ == "__main__":
     train_ds, classes = get_mnist(data_folder=args.data_dir, train=True)
     test_ds, _ = get_mnist(data_folder=args.data_dir, train=False)
 
-    summary_writer = SummaryWriter(log_dir=args.log_dir, comment=args.comment)
     criterion = torch.nn.CrossEntropyLoss()
 
     # Tensorboard visualization
@@ -68,17 +66,6 @@ if __name__ == "__main__":
         model = SimpleConvNet(bw=args.bw, drop=args.dropout, n_cls=len(classes))
         optimizer = torch.optim.Adam(params=model.parameters(), lr=args.lr, weight_decay=args.wd)
         data_provider = DataProvider(item_loaders)
-
-        # session = Session(module=model,
-        #                   optimizer=optimizer,
-        #                   loss=criterion)
-        #
-        # trainer = Trainer(data_provider=data_provider,
-        #                   train_loader_names=tuple(sampling_config["train"]["data_provider"].keys()),
-        #                   val_loader_names=tuple(sampling_config["eval"]["data_provider"].keys()),
-        #                   session=session,
-        #                   train_callbacks=train_cbs,
-        #                   val_callbacks=val_cbs)
 
         strategy = Strategy(data_provider=data_provider,
                             train_loader_names=f'{fold_id}_train',
