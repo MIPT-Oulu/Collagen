@@ -1,6 +1,7 @@
 from collections import OrderedDict
 import tqdm
-import torch
+from typing import Iterable
+
 import yaml
 from torch.nn import BCELoss
 from torch import optim
@@ -20,18 +21,6 @@ from examples.dcgan.ex_utils import init_args, parse_item_mnist_gan, init_mnist_
 from examples.dcgan.ex_utils import Discriminator, Generator
 
 device = auto_detect_device()
-
-
-class GeneratorLoss(torch.nn.Module):
-    def __init__(self, d_network, d_loss):
-        super(GeneratorLoss, self).__init__()
-        self.__d_network = d_network
-        self.__d_loss = d_loss
-
-    def forward(self, img: torch.Tensor, target: torch.Tensor):
-        output = self.__d_network(img)
-        loss = self.__d_loss(output, 1 - target)
-        return loss
 
 
 class BackwardCallback(Callback):
@@ -58,7 +47,7 @@ class ProgressbarCallback(Callback):
     def _check_freq(self):
         return self.__count % self.__update_freq == 0
 
-    def on_batch_end(self, strategy: GANStrategy, epoch: int, progress_bar: tqdm, callbacks: Callback, **kwargs):
+    def on_batch_end(self, strategy: GANStrategy, epoch: int, progress_bar: tqdm, callbacks: Iterable[Callback], **kwargs):
         self.__count += 1
         if self._check_freq():
             list_metrics_desc = []

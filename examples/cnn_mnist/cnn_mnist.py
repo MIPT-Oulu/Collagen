@@ -1,7 +1,6 @@
 import torch
 import numpy as np
 import yaml
-from boto.s3 import prefix
 
 from collagen.data import ItemLoader, DataProvider
 from collagen.data import FoldSplit
@@ -10,6 +9,7 @@ from collagen.strategies import Strategy
 from collagen.metrics import RunningAverageMeter, AccuracyMeter
 from collagen.callbacks import ProgressbarVisualizer
 from collagen.savers import ModelSaver
+import random
 from collagen.logging import MeterLogging
 from tensorboardX import SummaryWriter
 from examples.cnn_mnist.ex_utils import get_mnist, init_mnist_transforms, init_args
@@ -26,10 +26,13 @@ def parse_item_mnist(root, entry, trf):
 if __name__ == "__main__":
     args = init_args()
 
+    torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
+    random.seed(args.seed)
+
     train_ds, classes = get_mnist(data_folder=args.data_dir, train=True)
     test_ds, _ = get_mnist(data_folder=args.data_dir, train=False)
 
-    summary_writer = SummaryWriter(log_dir=args.log_dir, comment=args.comment)
     criterion = torch.nn.CrossEntropyLoss()
 
     # Tensorboard visualization
@@ -37,18 +40,9 @@ if __name__ == "__main__":
     comment = args.comment
     summary_writer = SummaryWriter(log_dir=log_dir, comment=comment)
 
-    train_cbs = (RunningAverageMeter(prefix="train", name="loss"),)
-    val_cbs = (RunningAverageMeter(prefix="eval", name="loss"),
-               ProgressbarVisualizer(update_freq=1),
-               MeterLogging(writer=summary_writer),
-               AccuracyMeter(prefix="eval", name="acc"))
-
-    st_callbacks = (ProgressbarVisualizer(update_freq=1),
-                    MeterLogging(writer=summary_writer))
-
     kfold_train_losses = []
     kfold_val_losses = []
-    kfold__val_accuracies = []
+    kfold_val_accuracies = []
 
     splitter = FoldSplit(train_ds, n_folds=5, target_col="target")
 
@@ -69,16 +63,14 @@ if __name__ == "__main__":
         optimizer = torch.optim.Adam(params=model.parameters(), lr=args.lr, weight_decay=args.wd)
         data_provider = DataProvider(item_loaders)
 
-        # session = Session(module=model,
-        #                   optimizer=optimizer,
-        #                   loss=criterion)
-        #
-        # trainer = Trainer(data_provider=data_provider,
-        #                   train_loader_names=tuple(sampling_config["train"]["data_provider"].keys()),
-        #                   val_loader_names=tuple(sampling_config["eval"]["data_provider"].keys()),
-        #                   session=session,
-        #                   train_callbacks=train_cbs,
-        #                   val_callbacks=val_cbs)
+        train_cbs = (RunningAverageMeter(prefix="train", name="loss"),
+                     ProgressbarVisualizer(update_freq=1))
+
+        val_cbs = (RunningAverageMeter(prefix="eval", name="loss"),
+                   AccuracyMeter(prefix="eval", name="acc"),
+                   ProgressbarVisualizer(update_freq=1),
+                   MeterLogging(writer=summary_writer),
+                   ModelSaver(metric_names='eval/loss', save_dir=args.snapshots, conditions='min', model=model))
 
         strategy = Strategy(data_provider=data_provider,
                             train_loader_names=f'{fold_id}_train',
@@ -96,11 +88,11 @@ if __name__ == "__main__":
         strategy.run()
         kfold_train_losses.append(train_cbs[0].current())
         kfold_val_losses.append(val_cbs[0].current())
-        kfold__val_accuracies.append(val_cbs[1].current())
+        kfold_val_accuracies.append(val_cbs[1].current())
 
     print("k-fold training loss: {}".format(np.asarray(kfold_train_losses).mean()))
     print("k-fold validation loss: {}".format(np.asarray(kfold_val_losses).mean()))
-    print("k-fold validation accuracy: {}".format(np.asarray(kfold__val_accuracies).mean()))
+    print("k-fold validation accuracy: {}".format(np.asarray(kfold_val_accuracies).mean()))
 
     item_loaders = dict()
     item_loaders['test'] = ItemLoader(root='', meta_data=test_ds,

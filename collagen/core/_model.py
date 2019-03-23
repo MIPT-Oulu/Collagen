@@ -17,7 +17,7 @@ class Module(torch.nn.Module):
 
     # Should not overwrite parameters() because it eliminates some useful params of nn.Module such as device, requires_grad, etc.
     def _parameters(self, group: str or Tuple[str] or None = None,
-                   name: str or None = None) -> Dict[str, torch.nn.Parameter or str]:
+                    name: str or None = None) -> Dict[str, torch.nn.Parameter or str]:
         """
         Returns an iterator through the parameters of the module from one or many groups.
 
@@ -84,5 +84,5 @@ class Module(torch.nn.Module):
             self.__param_groups[group_name][name] = layer.parameters()
 
     @abstractmethod
-    def forward(self, input):
+    def forward(self, *x):
         raise NotImplementedError

@@ -7,6 +7,10 @@ __pycache__/
 *.so
 
 examples/minist_classification/data/
+.pytest_cache/
+examples/*/runs/
+examples/*/data/
+examples/*/snapshots/
 
 # Distribution / packaging
 .Python
