@@ -10,6 +10,7 @@ examples/minist_classification/data/
 .pytest_cache/
 examples/cnn_mnist/runs/
 examples/cnn_mnist/data/
+examples/cnn_mnist/snapshots/
 
 # Distribution / packaging
 .Python

@@ -146,7 +146,6 @@ class Strategy(object):
                               target_key=self.__target_key,
                               strategy=self)
 
-
     def _on_epoch_end_callbacks(self, epoch, stage):
         for cb in self.get_callbacks_by_stage(stage):
             cb.on_epoch_end(stage=stage,
@@ -157,7 +156,6 @@ class Strategy(object):
                             target_key=self.__target_key,
                             strategy=self)
 
-
     def _on_batch_begin_callbacks(self, progress_bar, epoch, n_epochs, stage, batch_i):
         for cb in self.get_callbacks_by_stage(stage):
             cb.on_batch_begin(epoch=epoch,
@@ -167,7 +165,6 @@ class Strategy(object):
                               stage=stage,
                               strategy=self)
 
-
     def _on_batch_end_callbacks(self, progress_bar, epoch, n_epochs, stage, batch_i):
         for cb in self.get_callbacks_by_stage(stage):
             cb.on_batch_end(epoch=epoch,
@@ -176,7 +173,6 @@ class Strategy(object):
                             progress_bar=progress_bar,
                             stage=stage,
                             strategy=self)
-
 
     def _on_sample_begin_callbacks(self, epoch, stage, batch_i, progress_bar):
         for cb in self.get_callbacks_by_stage(stage):

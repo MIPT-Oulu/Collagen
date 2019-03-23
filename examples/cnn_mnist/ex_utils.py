@@ -12,8 +12,7 @@ import solt.core as slc
 import solt.transforms as slt
 
 from collagen.data.utils import ApplyTransform, Normalize, Compose
-from collagen.core.utils import to_cpu
-from collagen.core import Module, Callback
+from collagen.core import Module
 
 
 def init_args():
@@ -24,20 +23,15 @@ def init_args():
     parser.add_argument('--bw', type=int, default=64, help='Bandwidth of model')
     parser.add_argument('--wd', type=float, default=1e-4, help='Weight decay')
     parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
-    parser.add_argument('--beta1', type=float, default=0.5, help='Weight decay (Generator)')
     parser.add_argument('--num_threads', type=int, default=0, help='Number of threads for data loader')
     parser.add_argument('--save_data', default='data', help='Where to save downloaded dataset')
+    parser.add_argument('--snapshots', default='snapshots', help='Where to save the snapshots')
     parser.add_argument('--seed', type=int, default=12345, help='Random seed')
-    parser.add_argument('--ngpu', type=int, default=1, help='Num of GPUs')
     parser.add_argument('--device', type=str, default="cuda", help='Use `cuda` or `cpu`')
     parser.add_argument('--data_dir', type=str, default="data", help='Data directory')
     parser.add_argument('--log_dir', type=str, default=None, help='Log directory')
     parser.add_argument('--comment', type=str, default="cnn", help='Comment of log')
-    parser.add_argument('--grid_shape', type=tuple, default=(24, 24), help='Shape of grid of generated images')
     args = parser.parse_args()
-
-    torch.manual_seed(args.seed)
-    np.random.seed(args.seed)
 
     return args
 
