@@ -84,5 +84,5 @@ class Module(torch.nn.Module):
             self.__param_groups[group_name][name] = layer.parameters()
 
     @abstractmethod
-    def forward(self, x):
+    def forward(self, *x):
         raise NotImplementedError
