@@ -3,6 +3,7 @@ from os.path import exists, join, isfile
 from datetime import datetime
 from os import mkdir, remove
 from typing import Tuple
+import numpy as np
 import torch
 from collagen.core import Callback
 from collagen.core.utils import to_tuple
@@ -10,7 +11,7 @@ from collagen.core.utils import to_tuple
 
 class ModelSaver(Callback):
     def __init__(self, metric_names: Tuple[str] or str, conditions: Tuple[str] or str, model: nn.Module,
-                 save_dir: str, prefix: str = "", keep_best_only: bool = True):
+                 save_dir: str, prefix: str = "", keep_best_only: bool = True, mode="and"):
         super().__init__(ctype="saver")
         self.__metric_names = to_tuple(metric_names)
         self.__conditions = to_tuple(conditions)
@@ -18,6 +19,11 @@ class ModelSaver(Callback):
         self.__save_dir = save_dir
         self.__keep_best_only = keep_best_only
         self.__prev_model_path = ""
+        self.__mode = mode
+
+        if self.__mode == "avg" and len(self.__conditions) > 1:
+            if len(set(self.__conditions)) > 1:
+                raise ValueError("All modes must be the same in {} mode, but got".format(self.__mode, self.__conditions))
 
         if not exists(self.__save_dir):
             print("Not found directory {} to save models. Create the directory.".format(self.__save_dir))
@@ -51,14 +57,36 @@ class ModelSaver(Callback):
 
         return is_improved
 
+    def __check_combined_cond(self, metrics):
+        is_improved = False
+        comb_metric = np.mean(np.array([metrics[metric_name] for metric_name in metrics]))
+        best_metric = np.mean(np.array([self.__best_metrics[metric_name]["value"] for metric_name in self.__best_metrics]))
+        cond = self.__best_metrics[next(iter(self.__best_metrics))]["cond"]
+        if cond == "min" and comb_metric < best_metric:
+            is_improved = True
+        elif cond == "max" and comb_metric > best_metric:
+            is_improved = True
+        elif cond != "min" and cond != "max":
+            raise ValueError("Condition must be `min` or `max`, but got {}".format(cond))
+        return is_improved
+
+
     def on_epoch_end(self, epoch, stage, strategy, **kwargs):
         improved_metrics = dict()
         for cb in strategy.get_callbacks_by_name("minibatch", stage=stage):
             cb_name = str(cb)
             if cb.ctype == "meter" and cb_name in self.__best_metrics:
                 cb_value = cb.current()
-                if self.__check_cond(value=cb_value, metric_name=cb_name):
+
+                if self.__mode == "and":
+                    if self.__check_cond(value=cb_value, metric_name=cb_name):
+                        improved_metrics[cb_name] = cb_value
+                elif self.__mode == "avg":
                     improved_metrics[cb_name] = cb_value
+
+        if self.__mode == "avg":
+            if not self.__check_combined_cond(improved_metrics):
+                improved_metrics = dict()
 
         if len(improved_metrics) == len(self.__best_metrics):
             list_metrics = []
