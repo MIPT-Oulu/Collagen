@@ -8,9 +8,9 @@ __pycache__/
 
 examples/minist_classification/data/
 .pytest_cache/
-examples/cnn_mnist/runs/
-examples/cnn_mnist/data/
-examples/cnn_mnist/snapshots/
+examples/*/runs/
+examples/*/data/
+examples/*/snapshots/
 
 # Distribution / packaging
 .Python
