@@ -149,9 +149,18 @@ class TensorboardSynthesisVisualizer(Callback):
                     img = self.__transform(img)
                     if len(img.shape) == 3 and img.shape[0] != 1 and img.shape[0] != 3:
                         if self.__split_channel:
-                            separate_imgs = torch.unbind(img, dim=0)
-                            concate_img = torch.cat(separate_imgs, dim=-1)
-                            images.append(torch.unsqueeze(concate_img, 0))
+                            if img.shape[0] % 3 == 0:
+                                n_split = int(img.shape[0]/3)
+                                separate_imgs = [img[3*k:3*(k+1), :, :] for k in range(n_split)]
+                                concate_img = torch.cat(separate_imgs, dim=-1)
+                                # print("concate_img0 shape: {}".format(concate_img.shape))
+                                # concate_img = torch.unsqueeze(concate_img, 0)
+                                # print("concate_img1 shape: {}".format(concate_img.shape))
+                                images.append(concate_img)
+                            else:
+                                separate_imgs = torch.unbind(img, dim=0)
+                                concate_img = torch.cat(separate_imgs, dim=-1)
+                                images.append(torch.unsqueeze(concate_img, 0))
                         else:
                             raise ValueError("Channels of image ({}) must be either 1 or 3, but found {}".format(img.shape, img.shape[0]))
                     else:

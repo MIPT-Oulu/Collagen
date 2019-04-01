@@ -75,8 +75,12 @@ class SSFoldSplit(Splitter):
         if equal_target and labeled_train_size_per_class is None:
             raise ValueError("labeled_train_size_per_class must be determined when equal_target is True, but found None")
         # Master split into Label/Unlabel
-        master_splitter = model_selection.GroupKFold(n_splits=n_ss_folds)
-        unlabeled_idx, labeled_idx = next(master_splitter.split(ds, ds[target_col], groups=ds[group_col]))
+        if group_col is None:
+            master_splitter = model_selection.StratifiedKFold(n_splits=n_ss_folds, random_state=random_state)
+            unlabeled_idx, labeled_idx = next(master_splitter.split(ds, ds[target_col]))
+        else:
+            master_splitter = model_selection.GroupKFold(n_splits=n_ss_folds)
+            unlabeled_idx, labeled_idx = next(master_splitter.split(ds, ds[target_col], groups=ds[group_col]))
         unlabeled_ds = ds.iloc[unlabeled_idx]
         # u_groups = ds[unlabeled_target_col].iloc[unlabeled_idx]
         labeled_ds = ds.iloc[labeled_idx]
@@ -95,11 +99,19 @@ class SSFoldSplit(Splitter):
         self.__ds_chunks = []
 
         # split of train/val data
-        unlabeled_splitter = model_selection.GroupKFold(n_splits=n_folds)
-        unlabeled_spl_iter = unlabeled_splitter.split(unlabeled_ds, unlabeled_ds[target_col], groups=unlabeled_ds[group_col])
+        if group_col is None:
+            unlabeled_splitter = model_selection.StratifiedKFold(n_splits=n_folds, random_state=random_state+1)
+            unlabeled_spl_iter = unlabeled_splitter.split(unlabeled_ds, unlabeled_ds[target_col])
+        else:
+            unlabeled_splitter = model_selection.GroupKFold(n_splits=n_folds)
+            unlabeled_spl_iter = unlabeled_splitter.split(unlabeled_ds, unlabeled_ds[target_col], groups=unlabeled_ds[group_col])
 
-        labeled_splitter = model_selection.GroupKFold(n_splits=n_folds)
-        labeled_spl_iter = labeled_splitter.split(labeled_ds, labeled_ds[target_col], groups=labeled_ds[group_col])
+        if group_col is None:
+            labeled_splitter = model_selection.StratifiedKFold(n_splits=n_folds, random_state=random_state+2)
+            labeled_spl_iter = labeled_splitter.split(labeled_ds, labeled_ds[target_col])
+        else:
+            labeled_splitter = model_selection.GroupKFold(n_splits=n_folds)
+            labeled_spl_iter = labeled_splitter.split(labeled_ds, labeled_ds[target_col], groups=labeled_ds[group_col])
 
         for i in range(n_folds):
             u_train, u_test = next(unlabeled_spl_iter)

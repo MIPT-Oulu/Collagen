@@ -10,10 +10,29 @@ class Module(torch.nn.Module):
     This extension allows to group the layers and have an easy access to them via group names.
 
     """
-    def __init__(self):
+    def __init__(self, input_shape=None, output_shape=None):
         super(Module, self).__init__()
         self.__param_groups = dict()
         self.optimize_cb = None
+        self.__input_shape = input_shape
+        self.__output_shape = output_shape
+
+
+    def validate_input(self, x):
+        if self.__input_shape is not None:
+            if len(x.shape) != len(self.__input_shape):
+                raise ValueError("Expect {}-dim input, but got {}".format(len(x.shape), len(self.__input_shape)))
+            for i, d in enumerate(self.__input_shape):
+                if d is not None and d != x.shape[i]:
+                    raise ValueError(f"Expect dim {i} to be {d}, but got {x.shape[i]}")
+
+    def validate_output(self, y):
+        if self.__output_shape is not None:
+            if len(y.shape) != len(self.__output_shape):
+                raise ValueError("Expect {}-dim input, but got {}".format(len(y.shape), len(self.__output_shape)))
+            for i, d in enumerate(self.__output_shape):
+                if d is not None and d != y.shape[i]:
+                    raise ValueError(f"Expect dim {i} to be {d}, but got {y.shape[i]}")
 
     # Should not overwrite parameters() because it eliminates some useful params of nn.Module such as device, requires_grad, etc.
     def _parameters(self, group: str or Tuple[str] or None = None,
@@ -85,4 +104,10 @@ class Module(torch.nn.Module):
 
     @abstractmethod
     def forward(self, *x):
+        raise NotImplementedError
+
+    def get_features(self):
+        raise NotImplementedError
+
+    def get_features_by_name(self):
         raise NotImplementedError
