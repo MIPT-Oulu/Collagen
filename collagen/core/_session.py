@@ -1,10 +1,7 @@
 import torch
-
-from ..logging import KVS
-from ._model import Module
-
-
-from typing import Tuple, Any
+from typing import Tuple, Any, List
+from collagen.core import KVS
+from collagen.core import Module
 
 
 class Session(object):
@@ -21,25 +18,20 @@ class Session(object):
         Optimizer to train teh model
     loss : torch.nn.Module
         Loss used in the session
-    param_groups : str or tuple
-        Groups of parameters, which need to be optimized. If str, then a particular group of parameters will be used.
-        If a tuple of strings, then all the mentioned groups will be used.
 
     """
     def __init__(self, module: Module, optimizer: torch.optim.Optimizer,
-                 loss: torch.nn.Module, param_groups: str or Tuple[str]):
-
-        if isinstance(param_groups, str):
-            param_groups = (param_groups, )
+                 loss: torch.nn.Module):
 
         self.__module: Module = module
         self.__optimizer: torch.optim.Optimizer = optimizer
         self.__loss: torch.nn.Module = loss
         self.__kvs: KVS = KVS()
-        self.__param_groups: Tuple[str] = param_groups
 
-        for group_name in param_groups:
-            self.add_param_group(group_name)
+        # Params of ``backward``
+        self.__retain_graph: bool or None = None
+        self.__create_graph: bool = False
+        self.__gradient = None
 
     @property
     def loss(self):
@@ -73,6 +65,11 @@ class Session(object):
                 if new_value[0] == group['name']:
                     group[param_name] = new_value[1]
 
+    def set_backward_param(self, gradient=None, retain_graph=None, create_graph=False):
+        self.__gradient = gradient
+        self.__retain_graph = retain_graph
+        self.__create_graph = create_graph
+
     def add_param_group(self, group_name: str):
         """Adds parameter group to the optimizer.
 
@@ -86,7 +83,8 @@ class Session(object):
 
     def train_step(self, batch: torch.Tensor or Tuple[torch.Tensor],
                    target: torch.Tensor or Tuple[torch.Tensor],
-                   accumulate_grad: bool = False, return_out=False) -> float:
+                   accumulate_grad: bool = False, return_out=False,
+                   callbacks=Tuple[callable] or List[callable] or None) -> float:
         """
         Performs one training iteration using the given mini-batch.
 
@@ -102,7 +100,8 @@ class Session(object):
             Useful if the batch size are too small because of the input size.
         return_out : bool
             Whether to return output
-
+        callbacks : Tuple[callable] or List[callable] or None
+            Callbacks to be used during the training.
         Returns
         -------
         out : float
@@ -110,14 +109,17 @@ class Session(object):
 
         """
 
-        if not accumulate_grad:
+        if not accumulate_grad and self.__optimizer is not None:
             self.__optimizer.zero_grad()
 
-        return self.__batch_step(batch, target, with_grad=True, with_backward=True, return_out=return_out)
+        return self.__batch_step(batch=batch, target=target, with_grad=True,
+                                 with_backward=True,
+                                 return_out=return_out, callbacks=callbacks)
 
     def eval_step(self, batch: torch.Tensor or Tuple[torch.Tensor],
                   target: torch.Tensor or Tuple[torch.Tensor],
-                  return_out=False) -> Tuple[float, torch.Tensor or tuple] or float:
+                  return_out=False,
+                  callbacks=Tuple[callable] or List[callable] or None) -> Tuple[float, torch.Tensor or tuple] or float:
         """
         Performs evaluation of the given mini-batch. If needed, also returns the results.
 
@@ -129,7 +131,8 @@ class Session(object):
             One or multiple targets
         return_out : bool
             Whether to return the output of the network
-
+        callbacks : Tuple[callable] or List [callable] or None
+            Callbacks to be used during the training.
         Returns
         -------
         out : Tuple[float, torch.Tensor or tuple] or float
@@ -139,12 +142,13 @@ class Session(object):
         return self.__batch_step(batch, target, with_grad=False,
                                  with_backward=False,
                                  eval_mode=True,
-                                 return_out=return_out)
+                                 return_out=return_out, callbacks=callbacks)
 
     def __batch_step(self, batch: torch.Tensor or Tuple[torch.Tensor],
                      target: torch.Tensor or Tuple[torch.Tensor],  with_grad: bool = True,
                      with_backward: bool = True, eval_mode: bool = False,
-                     return_out: bool = False) -> Tuple[float, Any] or float:
+                     return_out: bool = False,
+                     callbacks=Tuple[callable] or List[callable] or None) -> Tuple[float, Any] or float:
         """
         Private method, which handles the logic for training and evaluation for 1 mini-batch.
 
@@ -162,6 +166,8 @@ class Session(object):
             Whether to switch the trained module to the evaluation mode
         return_out : bool
             Whether to return the output
+        callbacks : Tuple[callable] or List [callable] or None
+            Callbacks to be used during the batch step.
 
         Returns
         -------
@@ -169,6 +175,7 @@ class Session(object):
                 Loss value and possibly the output of the model.
         """
 
+        module_device = next(self.__module.parameters()).device
         if eval_mode:
             with_backward = False
             with_grad = False
@@ -181,16 +188,103 @@ class Session(object):
                 raise ValueError
 
         with torch.set_grad_enabled(with_grad):
-            out = self.__module(batch)
-            loss = self.__loss(out, target)
+            if isinstance(batch, tuple) and len(batch) == 1:
+                batch = batch[0]
+            if isinstance(target, tuple) and len(target) == 1:
+                target = target[0]
 
-        if with_backward:
-            loss.backward()
-            self.__optimizer.step()
-        if not return_out:
-            return loss.item()
-        else:
-            return loss.item(), return_out
+            # Transfer input and target into proper device
+            if isinstance(batch, tuple) or isinstance(batch, list):
+                batch_on_device = tuple([b.to(module_device) for b in batch])
+            else:
+                batch_on_device = batch.to(module_device)
+
+            if isinstance(target, tuple) or isinstance(target, list):
+                target_on_device = tuple([t.to(module_device) for t in target])
+            else:
+                target_on_device = target.to(module_device)
+
+            # Forward
+            for cb in callbacks:
+                cb.on_forward_begin(module=self.__module,
+                                    input=batch_on_device,
+                                    target=target_on_device,
+                                    optimizer=self.__optimizer,
+                                    criterion=self.__loss)
+
+            out = self.__module(batch_on_device)
+
+            for cb in callbacks:
+                cb.on_forward_end(module=self.__module,
+                                  input=batch_on_device,
+                                  target=target_on_device,
+                                  output=out,
+                                  optimizer=self.__optimizer,
+                                  criterion=self.__loss)
+
+            # Compute loss
+            for cb in callbacks:
+                cb.on_loss_begin(session=self,
+                                 input=batch_on_device,
+                                 target=target_on_device,
+                                 output=out)
+
+            loss = self.__loss(out, target_on_device)
+
+            for cb in callbacks:
+                cb.on_loss_end(session=self,
+                               loss=loss,
+                               input=batch_on_device,
+                               target=target_on_device,
+                               output=out)
+
+            if with_backward:
+                # Backward
+                for cb in callbacks:
+                    cb.on_backward_begin(session=self,
+                                         loss=loss,
+                                         input=batch_on_device,
+                                         target=target_on_device,
+                                         output=out)
+
+                loss.backward(gradient=self.__gradient,
+                              retain_graph=self.__retain_graph,
+                              create_graph=self.__create_graph)
+
+                for cb in callbacks:
+                    cb.on_backward_end(session=self,
+                                       loss=loss,
+                                       input=batch_on_device,
+                                       target=target_on_device,
+                                       output=out,
+                                       optimizer=self.__optimizer,
+                                       criterion=self.__loss)
+
+                # Optimizer step
+                for cb in callbacks:
+                    cb.on_optimizer_step_begin(module=self.__module,
+                                               loss=loss,
+                                               input=batch_on_device,
+                                               target=target_on_device,
+                                               output=out,
+                                               optimizer=self.__optimizer,
+                                               criterion=self.__loss)
+
+                self.__optimizer.step()
+
+                for cb in callbacks:
+                    cb.on_optimizer_step_begin(module=self.__module,
+                                               loss=loss,
+                                               input=batch_on_device,
+                                               target=target_on_device,
+                                               output=out,
+                                               optimizer=self.__optimizer,
+                                               criterion=self.__loss)
+
+            if not return_out:
+                return loss.item()
+            else:
+                return loss.item(), out
 
 
 

@@ -6,19 +6,17 @@
 from setuptools import setup, find_packages
 
 
-requirements = ('numpy', 'opencv-python', 'solt')
+requirements = ('numpy', 'opencv-python', 'solt', 'torch', 'tqdm', 'scikit-learn', 'pandas')
 
 setup_requirements = ()
 
 test_requirements = ('pytest',)
 
-description = """Deep Learning framework for reproducible science. 
-Supports all modern practices for training deep neural networks. From Finland with love.
-"""
+description = """Deep Learning framework for reproducible science. From Finland with love."""
 
 setup(
-    author="Aleksei Tiulpin, Egor Panfilov, Hoang Nguyen",
-    author_email='aleksei.tiulpin@oulu.fi, egor.panfilov@oulu.fi, huy.nguyen@oulu.fi',
+    author="Hoang Nguyen, Egor Panfilov, Aleksei Tiulpin",
+    author_email='huy.nguyen@oulu.fi, egor.panfilov@oulu.fi, aleksei.tiulpin@oulu.fi,',
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Science/Research',

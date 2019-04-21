@@ -6,6 +6,12 @@ __pycache__/
 # C extensions
 *.so
 
+examples/minist_classification/data/
+.pytest_cache/
+examples/*/runs/
+examples/*/data/
+examples/*/snapshots/
+
 # Distribution / packaging
 .Python
 build/
@@ -109,3 +115,5 @@ venv.bak/
 # Image files
 *.jpg
 *.png
+*.csv
+*.pt

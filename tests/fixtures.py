@@ -4,7 +4,7 @@ import numpy as np
 import torch 
 
 
-@pytest.fixture(scope='module', params=[100, 500])
+@pytest.fixture(scope='module', params=[32, 500])
 def metadata_fname_target_5_classes(request):
     np.random.seed(42)
     return pd.DataFrame(data={'fname': [f'img_{i}.png' for i in range(request.param)],

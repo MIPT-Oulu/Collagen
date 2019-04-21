@@ -16,7 +16,7 @@ class DataProvider(object):
         self.__state_dict = {}
 
         for itemloader_name in self.__loaders:
-            itemloader_len = self.__loaders[itemloader_name].__len__()
+            itemloader_len = len(self.__loaders[itemloader_name])
             self.__state_dict[itemloader_name] = {"total": itemloader_len,
                                           "samples": None,
                                           "num_sampled": 0,
@@ -45,7 +45,7 @@ class DataProvider(object):
             if itemloader_name in self.__loaders:
                 sampling_args.append((itemloader_name, k))
             else:
-                raise ValueError("Not found argument {} in itemloader list".format(itemloader_name))
+                raise ValueError("Not found argument `{}` in itemloader list".format(itemloader_name))
 
         for il_name, k in sampling_args:
             list_samples.append(self.__sample(il_name, k))
@@ -94,3 +94,11 @@ class DataProvider(object):
         del self.__state_dict
         gc.collect()
         self.__state_dict = {}
+
+    def get_loader_by_name(self, name):
+        if name in self.__loaders:
+            return self.__loaders[name]
+        elif isinstance(name, tuple) or isinstance(name, list):
+            return tuple([self.__loaders[s] for s in name])
+        else:
+            raise ValueError("`{}` not found in list of loader names".format(name))

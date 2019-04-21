@@ -45,7 +45,7 @@ class DataFrameDataset(Dataset):
         Returns
         -------
         entry : dict
-            dictionary of `index`-th parsed item.
+            Dictionary of `index`-th parsed item.
         """
         entry = self.meta_data.iloc[index]
         entry = self.parse_item_cb(self.root, entry, self.transform)

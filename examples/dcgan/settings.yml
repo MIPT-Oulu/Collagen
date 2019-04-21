@@ -1,0 +1,46 @@
+train:
+  data_provider:
+    D:
+      real_train:
+        cate: ItemLoader
+        num_samples: 1
+        data_key: "data"
+        target_key: "target"
+      fake:
+        cate: FakeSampler
+        num_samples: 1
+        data_key: "data"
+        target_key: "target"
+    G:
+      noise:
+        cate: GaussianNoiseSampler
+        num_samples: 1
+        data_key: "latent"
+        target_key: "valid"
+  meters:
+    - SSAccuracy
+    - SSValidity
+eval:
+  data_provider:
+    D:
+      real_eval:
+        num_samples: 1
+        data_key: "data"
+        target_key: "target"
+      fake:
+        cate: FakeSampler
+        num_samples: 1
+        data_key: "data"
+        target_key: "target"
+    G:
+      noise:
+        cate: GaussianNoiseSampler
+        num_samples: 1
+        data_key: "latent"
+        target_key: "valid"
+  meters:
+    - SSAccuracy
+    - SSValidity
+  visualizers:
+    - generation
+    - meters
