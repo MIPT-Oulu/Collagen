@@ -20,7 +20,7 @@ def test_loader_samples_batches(batch_size, n_samples, metadata_fname_target_5_c
     assert samples[0]['target'].size(0) == batch_size
 
 
-@pytest.mark.parametrize('batch_size, n_samples', itertools.product([32], [20, 100]))
+@pytest.mark.parametrize('batch_size, n_samples', itertools.product([8], [5, 25]))
 def test_loader_endless_sampling_works(batch_size, n_samples, metadata_fname_target_5_classes,
                                        ones_image_parser, img_target_transformer):
 
