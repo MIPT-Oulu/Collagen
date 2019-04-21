@@ -17,7 +17,6 @@ class Module(torch.nn.Module):
         self.__input_shape = input_shape
         self.__output_shape = output_shape
 
-
     def validate_input(self, x):
         if self.__input_shape is not None:
             if len(x.shape) != len(self.__input_shape):
@@ -34,7 +33,6 @@ class Module(torch.nn.Module):
                 if d is not None and d != y.shape[i]:
                     raise ValueError(f"Expect dim {i} to be {d}, but got {y.shape[i]}")
 
-    # Should not overwrite parameters() because it eliminates some useful params of nn.Module such as device, requires_grad, etc.
     def _parameters(self, group: str or Tuple[str] or None = None,
                     name: str or None = None) -> Dict[str, torch.nn.Parameter or str]:
         """

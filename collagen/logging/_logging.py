@@ -1,4 +1,4 @@
-from collagen.callbacks import Callback
+from collagen.core import Callback
 
 
 class Logging(Callback):
