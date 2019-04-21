@@ -14,15 +14,17 @@ matrix:
       sudo: true
       python: 3.7
 
-
-install:
+before_install:
   - sh ci/conda_setup.sh
   - bash $HOME/miniconda.sh -b -p $HOME/miniconda
   - export OPATH="$PATH" && export PATH="$HOME/miniconda/bin:$PATH"
+
+install:
   - conda create -q -y -n collagen_test_env python=$TRAVIS_PYTHON_VERSION
   - conda install -y -n collagen_test_env pandoc
   - source activate collagen_test_env
   - pip install -r ci/requirements.txt
   - pip install .
+
 script:
-  - py.test tests --cov collagen --cov-report term-missing -v
+  - py.test tests  -v
