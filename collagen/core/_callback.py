@@ -96,4 +96,4 @@ class Callback(object):
         pass
 
     def __str__(self):
-        return ""
+        return "Default callback"

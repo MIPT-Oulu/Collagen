@@ -71,12 +71,12 @@ if __name__ == "__main__":
 
     # Initializing Discriminator
     d_network = Discriminator(nc=1, ndf=args.d_net_features).to(device)
-    d_optim = optim.Adam(d_network.parameters(), lr=args.d_lr, betas=(args.beta1, 0.999))
+    d_optim = optim.Adam(d_network.group_parameters(), lr=args.d_lr, betas=(args.beta1, 0.999))
     d_crit = BCELoss().to(device)
 
     # Initializing Generator
     g_network = Generator(nc=1, nz=args.latent_size, ngf=args.g_net_features).to(device)
-    g_optim = optim.Adam(g_network.parameters(), lr=args.g_lr, betas=(args.beta1, 0.999))
+    g_optim = optim.Adam(g_network.group_parameters(), lr=args.g_lr, betas=(args.beta1, 0.999))
     g_crit = GeneratorLoss(d_network=d_network, d_loss=d_crit).to(device)
 
     # Data provider

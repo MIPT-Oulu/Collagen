@@ -33,8 +33,8 @@ class Module(torch.nn.Module):
                 if d is not None and d != y.shape[i]:
                     raise ValueError(f"Expect dim {i} to be {d}, but got {y.shape[i]}")
 
-    def _parameters(self, group: str or Tuple[str] or None = None,
-                    name: str or None = None) -> Dict[str, torch.nn.Parameter or str]:
+    def group_parameters(self, group: str or Tuple[str] or None = None,
+                         name: str or None = None) -> Dict[str, torch.nn.Parameter or str]:
         """
         Returns an iterator through the parameters of the module from one or many groups.
 
@@ -104,8 +104,10 @@ class Module(torch.nn.Module):
     def forward(self, *x):
         raise NotImplementedError
 
+    @abstractmethod
     def get_features(self):
         raise NotImplementedError
 
-    def get_features_by_name(self):
+    @abstractmethod
+    def get_features_by_name(self, name: str):
         raise NotImplementedError
