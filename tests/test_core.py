@@ -17,13 +17,13 @@ def test_session_single_batch_step_simple(dumb_net, classification_minibatch_two
     batch, target = classification_minibatch_two_class
     optimizer = optim.Adam(net.parameters(), lr=5e-2)
     criterion = nn.BCEWithLogitsLoss()
-
+    torch.manual_seed(42)
     session = Session(net, optimizer, criterion)
-    loss = (10000, None)
+    loss = 10000
     for i in range(50):
-        loss = session.train_step(batch, target, return_out=True)
+        loss = session.train_step(batch, target, return_out=True)[0]
 
-    assert loss[0] < 1e-1
+    assert loss < 1e-1
 
 
 def test_session_train_eval(dumb_net, classification_minibatches_seq_two_class):
@@ -33,6 +33,7 @@ def test_session_train_eval(dumb_net, classification_minibatches_seq_two_class):
 
     session = Session(net, optimizer, criterion)
     loss = 100000
+    torch.manual_seed(42)
     for i in range(50):
         for batch, target in classification_minibatches_seq_two_class[:1]:
             loss = session.train_step(batch, target, return_out=True)[0]
@@ -43,8 +44,7 @@ def test_session_train_eval(dumb_net, classification_minibatches_seq_two_class):
     val_loss /= len(classification_minibatches_seq_two_class[1:])
 
     assert loss < 1e-1
-    # model should have overfitted
-    assert val_loss > 1
+    assert val_loss < 1e-1
 
 
 
