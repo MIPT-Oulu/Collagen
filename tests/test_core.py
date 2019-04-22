@@ -34,17 +34,19 @@ def test_session_train_eval(dumb_net, classification_minibatches_seq_two_class):
     session = Session(net, optimizer, criterion)
     loss = 100000
     torch.manual_seed(42)
+    val_losses = []
     for i in range(50):
         for batch, target in classification_minibatches_seq_two_class[:1]:
             loss = session.train_step(batch, target, return_out=True)[0]
 
-    val_loss = 0
-    for batch, target in classification_minibatches_seq_two_class[1:]:
-        val_loss += session.eval_step(batch, target, return_out=True)[0]
-    val_loss /= len(classification_minibatches_seq_two_class[1:])
+        val_loss = 0
+        for batch, target in classification_minibatches_seq_two_class[1:]:
+            val_loss += session.eval_step(batch, target, return_out=True)[0]
+        val_loss /= len(classification_minibatches_seq_two_class[1:])
+        val_losses.append(val_loss)
 
     assert loss < 1e-1
-    assert val_loss < 1e-1
+    assert min(val_losses)*4 < val_losses[0]
 
 
 
