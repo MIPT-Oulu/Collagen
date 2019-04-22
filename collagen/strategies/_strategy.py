@@ -213,7 +213,9 @@ class Strategy(object):
                                                    n_epochs=self.__n_epochs,
                                                    stage=stage,
                                                    batch_i=batch_i)
+
                     getattr(self.__trainer, stage)(data_key=self.__data_key, target_key=self.__target_key)
+
                     self._on_batch_end_callbacks(progress_bar=progress_bar,
                                                  epoch=epoch,
                                                  n_epochs=self.__n_epochs,

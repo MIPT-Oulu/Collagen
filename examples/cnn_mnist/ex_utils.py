@@ -107,3 +107,10 @@ class SimpleConvNet(Module):
         x = x.view(x.size(0), -1)
 
         return self.classifier(x)
+
+    def get_features(self):
+        pass
+
+    def get_features_by_name(self, name):
+        pass
+

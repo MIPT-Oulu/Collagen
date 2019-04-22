@@ -30,7 +30,7 @@ class GANStrategy(object):
         data_provider: DataProvider
             Provides batches of data to D and G models
         data_sampling_config: dict
-            Configuration of itemloader names and corresponding quantities of samples
+            Configuration of the itemloader names and the corresponding numbers of samples
         d_trainer: Trainer
             Trainer of Discriminative model
         g_trainer: Trainer
@@ -40,7 +40,7 @@ class GANStrategy(object):
         callbacks: Callback or Tuple[Callback]
             Callbacks at strategy-level
         device: device
-            Device on which forwarding and backwarding take place
+            Device on which forward and backward are performed
         """
         self.__stage_names = ("train", "eval")
         self.__model_names = ("G", "D")

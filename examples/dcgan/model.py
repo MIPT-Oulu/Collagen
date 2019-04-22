@@ -3,6 +3,7 @@ from torch import nn
 import torch
 from collagen.core import Module
 
+
 class Discriminator(Module):
     def __init__(self, nc=1, ndf=64, n_gpu=1):
         super(Discriminator, self).__init__()
@@ -48,7 +49,7 @@ class Discriminator(Module):
     def get_features(self):
         pass
 
-    def get_features_by_name(self):
+    def get_features_by_name(self, name):
         pass
 
 
@@ -106,7 +107,7 @@ class Generator(Module):
     def get_features(self):
         pass
 
-    def get_features_by_name(self):
+    def get_features_by_name(self, name):
         pass
 
 
