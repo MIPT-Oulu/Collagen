@@ -63,7 +63,10 @@ class GANStrategy(object):
             for model_name in self.__model_names:
                 data_keys = []
                 target_keys = []
-                data_loader_names = self.__data_sampling_config[stage]["data_provider"][model_name]
+                if model_name in self.__data_sampling_config[stage]["data_provider"]:
+                    data_loader_names = self.__data_sampling_config[stage]["data_provider"][model_name]
+                else:
+                    continue
                 for loader_name in data_loader_names:
                     n_samples_dict[loader_name] = data_loader_names[loader_name]["num_samples"]
                     n_batches = len(self.__data_provider.get_loader_by_name(loader_name))
@@ -293,7 +296,9 @@ class GANStrategy(object):
                                                     n_epochs=self.__n_epochs,
                                                     stage=stage,
                                                     batch_i=batch_i)
+
                     self.__data_provider.sample(**self.__num_samples_by_stage[stage])
+
                     self._on_sample_end_callbacks(progress_bar=progress_bar,
                                                   epoch=epoch,
                                                   n_epochs=self.__n_epochs,
@@ -311,8 +316,10 @@ class GANStrategy(object):
                                                      n_epochs=self.__n_epochs,
                                                      stage=stage,
                                                      batch_i=batch_i)
-                    getattr(self.__trainers["D"], stage)(data_key=self.__data_key_by_stage[stage]["D"],
-                                                         target_key=self.__target_key_by_stage[stage]["D"])
+                    if "D" in self.__data_key_by_stage[stage]:
+                        getattr(self.__trainers["D"], stage)(data_key=self.__data_key_by_stage[stage]["D"],
+                                                             target_key=self.__target_key_by_stage[stage]["D"])
+
                     self._on_d_batch_end_callbacks(progress_bar=progress_bar,
                                                    epoch=epoch,
                                                    n_epochs=self.__n_epochs,
@@ -323,8 +330,10 @@ class GANStrategy(object):
                                                      n_epochs=self.__n_epochs,
                                                      stage=stage,
                                                      batch_i=batch_i)
-                    getattr(self.__trainers["G"], stage)(data_key=self.__data_key_by_stage[stage]["G"],
-                                                         target_key=self.__target_key_by_stage[stage]["G"])
+                    if "G" in self.__data_key_by_stage[stage]:
+                        getattr(self.__trainers["G"], stage)(data_key=self.__data_key_by_stage[stage]["G"],
+                                                             target_key=self.__target_key_by_stage[stage]["G"])
+
                     self._on_g_batch_end_callbacks(progress_bar=progress_bar,
                                                    epoch=epoch,
                                                    n_epochs=self.__n_epochs,

@@ -3,6 +3,7 @@ from torch.nn.utils import clip_grad_value_, clip_grad_norm_
 from collagen.core import Callback, Module
 from collagen.core.utils import to_tuple
 
+
 class BackwardCallback(Callback):
     def __init__(self, retain_graph=True, create_graph=False):
         super().__init__()

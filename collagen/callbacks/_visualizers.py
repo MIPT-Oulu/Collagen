@@ -102,7 +102,7 @@ class ProgressbarVisualizer(Callback):
 
 class TensorboardSynthesisVisualizer(Callback):
     def __init__(self, writer, generator_sampler, key_name: str = "data", tag: str = "Generated",
-                 grid_shape: Tuple[int] = (10, 10), split_channel=True, transform=None):
+                 grid_shape: Tuple[int] or int = 10, split_channel=True, transform=None):
         """Visualizes synthesized images in TensorboardX
 
         Parameters
@@ -115,8 +115,9 @@ class TensorboardSynthesisVisualizer(Callback):
             Key corresponding to synthesized image in loaded samples from :attr:generator_sampler`
         tag: str
             Tag of metric in TensorboardX
-        grid_shape: tuple
-            Shape of synthesized image grip (default: (10, 10))
+        grid_shape: tuple of int or int
+            Shape of the image grid. Will be generated according to the specified tuple - `WxH`. If int,
+            the a square `grid_shape x grid_shape` will be generated
         split_channel: bool
             Whether split synthesized image by channels and concatenate them horizontally
         transform: function
@@ -126,13 +127,14 @@ class TensorboardSynthesisVisualizer(Callback):
         self.__generator_sampler = generator_sampler
         self.__split_channel = split_channel
 
-        if len(grid_shape) != 2:
-            raise ValueError("`grid_shape` must have 2 dim, but found {}".format(len(grid_shape)))
+        if isinstance(grid_shape, tuple):
+            if len(grid_shape) != 2:
+                raise ValueError("`grid_shape` must have 2 dim, but found {}".format(len(grid_shape)))
         self.__transform = self._default_transform if transform is None else transform
         self.__writer = writer
         self.__key_name = key_name
-        self.__grid_shape = grid_shape
-        self.__num_images = grid_shape[0] * grid_shape[1]
+        self.__grid_shape = grid_shape if isinstance(grid_shape, tuple) else (grid_shape, grid_shape)
+        self.__num_images = self.__grid_shape[0] * self.__grid_shape[1]
         self.__num_batches = self.__num_images // self.__generator_sampler.batch_size + 1
         self.__tag = tag
 

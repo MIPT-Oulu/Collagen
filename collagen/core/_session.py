@@ -1,6 +1,5 @@
 import torch
 from typing import Tuple, Any, List
-from collagen.core import KVS
 from collagen.core import Module
 
 
@@ -26,7 +25,6 @@ class Session(object):
         self.__module: Module = module
         self.__optimizer: torch.optim.Optimizer = optimizer
         self.__loss: torch.nn.Module = loss
-        self.__kvs: KVS = KVS()
 
         # Params of ``backward``
         self.__retain_graph: bool or None = None

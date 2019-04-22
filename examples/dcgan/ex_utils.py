@@ -6,8 +6,8 @@ import torch
 import numpy as np
 import solt.data as sld
 from collagen.data.utils import ApplyTransform, Normalize, Compose
-import solt.core as slc
 import solt.transforms as slt
+import random
 
 
 def wrap2solt(inp):
@@ -22,31 +22,12 @@ def unpack_solt(dc: sld.DataContainer):
 
 
 def init_mnist_transforms():
-    train_trf = Compose([
+    return Compose([
         wrap2solt,
-        slc.Stream([
-            slt.ResizeTransform(resize_to=(64, 64), interpolation='bilinear'),
-            slt.RandomScale(range_x=(0.9, 1.1), same=False, p=0.5),
-            slt.RandomShear(range_x=(-0.05, 0.05), p=0.5),
-            slt.RandomRotate(rotation_range=(-10, 10), p=0.5),
-            # slt.RandomRotate(rotation_range=(-5, 5), p=0.5),
-            slt.PadTransform(pad_to=70),
-            slt.CropTransform(crop_size=64, crop_mode='r')
-        ]),
+        slt.ResizeTransform(resize_to=(64, 64), interpolation='bilinear'),
         unpack_solt,
         ApplyTransform(Normalize((0.5,), (0.5,)))
     ])
-
-    test_trf = Compose([
-        wrap2solt,
-        slt.ResizeTransform(resize_to=(64, 64), interpolation='bilinear'),
-        # slt.PadTransform(pad_to=64),
-        unpack_solt,
-        ApplyTransform(Normalize((0.5,), (0.5,))),
-
-    ])
-
-    return train_trf, test_trf
 
 
 def weights_init(m):
@@ -59,13 +40,11 @@ def weights_init(m):
 
 
 class Discriminator(Module):
-    def __init__(self, nc=1, ndf=64, drop_rate=0.3, ngpu=1):
+    def __init__(self, nc=1, ndf=64, n_gpu=1):
         super(Discriminator, self).__init__()
 
-        self.__drop_rate = drop_rate
-        self.__ngpu = ngpu
+        self.__devices = list(range(n_gpu))
 
-        self.dropout = nn.Dropout(p=self.__drop_rate)
         # input is (nc) x 64 x 64
         self._layer1 = nn.Sequential(nn.Conv2d(nc, ndf, 4, 2, 1, bias=False),
                                      nn.LeakyReLU(0.2, inplace=True))  # state size. (ndf) x 32 x 32
@@ -83,36 +62,31 @@ class Discriminator(Module):
                                      nn.LeakyReLU(0.2, inplace=True))  # state size. (ndf*4) x 4 x 4
 
         self._layer5 = nn.Sequential(nn.Conv2d(ndf * 8, 1, 4, 1, 0, bias=False),
-                                 nn.Sigmoid())  # state size. 1x1x1
+                                     nn.Sigmoid())  # state size. 1x1x1
 
         self.main_flow = nn.Sequential(OrderedDict([("conv_block1", self._layer1),
-                                                    ("dropout1", self.dropout),
                                                     ("conv_block2", self._layer2),
-                                                    ("dropout2", self.dropout),
                                                     ("conv_block3", self._layer3),
-                                                    ("dropout3", self.dropout),
                                                     ("conv_block4", self._layer4),
-                                                    ("dropout3", self.dropout),
                                                     ("conv_final", self._layer5)
                                                     ]))
 
         self.main_flow.apply(weights_init)
 
-    def forward(self, x):
-        if x.is_cuda and self.__ngpu > 1:
-            output = nn.parallel.data_parallel(self.main_flow, x, range(self.__ngpu))
+    def forward(self, x: torch.tensor):
+        if x.is_cuda and len(self.__devices) > 1:
+            output = nn.parallel.data_parallel(self.main_flow, x, self.__devices)
         else:
             output = self.main_flow(x)
 
         return output.view(-1, 1).squeeze(1)
 
 
-class Generator(nn.Module):
-    def __init__(self, nc=1, nz=100, ngf=64, ngpu=1, drop_rate=0.1):
+class Generator(Module):
+    def __init__(self, nc=1, nz=100, ngf=64, n_gpu=1):
         super(Generator, self).__init__()
 
-        self.__ngpu = ngpu
-        self.dropout = nn.Dropout(p=drop_rate)
+        self.__devices = list(range(n_gpu))
 
         self._layer1 = nn.Sequential(nn.ConvTranspose2d(nz, ngf * 8, 4, 1, 0, bias=False),
                                      nn.BatchNorm2d(ngf * 8),
@@ -134,8 +108,8 @@ class Generator(nn.Module):
                                      nn.BatchNorm2d(ngf // 2),
                                      nn.ReLU(True))  # state size. (ngf) x 64 x 64
 
-        self._layer6 = nn.Sequential(nn.Conv2d(ngf // 2, 1, 3, 1, 1, bias=False),
-                                     nn.Sigmoid())  # state size. (ngf) x 64 x 64
+        self._layer6 = nn.Sequential(nn.Conv2d(ngf // 2, nc, 3, 1, 1, bias=False),
+                                     nn.Tanh())  # state size. (ngf) x 64 x 64
 
         self.main_flow = nn.Sequential(OrderedDict([("conv_block1", self._layer1),
                                                     ("conv_block2", self._layer2),
@@ -147,13 +121,13 @@ class Generator(nn.Module):
 
         self.main_flow.apply(weights_init)
 
-    def forward(self, x):
+    def forward(self, x: torch.tensor):
         if len(x.size()) != 2:
             raise ValueError("Input must have 2 dim but found {}".format(x.shape))
         x = x.view(x.size(0), x.size(1), 1, 1)
 
-        if x.is_cuda and self.__ngpu > 1:
-            output = nn.parallel.data_parallel(self.main_flow, x, range(self.__ngpu))
+        if x.is_cuda and len(self.__devices) > 1:
+            output = nn.parallel.data_parallel(self.main_flow, x, device_ids=self._devices)
         else:
             output = self.main_flow(x)
 
@@ -169,14 +143,12 @@ def init_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--n_epochs', type=int, default=1000, help='Number of epochs')
     parser.add_argument('--bs', type=int, default=128, help='Batch size')
-    parser.add_argument('--d_lr', type=float, default=1e-4, help='Learning rate (Discriminator)')
-    parser.add_argument('--d_wd', type=float, default=1e-4, help='Weight decay (Generator)')
-    parser.add_argument('--g_lr', type=float, default=1e-4, help='Learning rate (Discriminator)')
-    parser.add_argument('--g_wd', type=float, default=1e-4, help='Weight decay (Generator)')
-    parser.add_argument('--beta1', type=float, default=0.5, help='Weight decay (Generator)')
-    parser.add_argument('--g_net_features', type=int, default=128, help='Number of features (Generator)')
-    parser.add_argument('--d_net_features', type=int, default=128, help='Number of featuresGenerator)')
-    parser.add_argument('--latent_size', type=int, default=256, help='Latent space size')
+    parser.add_argument('--d_lr', type=float, default=2e-4, help='Learning rate (Discriminator)')
+    parser.add_argument('--g_lr', type=float, default=2e-4, help='Learning rate (Discriminator)')
+    parser.add_argument('--beta1', type=float, default=0.5, help='beta1 for Adam')
+    parser.add_argument('--g_net_features', type=int, default=64, help='Number of features (Generator)')
+    parser.add_argument('--d_net_features', type=int, default=64, help='Number of featuresGenerator)')
+    parser.add_argument('--latent_size', type=int, default=64, help='Latent space size')
     parser.add_argument('--num_threads', type=int, default=0, help='Number of threads for data loader')
     parser.add_argument('--save_data', default='data', help='Where to save downloaded dataset')
     parser.add_argument('--seed', type=int, default=12345, help='Random seed')
@@ -184,10 +156,11 @@ def init_args():
     parser.add_argument('--device', type=str, default="cuda", help='Use `cuda` or `cpu`')
     parser.add_argument('--log_dir', type=str, default=None, help='Log directory')
     parser.add_argument('--comment', type=str, default="dcgan", help='Comment of log')
-    parser.add_argument('--grid_shape', type=tuple, default=(24, 24), help='Shape of grid of generated images')
+    parser.add_argument('--grid_shape', type=int, default=8, help='Shape of grid of generated images')
     args = parser.parse_args()
 
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
+    random.seed(args.seed)
 
     return args
