@@ -84,7 +84,7 @@ class Session(object):
     def train_step(self, batch: torch.Tensor or Tuple[torch.Tensor],
                    target: torch.Tensor or Tuple[torch.Tensor],
                    accumulate_grad: bool = False, return_out=False,
-                   callbacks=Tuple[callable] or List[callable] or None) -> float:
+                   callbacks: Tuple[callable] or List[callable] or None = None) -> float:
         """
         Performs one training iteration using the given mini-batch.
 
@@ -119,7 +119,8 @@ class Session(object):
     def eval_step(self, batch: torch.Tensor or Tuple[torch.Tensor],
                   target: torch.Tensor or Tuple[torch.Tensor],
                   return_out=False,
-                  callbacks=Tuple[callable] or List[callable] or None) -> Tuple[float, torch.Tensor or tuple] or float:
+                  callbacks: Tuple[callable] or List[callable] or None = None) -> Tuple[float,
+                                                                                        torch.Tensor or tuple] or float:
         """
         Performs evaluation of the given mini-batch. If needed, also returns the results.
 
@@ -148,7 +149,7 @@ class Session(object):
                      target: torch.Tensor or Tuple[torch.Tensor],  with_grad: bool = True,
                      with_backward: bool = True, eval_mode: bool = False,
                      return_out: bool = False,
-                     callbacks=Tuple[callable] or List[callable] or None) -> Tuple[float, Any] or float:
+                     callbacks: Tuple[callable] or List[callable] or None = None) -> Tuple[float, Any] or float:
         """
         Private method, which handles the logic for training and evaluation for 1 mini-batch.
 
@@ -176,6 +177,8 @@ class Session(object):
         """
 
         module_device = next(self.__module.parameters()).device
+        if callbacks is None:
+            callbacks = ()
         if eval_mode:
             with_backward = False
             with_grad = False
