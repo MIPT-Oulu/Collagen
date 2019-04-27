@@ -1,4 +1,4 @@
 from ._lr_schedulers import LRScheduler
-from ._visualizers import ProgressbarVisualizer, TensorboardSynthesisVisualizer
+from ._visualizers import ProgressbarVisualizer, TensorboardSynthesisVisualizer, ConfusionMatrixVisualizer
 from ._gan_callbacks import OnDiscriminatorBatchFreezer, OnGeneratorBatchFreezer, GeneratorLoss, OnSamplingFreezer
 from ._backprop_callbacks import ClipGradCallback, BackwardCallback
