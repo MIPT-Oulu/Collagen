@@ -102,7 +102,7 @@ class ProgressbarVisualizer(Callback):
 
 class TensorboardSynthesisVisualizer(Callback):
     def __init__(self, writer, generator_sampler, key_name: str = "data", tag: str = "Generated",
-                 grid_shape: Tuple[int] = (10, 10), split_channel=True, transform=None):
+                 grid_shape: Tuple[int] = (10, 10), split_channel=True, transform=None, unbind_imgs_transform=None):
         """Visualizes synthesized images in TensorboardX
 
         Parameters
@@ -135,10 +135,17 @@ class TensorboardSynthesisVisualizer(Callback):
         self.__num_images = grid_shape[0] * grid_shape[1]
         self.__num_batches = self.__num_images // self.__generator_sampler.batch_size + 1
         self.__tag = tag
+        self.__unbind_imgs_transform = self._default_tranform_unbind_imgs if unbind_imgs_transform is None else unbind_imgs_transform
 
     @staticmethod
     def _default_transform(x):
         return (x+1.0)/2.0
+
+
+    @staticmethod
+    def _default_tranform_unbind_imgs(separate_imgs):
+        concate_img = torch.cat(separate_imgs, dim=-1)
+        return concate_img
 
     def on_epoch_end(self, epoch, n_epochs, **kwargs):
         sampled_data = self.__generator_sampler.sample(self.__num_batches)
@@ -152,14 +159,11 @@ class TensorboardSynthesisVisualizer(Callback):
                             if img.shape[0] % 3 == 0:
                                 n_split = int(img.shape[0]/3)
                                 separate_imgs = [img[3*k:3*(k+1), :, :] for k in range(n_split)]
-                                concate_img = torch.cat(separate_imgs, dim=-1)
-                                # print("concate_img0 shape: {}".format(concate_img.shape))
-                                # concate_img = torch.unsqueeze(concate_img, 0)
-                                # print("concate_img1 shape: {}".format(concate_img.shape))
+                                concate_img = self.__unbind_imgs_transform(separate_imgs)
                                 images.append(concate_img)
                             else:
                                 separate_imgs = torch.unbind(img, dim=0)
-                                concate_img = torch.cat(separate_imgs, dim=-1)
+                                concate_img = self.__unbind_imgs_transform(separate_imgs)
                                 images.append(torch.unsqueeze(concate_img, 0))
                         else:
                             raise ValueError("Channels of image ({}) must be either 1 or 3, but found {}".format(img.shape, img.shape[0]))
