@@ -22,7 +22,8 @@ class GANStrategy(object):
                  d_trainer: Trainer, g_trainer: Trainer,
                  n_epochs: int or None = 100,
                  callbacks: Tuple[Callback] or Callback = None,
-                 device: str or None = "cuda"):
+                 device: str or None = "cuda",
+                 n_training_batches: int or None=None):
         """Implements a part of the training GAN loop by passing the available batches through the model.
 
         Parameters
@@ -41,6 +42,8 @@ class GANStrategy(object):
             Callbacks at strategy-level
         device: device
             Device on which forwarding and backwarding take place
+        n_training_batches: int
+            The number of training batches of each epoch. If None, the number of batches will be auto computed
         """
         self.__stage_names = ("train", "eval")
         self.__model_names = ("G", "D")
@@ -77,6 +80,9 @@ class GANStrategy(object):
 
             self.__num_samples_by_stage[stage] = n_samples_dict
 
+        if n_training_batches is not None:
+            self.__num_batches_by_stage['train'] = n_training_batches
+
         self.__use_cuda = torch.cuda.is_available() and device == "cuda"
         self.__device = torch.device("cuda" if self.__use_cuda and torch.cuda.is_available() else "cpu")
         self.__trainers = {"D": d_trainer, "G": g_trainer}
@@ -106,7 +112,7 @@ class GANStrategy(object):
                                 n_epochs=n_epochs,
                                 batch_i=batch_i,
                                 progress_bar=progress_bar,
-                                stage="generate",
+                                stage=stage,
                                 strategy=self)
 
         for cb in self.__callbacks:
@@ -283,8 +289,6 @@ class GANStrategy(object):
         for epoch in range(self.__n_epochs):
             for stage in self.__stage_names:
                 self._on_epoch_begin_callbacks(epoch=epoch, stage=stage, n_epochs=self.__n_epochs)
-                # DEBUG
-                # self.__num_batches_by_stage[stage] = 5
                 progress_bar = tqdm(range(self.__num_batches_by_stage[stage]), total=self.__num_batches_by_stage[stage],
                                     desc=f'Epoch [{epoch}][{stage}]::')
                 for batch_i in progress_bar:
