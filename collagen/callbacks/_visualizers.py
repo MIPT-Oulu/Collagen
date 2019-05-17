@@ -5,7 +5,6 @@ from torch import Tensor
 from torch.tensor import OrderedDict
 from typing import Tuple
 from collagen.core import Callback
-from collagen.strategies import Strategy
 from torchvision.utils import make_grid
 from collagen.core.utils import to_cpu
 from collagen.metrics import plot_confusion_matrix
@@ -87,7 +86,7 @@ class ProgressbarVisualizer(Callback):
     def _check_freq(self):
         return self.__count % self.__update_freq == 0
 
-    def on_batch_end(self, strategy: Strategy, epoch: int, progress_bar: tqdm, stage: str or None, **kwargs):
+    def on_batch_end(self, strategy, epoch: int, progress_bar: tqdm, stage: str or None, **kwargs):
         self.__count += 1
         if self._check_freq():
             list_metrics_desc = []

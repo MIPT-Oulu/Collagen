@@ -1,18 +1,13 @@
-from collections import OrderedDict
-import tqdm
-from typing import Iterable
 import yaml
 from torch.nn import BCELoss
 from torch import optim
 from tensorboardX import SummaryWriter
 
-from collagen.core import Callback, Session, Trainer
-from collagen.callbacks import OnGeneratorBatchFreezer, OnDiscriminatorBatchFreezer
-from collagen.callbacks import ProgressbarVisualizer, TensorboardSynthesisVisualizer, GeneratorLoss, OnSamplingFreezer
+from collagen.core import Trainer
+from collagen.callbacks import  TensorboardSynthesisVisualizer, GeneratorLoss
 from collagen.data.utils import gan_data_provider
 from collagen.core.utils import auto_detect_device
 from collagen.strategies import GANStrategy
-from collagen.metrics import RunningAverageMeter
 from collagen.data.utils import get_mnist
 from collagen.logging import MeterLogging
 
@@ -40,6 +35,8 @@ if __name__ == "__main__":
     with open("settings.yml", "r") as f:
         sampling_config = yaml.load(f)
 
+
+
     # Initializing the data provider
     item_loaders = dict()
     train_ds, classes = get_mnist(data_folder=args.save_data, train=True)
@@ -47,39 +44,22 @@ if __name__ == "__main__":
                                       train_ds, classes, args.latent_size, init_mnist_transforms(),
                                       parse_item_mnist_gan, args.bs, args.num_threads, device)
     # Setting up the callbacks
-    g_callbacks_train = (RunningAverageMeter(prefix="train/G", name="loss"),
-                         OnGeneratorBatchFreezer(modules=d_network))
 
-    g_callbacks_eval = RunningAverageMeter(prefix="eval/G", name="loss")
-
-    d_callbacks_train = (RunningAverageMeter(prefix="train/D", name="loss"),
-                         OnDiscriminatorBatchFreezer(modules=g_network))
-
-    d_callbacks_eval = (RunningAverageMeter(prefix="eval/D", name="loss"),)
-
-    st_callbacks = (ProgressbarVisualizer(update_freq=1),
-                    MeterLogging(writer=summary_writer),
-                    OnSamplingFreezer(modules=(g_network, d_network)),
+    st_callbacks = (MeterLogging(writer=summary_writer),
                     TensorboardSynthesisVisualizer(generator_sampler=item_loaders['fake'],
                                                    writer=summary_writer,
                                                    grid_shape=args.grid_shape))
-
-    # Sessions
-    d_session = Session(module=d_network, optimizer=d_optim, loss=d_crit)
-    g_session = Session(module=g_network, optimizer=g_optim, loss=g_crit)
 
     # Trainers
     d_trainer = Trainer(data_provider=data_provider,
                         train_loader_names=tuple(sampling_config["train"]["data_provider"]["D"].keys()),
                         val_loader_names=None,
-                        session=d_session,
-                        train_callbacks=d_callbacks_train, val_callbacks=d_callbacks_eval)
+                        module=d_network, optimizer=d_optim, loss=d_crit)
 
     g_trainer = Trainer(data_provider=data_provider,
                         train_loader_names=tuple(sampling_config["train"]["data_provider"]["G"].keys()),
                         val_loader_names=tuple(sampling_config["eval"]["data_provider"]["G"].keys()),
-                        session=g_session,
-                        train_callbacks=g_callbacks_train, val_callbacks=g_callbacks_eval)
+                        module=g_network, optimizer=g_optim, loss=g_crit)
 
     # Strategy
     dcgan = GANStrategy(data_provider=data_provider, data_sampling_config=sampling_config,
