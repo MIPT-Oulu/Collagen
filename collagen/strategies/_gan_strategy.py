@@ -24,7 +24,8 @@ class GANStrategy(object):
                  d_trainer: Trainer, g_trainer: Trainer,
                  n_epochs: int or None = 100,
                  callbacks: Tuple[Callback] or Callback = None,
-                 device: str or None = "cuda"):
+                 device: str or None = "cuda",
+                 n_training_batches: int or None=None):
         """Implements a part of the training GAN loop by passing the available batches through the model.
 
         Parameters
@@ -42,7 +43,9 @@ class GANStrategy(object):
         callbacks: Callback or Tuple[Callback]
             Callbacks at strategy-level
         device: device
-            Device on which forward and backward are performed
+            Device on which forwarding and backwarding take place
+        n_training_batches: int
+            The number of training batches of each epoch. If None, the number of batches will be auto computed
         """
         self.__stage_names = ("train", "eval")
         self.__model_names = ("G", "D")
@@ -81,6 +84,9 @@ class GANStrategy(object):
                 self.__target_key_by_stage[stage][model_name] = tuple(target_keys)
 
             self.__num_samples_by_stage[stage] = n_samples_dict
+
+        if n_training_batches is not None:
+            self.__num_batches_by_stage['train'] = n_training_batches
 
         self.__use_cuda = torch.cuda.is_available() and device == "cuda"
         self.__device = torch.device("cuda" if self.__use_cuda and torch.cuda.is_available() else "cpu")
