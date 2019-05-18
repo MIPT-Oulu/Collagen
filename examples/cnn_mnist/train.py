@@ -12,8 +12,8 @@ from collagen.savers import ModelSaver
 import random
 from collagen.logging import MeterLogging
 from tensorboardX import SummaryWriter
-from examples.cnn_mnist.ex_utils import get_mnist, init_mnist_transforms, init_args
-from examples.cnn_mnist.ex_utils import SimpleConvNet
+from examples.cnn_mnist.utils import get_mnist, init_mnist_transforms, init_args
+from examples.cnn_mnist.utils import SimpleConvNet
 
 device = auto_detect_device()
 

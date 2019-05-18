@@ -35,8 +35,6 @@ if __name__ == "__main__":
     with open("settings.yml", "r") as f:
         sampling_config = yaml.load(f)
 
-
-
     # Initializing the data provider
     item_loaders = dict()
     train_ds, classes = get_mnist(data_folder=args.save_data, train=True)
