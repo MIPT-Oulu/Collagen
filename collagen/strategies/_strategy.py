@@ -4,9 +4,11 @@ from typing import Tuple
 import torch
 from tqdm import tqdm
 from collagen.core import Trainer, Session, Module
+from collagen.metrics import RunningAverageMeter
+from collagen.callbacks import ProgressbarVisualizer
 from collagen.core.utils import to_tuple
 from collagen.core import Callback
-from collagen.data import DataProvider, ItemLoader, Splitter
+from collagen.data import DataProvider
 
 
 class Strategy(object):
@@ -37,7 +39,8 @@ class Strategy(object):
     def __init__(self, data_provider: DataProvider,
                  train_loader_names: Tuple[str] or str,
                  val_loader_names: Tuple[str] or str,
-                 data_key: str, target_key: str,
+                 data_key: Tuple[str] or str, target_key: Tuple[str] or str,
+                 data_sampling_config: dict,
                  loss: nn.Module,
                  model: Module,
                  optimizer: Optimizer,
@@ -52,17 +55,14 @@ class Strategy(object):
         self.__optimizer: Optimizer = optimizer
         self.__model: Module = model
 
-        self.__train_loader_names: Tuple[str] or str = train_loader_names
-        self.__val_loader_names: Tuple[str] or str = val_loader_names
-
         self.__train_num_samples: Tuple[int] or int = train_num_samples
         self.__val_num_samples: Tuple[int] or int = val_num_samples
 
         self.__n_epochs: int = n_epochs
 
-        self.__data_key = data_key
-        self.__target_key = target_key
-
+        # self.__data_key = to_tuple(data_key)
+        # self.__target_key = to_tuple(target_key)
+        self.__data_sampling_config = data_sampling_config
         self.__train_callbacks: Tuple[Callback] = to_tuple(train_callbacks)
         self.__val_callbacks: Tuple[Callback] = to_tuple(val_callbacks)
         self.__train_loader_names: Tuple[str] = to_tuple(train_loader_names)
@@ -88,28 +88,47 @@ class Strategy(object):
                                                                               len(self.__val_loader_names),
                                                                               len(self.__val_num_samples)))
 
-        self.__sampling_kwargs = {"train": dict(), "eval": dict()}
-        self.__num_batches_by_stage = {"train": 0, "eval": 0}
-        for stage in ['train', 'eval']:
-            for i, num_samples in enumerate(self.__train_num_samples):
-                if stage == "train":
-                    self.__sampling_kwargs[stage][self.__train_loader_names[i]] = num_samples
-                    self.__num_batches_by_stage[stage] = max(
-                        len(self.__data_provider.get_loader_by_name(self.__train_loader_names[i])),
-                        self.__num_batches_by_stage[stage])
-                elif stage == "eval":
-                    self.__sampling_kwargs[stage][self.__val_loader_names[i]] = num_samples
-                    self.__num_batches_by_stage[stage] = max(
-                        len(self.__data_provider.get_loader_by_name(self.__val_loader_names[i])),
-                        self.__num_batches_by_stage[stage])
-                else:
-                    raise ValueError("Stage can only be `train` either `eval`, but found {}".format(stage))
+        self.__stage_names = ("train", "eval")
+        self.__num_samples_by_stage = dict()
+        self.__data_key_by_stage = dict()
+        self.__target_key_by_stage = dict()
+        self.__num_batches_by_stage = dict()
+        for stage in self.__stage_names:
+            self.__num_batches_by_stage[stage] = -1
+            self.__data_key_by_stage[stage] = dict()
+            self.__num_samples_by_stage[stage] = dict()
+            self.__target_key_by_stage[stage] = dict()
+            n_samples_dict = dict()
+
+            data_keys = []
+            target_keys = []
+            data_loader_names = self.__data_sampling_config[stage]["data_provider"]
+            for loader_name in data_loader_names:
+                n_samples_dict[loader_name] = data_loader_names[loader_name]["num_samples"]
+                n_batches = len(self.__data_provider.get_loader_by_name(loader_name))
+                data_keys.append(data_loader_names[loader_name]["data_key"])
+                target_keys.append(data_loader_names[loader_name]["target_key"])
+                if self.__num_batches_by_stage[stage] < n_batches:
+                    self.__num_batches_by_stage[stage] = n_batches
+
+            self.__data_key_by_stage[stage] = tuple(data_keys)
+            self.__target_key_by_stage[stage] = tuple(target_keys)
+
+            self.__num_samples_by_stage[stage] = n_samples_dict
 
         self.__use_cuda = torch.cuda.is_available() and device == "cuda"
         self.__device = torch.device("cuda" if self.__use_cuda and torch.cuda.is_available() else "cpu")
 
         self.__model.to(self.__device)
         self.__loss.to(self.__device)
+
+        self.__default_callbacks_train = (RunningAverageMeter(prefix='train', name='loss'),
+                                          ProgressbarVisualizer(update_freq=1))
+        self.__default_callbacks_eval = (RunningAverageMeter(prefix='train', name='loss'),
+                                         ProgressbarVisualizer(update_freq=1),)
+
+        self.__train_callbacks = self._auto_add_default_callbacks(self.__default_callbacks_train, self.__train_callbacks)
+        self.__val_callbacks = self._auto_add_default_callbacks(self.__default_callbacks_eval, self.__val_callbacks)
 
         self.__session = Session(module=self.__model,
                                  optimizer=self.__optimizer,
@@ -123,6 +142,18 @@ class Strategy(object):
                                  loss=self.__loss,
                                  train_callbacks=self.__train_callbacks,
                                  val_callbacks=self.__val_callbacks)
+
+    def _auto_add_default_callbacks(self, d_cbs, cbs):
+        added_train_cbs = []
+        for d_cb in d_cbs:
+            exist = False
+            for cb in cbs:
+                if cb.ctype==d_cb.ctype and cb.name == d_cb.name:
+                    exist = True
+                    break
+            if not exist:
+                added_train_cbs.append(d_cb)
+        return cbs + tuple(added_train_cbs)
 
     def get_callbacks_by_name(self, name, stage):
         if name == "minibatch" or name == "all":
@@ -146,14 +177,14 @@ class Strategy(object):
         for epoch in range(self.__n_epochs):
             for stage in ['train', 'eval']:
 
-                self._call_callbacks_by_name('on_epoch_begin', epoch=epoch, stage=stage)
+                self._call_callbacks_by_name('on_epoch_begin', epoch=epoch, stage=stage, n_epochs=self.__num_batches_by_stage[stage])
                 progress_bar = tqdm(range(self.__num_batches_by_stage[stage]),
                                     total=self.__num_batches_by_stage[stage],
                                     desc=f'Epoch [{epoch}] | {stage}::')
                 for batch_i in progress_bar:
                     self._call_callbacks_by_name('on_sample_begin', epoch=epoch, stage=stage, batch_i=batch_i,
                                                  progress_bar=progress_bar)
-                    self.__data_provider.sample(**self.__sampling_kwargs[stage])
+                    self.__data_provider.sample(**self.__num_samples_by_stage[stage])
                     self._call_callbacks_by_name('on_sample_end', epoch=epoch, stage=stage, batch_i=batch_i,
                                                  progress_bar=progress_bar)
                     self._call_callbacks_by_name('on_batch_begin',
@@ -163,7 +194,7 @@ class Strategy(object):
                                                  stage=stage,
                                                  batch_i=batch_i)
 
-                    getattr(self.__trainer, stage)(data_key=self.__data_key, target_key=self.__target_key)
+                    getattr(self.__trainer, stage)(data_key=self.__data_key_by_stage[stage], target_key=self.__target_key_by_stage[stage])
 
                     self._call_callbacks_by_name('on_batch_end',
                                                  progress_bar=progress_bar,
@@ -171,4 +202,4 @@ class Strategy(object):
                                                  n_epochs=self.__n_epochs,
                                                  stage=stage,
                                                  batch_i=batch_i)
-            self._call_callbacks_by_name('on_epoch_end', epoch=epoch, stage=stage)
+            self._call_callbacks_by_name('on_epoch_end', epoch=epoch, stage=stage, n_epochs=self.__num_batches_by_stage[stage])

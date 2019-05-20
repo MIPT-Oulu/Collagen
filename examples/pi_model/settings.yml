@@ -1,0 +1,28 @@
+train:
+  data_provider:
+    labeled_train:
+      cate: ItemLoader
+      num_samples: 1
+      data_key: "data"
+      target_key: "target"
+    unlabeled_train:
+      cate: AugmentedGroupSampler
+      num_samples: 1
+      data_key: "data"
+      target_key:
+        - "target"
+        - "features"
+eval:
+  data_provider:
+    labeled_eval:
+      cate: ItemLoader
+      num_samples: 1
+      data_key: "data"
+      target_key: "target"
+    unlabeled_eval:
+      cate: AugmentedGroupSampler
+      num_samples: 1
+      data_key: "data"
+      target_key:
+        - "target"
+        - "features"

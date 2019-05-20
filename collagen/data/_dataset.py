@@ -24,7 +24,7 @@ class DataFrameDataset(Dataset):
         `meta_data` must be `pandas.DataFrame`.
     
     """
-    def __init__(self, root, meta_data, parse_item_cb, transform=None):
+    def __init__(self, root, meta_data, parse_item_cb, transform=None, data_key='data', target_key='target'):
         if not isinstance(root, str):
             raise TypeError("`root` must be `str`")
         if not isinstance(meta_data, pd.DataFrame):
@@ -33,6 +33,16 @@ class DataFrameDataset(Dataset):
         self.meta_data = meta_data
         self.parse_item_cb = parse_item_cb
         self.transform = transform
+        self.__data_key = data_key
+        self.__target_key = target_key
+
+    @property
+    def data_key(self):
+        return self.__data_key
+
+    @property
+    def target_key(self):
+        return self.__target_key
 
     def __getitem__(self, index):
         """Get ``index``-th parsed item of :attr:`meta_data`.
@@ -48,7 +58,7 @@ class DataFrameDataset(Dataset):
             Dictionary of `index`-th parsed item.
         """
         entry = self.meta_data.iloc[index]
-        entry = self.parse_item_cb(self.root, entry, self.transform)
+        entry = self.parse_item_cb(self.root, entry, self.transform, self.data_key, self.target_key)
         if not isinstance(entry, dict):
             raise TypeError("Output of `parse_item_cb` must be `dict`, but found {}".format(type(entry)))
         return entry

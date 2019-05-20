@@ -6,6 +6,7 @@ from torch.utils.data.sampler import SequentialSampler
 from torch.utils.data.dataloader import default_collate
 
 from ._dataset import DataFrameDataset
+from collagen.core.utils import to_cpu
 
 
 class ItemLoader(object):
@@ -80,11 +81,16 @@ class ItemLoader(object):
                                                              worker_init_fn=lambda wid: np.random.seed(np.uint32(
                                                                  torch.initial_seed() + wid)))
 
+        self.__transform = transform
         self.drop_last: bool = drop_last
         self.batch_size: int = batch_size
         self.__iter_loader = None
         self.parse_item = parse_item_cb
-        
+
+    @property
+    def transform(self):
+        return self.__transform
+
     def __len__(self):
         """ Get length of the dataloader.
         """
@@ -116,6 +122,44 @@ class ItemLoader(object):
 
             samples.append(batch)
 
+        return samples
+
+
+class AugmentedGroupSampler(ItemLoader):
+    def __init__(self, model: nn.Module, augmentation, n_augmentations=1, data_key: str = "data", target_key: str = 'target',
+                 parse_item_cb: callable or None = None, meta_data: pd.DataFrame or None = None,
+                 root: str or None = None, batch_size: int = 1, num_workers: int = 0, shuffle: bool = False,
+                 pin_memory: bool = False, collate_fn: callable = default_collate, transform: callable or None = None,
+                 sampler: torch.utils.data.sampler.Sampler or None = None, batch_sampler=None,
+                 drop_last: bool = True, timeout: int = 0):
+        super().__init__(meta_data=meta_data, parse_item_cb=parse_item_cb, root=root, batch_size=batch_size,
+                         num_workers=num_workers, shuffle=shuffle, pin_memory=pin_memory, collate_fn=collate_fn,
+                         transform=transform, sampler=sampler, batch_sampler=batch_sampler, drop_last=drop_last, timeout=timeout)
+        self.__model: nn.Module = model
+        self.__n_augmentations = n_augmentations
+        self.__augmentation = augmentation
+        self.__data_key = data_key
+        self.__target_key = target_key
+
+    def sample(self, k=1):
+        samples = []
+        sampled_rows = super().sample(k)
+        for i in range(k):
+            imgs = sampled_rows[i][self.__data_key]
+            target = sampled_rows[i][self.__target_key]
+            list_features = []
+
+            for b in range(imgs.shape[0]):
+                list_imgs = [imgs[b, :, :, :]]
+                for j in range(self.__n_augmentations):
+                    img = imgs[b, 0, :, :]
+                    img_cpu = to_cpu(img, use_numpy=True)
+                    aug_img, _ = self.__augmentation((img_cpu, target))
+                    list_imgs.append(aug_img)
+                batch_imgs = torch.stack(list_imgs, dim=0).to(next(self.__model.parameters()).device)
+                features = self.__model.get_features(batch_imgs)
+                list_features.append(features)
+            samples.append({'features': torch.stack(list_features, dim=1), 'data': imgs, 'target': target})
         return samples
 
 
