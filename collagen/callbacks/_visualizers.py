@@ -11,7 +11,7 @@ from collagen.metrics import plot_confusion_matrix
 
 
 class ConfusionMatrixVisualizer(Callback):
-    def __init__(self, writer, labels: list or None = None, tag="confusion_matrix", normalize=False):
+    def __init__(self, writer, labels: list or None = None, tag="confusion_matrix", normalize=False, name='cm'):
         """ConfusionMatrixVisualizer class, which is a callback calculating accuracy after each forwarding step and
         exporting confusion matrix to TensorboardX at the end of each epoch
 
@@ -34,6 +34,11 @@ class ConfusionMatrixVisualizer(Callback):
         self._tag = tag
         self._predicts = []
         self._corrects = []
+        self._name = name
+
+    @property
+    def name(self):
+        return self._name
 
     def _reset(self):
         self._predicts = []
@@ -47,14 +52,14 @@ class ConfusionMatrixVisualizer(Callback):
         if len(target.shape) > 1 and target.shape[1] > 1:
             decoded_target_cls = target.argmax(dim=-1)
         elif len(target.shape) == 1:
-            decoded_target_cls = target
+            decoded_target_cls = target.type(torch.int64)
         else:
             raise ValueError("target dims ({}) must be 1 or 2, but got {}".format(target.shape, len(target.shape)))
 
         if len(output.shape) > 1 and output.shape[1] > 1:
             decoded_pred_cls = output.argmax(dim=-1)
         elif len(output.shape) == 1:
-            decoded_pred_cls = output
+            decoded_pred_cls = output.type(torch.int64)
         else:
             raise ValueError("pred dims ({}) must be 1 or 2, but got {}".format(output.shape, len(output.shape)))
 
@@ -67,7 +72,7 @@ class ConfusionMatrixVisualizer(Callback):
 
 
 class ProgressbarVisualizer(Callback):
-    def __init__(self, update_freq=1):
+    def __init__(self, update_freq=1, name='progressbar'):
         """Visualizes progressbar after a specific number of batches
 
         Parameters
@@ -78,10 +83,15 @@ class ProgressbarVisualizer(Callback):
         super().__init__(ctype="visualizer")
         self.__count = 0
         self.__update_freq = update_freq
+        self.__name = name
         if not isinstance(self.__update_freq, int) or self.__update_freq < 1:
             raise ValueError(
                 "`update_freq` must be `int` and greater than 0, but found {} {}".format(type(self.__update_freq),
                                                                                          self.__update_freq))
+
+    @property
+    def name(self):
+        return self.__name
 
     def _check_freq(self):
         return self.__count % self.__update_freq == 0

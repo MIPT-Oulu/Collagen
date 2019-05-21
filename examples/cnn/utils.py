@@ -27,6 +27,7 @@ def init_args():
     parser.add_argument('--save_data', default='data', help='Where to save downloaded dataset')
     parser.add_argument('--snapshots', default='snapshots', help='Where to save the snapshots')
     parser.add_argument('--seed', type=int, default=12345, help='Random seed')
+    parser.add_argument('--dataset', type=str, default="mnist", help='Dataset name')
     parser.add_argument('--device', type=str, default="cuda", help='Use `cuda` or `cpu`')
     parser.add_argument('--data_dir', type=str, default="data", help='Data directory')
     parser.add_argument('--log_dir', type=str, default=None, help='Log directory')
@@ -47,15 +48,11 @@ def unpack_solt(dc: sld.DataContainer):
     return img, target
 
 
-def get_mnist(data_folder='.', train=True):
-    mnist_db = datasets.MNIST(data_folder, train=train, transform=None, download=True)
-    list_rows = [{"img": np.array(item), "target": target.item()} for item, target in mnist_db]
-    meta_data = pd.DataFrame(list_rows)
-
-    return meta_data, list(range(10))
-
-
-def init_mnist_transforms():
+def init_mnist_transforms(n_channels=1):
+    if n_channels == 1:
+        norm_mean_std = Normalize((0.1307,), (0.3081,))
+    elif n_channels == 3:
+        norm_mean_std = Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     train_trf = Compose([
         wrap2solt,
         slc.Stream([
@@ -66,25 +63,25 @@ def init_mnist_transforms():
             slt.CropTransform(crop_size=32, crop_mode='r')
         ]),
         unpack_solt,
-        ApplyTransform(Normalize((0.1307,), (0.3081,)))
+        ApplyTransform(norm_mean_std)
     ])
 
     test_trf = Compose([
         wrap2solt,
         slt.PadTransform(pad_to=32),
         unpack_solt,
-        ApplyTransform(Normalize((0.1307,), (0.3081,)))
+        ApplyTransform(norm_mean_std)
     ])
 
     return train_trf, test_trf
 
 
 class SimpleConvNet(Module):
-    def __init__(self, bw, drop=0.5, n_cls=10):
+    def __init__(self, bw, drop=0.5, n_cls=10, n_channels=1):
         super(SimpleConvNet, self).__init__()
         self.n_filters_last = bw*2
 
-        self.conv1 = self.make_layer(1, bw)
+        self.conv1 = self.make_layer(n_channels, bw)
         self.conv2 = self.make_layer(bw, bw*2)
         self.conv3 = self.make_layer(bw*2, self.n_filters_last)
 

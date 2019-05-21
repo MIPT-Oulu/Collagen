@@ -1,7 +1,9 @@
 import numpy as np
+import torch
 from sklearn.metrics import balanced_accuracy_score
-from collagen.core import Callback
 from sklearn.metrics import cohen_kappa_score
+from torch import Tensor
+from collagen.core import Callback
 from collagen.core.utils import to_cpu
 
 
@@ -31,6 +33,14 @@ class Meter(Callback):
         else:
             loss_value = None
         return loss_value
+
+    @staticmethod
+    def default_parse_target(target):
+        return target
+
+    @staticmethod
+    def default_parse_output(output):
+        return output
 
     @property
     def name(self):
@@ -74,30 +84,39 @@ class RunningAverageMeter(Meter):
 
 
 class AccuracyMeter(Meter):
-    def __init__(self, name: str = "categorical_accuracy", prefix=""):
+    def __init__(self, name: str = "categorical_accuracy", prefix="", parse_target=None, parse_output=None, cond=None):
         super().__init__(name=name, prefix=prefix)
         self.__data_count = 0.0
         self.__correct_count = 0.0
         self.__accuracy = None
+        self.__parse_target = Meter.default_parse_target if parse_target is None else parse_target
+        self.__parse_output = Meter.default_parse_output if parse_output is None else parse_output
+        self.__cond = self._default_cond if cond is None else cond
+
+    def _default_cond(self, target, output):
+        return True
 
     def on_epoch_begin(self, epoch, *args, **kwargs):
         self.__data_count = 0.0
         self.__correct_count = 0.0
 
     def on_minibatch_end(self, target, output, device=None, **kwargs):
-        n = target.shape[0]
-        output = output.argmax(dim=-1).view(n, -1)
-        target = target.view(n, -1)
+        if self.__cond(target, output):
+            target = self.__parse_target(target)
+            output = self.__parse_output(output)
+            n = target.shape[0]
+            output = output.argmax(dim=-1).view(n, -1)
+            target = target.view(n, -1)
 
-        if device is None:
-            device = output.device
-            target_on_device = target.to(device)
-            output_on_device = output
-        else:
-            target_on_device = target.to(device)
-            output_on_device = output.to(device)
-        self.__correct_count += (output_on_device == target_on_device).float().sum()
-        self.__data_count += n
+            if device is None:
+                device = output.device
+                target_on_device = target.to(device)
+                output_on_device = output
+            else:
+                target_on_device = target.to(device)
+                output_on_device = output.to(device)
+            self.__correct_count += (output_on_device.to(torch.int64) == target_on_device.to(torch.int64)).float().sum()
+            self.__data_count += n
 
     def on_epoch_end(self, epoch, n_epochs, *args, **kwargs):
         self.__accuracy = self.current()

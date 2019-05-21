@@ -72,9 +72,9 @@ def metadata_fname_target_5_classes(request):
 
 @pytest.fixture
 def ones_image_parser():
-    def parser(data_dir, entry, transforms):
+    def parser(data_dir, entry, transforms, data_key='data', target_key='target'):
         img = np.ones((9, 9))
-        target = entry.target
+        target = entry[target_key]
 
         img, target = transforms(img, target)
 

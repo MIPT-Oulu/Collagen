@@ -4,7 +4,14 @@ import pandas as pd
 
 
 def get_mnist(data_folder='.', train=True):
-    mnist_db = datasets.MNIST(data_folder, train=train, transform=None, download=True)
-    list_rows = [{"img": np.array(item), "target": target.item()} for item, target in mnist_db]
+    _db = datasets.MNIST(data_folder, train=train, transform=None, download=True)
+    list_rows = [{"data": np.array(item), "target": target.item()} for item, target in _db]
     meta_data = pd.DataFrame(list_rows)
     return meta_data, list(range(10))
+
+def get_cifar10(data_folder='.', train=True):
+    _db = datasets.CIFAR10(data_folder, train=train, transform=None, download=True)
+    list_rows = [{"data": _db.train_data[i,:, :, :], "target": _db.train_labels[i]} for i in range(len(_db.train_labels))]
+    meta_data = pd.DataFrame(list_rows)
+    classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+    return meta_data, classes
