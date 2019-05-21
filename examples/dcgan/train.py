@@ -5,7 +5,7 @@ from tensorboardX import SummaryWriter
 
 from collagen.core import Trainer
 from collagen.callbacks import  TensorboardSynthesisVisualizer, GeneratorLoss
-from collagen.data.utils import gan_data_provider
+from collagen.data.data_provider import gan_data_provider
 from collagen.core.utils import auto_detect_device
 from collagen.strategies import GANStrategy
 from collagen.data.utils import get_mnist
@@ -46,7 +46,7 @@ if __name__ == "__main__":
     st_callbacks = (MeterLogging(writer=summary_writer),
                     TensorboardSynthesisVisualizer(generator_sampler=item_loaders['fake'],
                                                    writer=summary_writer,
-                                                   grid_shape=args.grid_shape))
+                                                   grid_shape=(args.grid_shape, args.grid_shape)))
 
     # Trainers
     d_trainer = Trainer(data_provider=data_provider,

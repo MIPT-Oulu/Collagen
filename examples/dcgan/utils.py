@@ -27,9 +27,9 @@ def init_mnist_transforms():
     ])
 
 
-def parse_item_mnist_gan(root, entry, trf):
-    img, target = trf((entry.img, entry.target))
-    return {'data': img, 'target': np.float32(1.0), 'class': target}
+def parse_item_mnist_gan(root, entry, trf, data_key, target_key):
+    img, target = trf((entry[data_key], entry[target_key]))
+    return {data_key: img, target_key: np.float32(1.0), 'class': target}
 
 
 def init_args():
