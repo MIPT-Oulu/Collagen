@@ -1,10 +1,5 @@
 train:
   data_provider:
-    labeled_train:
-      cate: ItemLoader
-      num_samples: 1
-      data_key: "data"
-      target_key: "target"
     unlabeled_train:
       cate: AugmentedGroupSampler
       num_samples: 1
@@ -12,6 +7,12 @@ train:
       target_key:
         - "target"
         - "features"
+    labeled_train:
+      cate: ItemLoader
+      num_samples: 3
+      data_key: "data"
+      target_key: "target"
+
 eval:
   data_provider:
     labeled_eval:

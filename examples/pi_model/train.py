@@ -14,7 +14,7 @@ from collagen.data.utils import get_mnist, get_cifar10
 from collagen.logging import MeterLogging
 
 from examples.pi_model.utils import init_args, parse_item, init_transforms, parse_target_accuracy_meter
-from examples.pi_model.utils import Discriminator, SSConfusionMatrixVisualizer, cond_accuracy_meter
+from examples.pi_model.utils import SSConfusionMatrixVisualizer, cond_accuracy_meter
 from examples.pi_model.networks import Model01
 
 device = auto_detect_device()
