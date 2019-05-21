@@ -15,6 +15,7 @@ from collagen.logging import MeterLogging
 
 from examples.pi_model.utils import init_args, parse_item, init_transforms, parse_target_accuracy_meter
 from examples.pi_model.utils import Discriminator, SSConfusionMatrixVisualizer, cond_accuracy_meter
+from examples.pi_model.networks import Model01
 
 device = auto_detect_device()
 
@@ -81,7 +82,7 @@ if __name__ == "__main__":
                            equal_target=True, equal_unlabeled_target=True, shuffle=True, unlabeled_target_col='target')
 
     # Initializing Discriminator
-    model = Discriminator(nc=n_channels, ndf=args.n_features).to(device)
+    model = Model01(nc=n_channels, ndf=args.n_features).to(device)
     optim = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.wd, betas=(args.beta1, 0.999))
     crit = PiModelLoss(alpha=0.5).to(device)
 

@@ -18,8 +18,8 @@ from examples.cnn_mnist.utils import SimpleConvNet
 device = auto_detect_device()
 
 
-def parse_item_mnist(root, entry, trf):
-    img, target = trf((entry.img, entry.target))
+def parse_item_mnist(root, entry, trf, data_key, target_key):
+    img, target = trf((entry[data_key], entry[target_key]))
     return {'img': img, 'target': target}
 
 
@@ -93,9 +93,3 @@ if __name__ == "__main__":
     print("k-fold training loss: {}".format(np.asarray(kfold_train_losses).mean()))
     print("k-fold validation loss: {}".format(np.asarray(kfold_val_losses).mean()))
     print("k-fold validation accuracy: {}".format(np.asarray(kfold_val_accuracies).mean()))
-
-    item_loaders = dict()
-    item_loaders['test'] = ItemLoader(root='', meta_data=test_ds,
-                                      transform=init_mnist_transforms()[1], parse_item_cb=parse_item_mnist,
-                                      batch_size=args.bs, num_workers=args.num_workers,
-                                      drop_last=False)
