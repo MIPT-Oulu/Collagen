@@ -8,13 +8,13 @@ from collagen.core.utils import auto_detect_device
 from collagen.strategies import Strategy
 from collagen.metrics import RunningAverageMeter, AccuracyMeter
 from collagen.callbacks import ProgressbarVisualizer
-from collagen.data.utils import get_mnist
+from collagen.data.utils import get_mnist, get_cifar10
 from collagen.savers import ModelSaver
 import random
 from collagen.logging import MeterLogging
 from tensorboardX import SummaryWriter
-from examples.cnn_mnist.utils import init_mnist_transforms, init_args
-from examples.cnn_mnist.utils import SimpleConvNet
+from examples.cnn.utils import init_mnist_transforms, init_args
+from examples.cnn.utils import SimpleConvNet
 
 device = auto_detect_device()
 
@@ -31,8 +31,15 @@ if __name__ == "__main__":
     np.random.seed(args.seed)
     random.seed(args.seed)
 
-    train_ds, classes = get_mnist(data_folder=args.data_dir, train=True)
-    test_ds, _ = get_mnist(data_folder=args.data_dir, train=False)
+    if args.dataset == 'cifar10':
+        train_ds, classes = get_cifar10(data_folder=args.save_data, train=True)
+        n_channels = 3
+    elif args.dataset == 'mnist':
+        train_ds, classes = get_mnist(data_folder=args.save_data, train=True)
+        n_channels = 1
+    else:
+        raise ValueError('Not support dataset {}'.format(args.dataset))
+
 
     criterion = torch.nn.CrossEntropyLoss()
 
@@ -60,7 +67,7 @@ if __name__ == "__main__":
                                                         batch_size=args.bs, num_workers=args.num_threads,
                                                         shuffle=True if stage == "train" else False)
 
-        model = SimpleConvNet(bw=args.bw, drop=args.dropout, n_cls=len(classes))
+        model = SimpleConvNet(bw=args.bw, drop=args.dropout, n_cls=len(classes), n_channels=n_channels)
         optimizer = torch.optim.Adam(params=model.parameters(), lr=args.lr, weight_decay=args.wd)
         data_provider = DataProvider(item_loaders)
 

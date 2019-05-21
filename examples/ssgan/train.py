@@ -87,7 +87,7 @@ if __name__ == "__main__":
     train_ds, classes = get_mnist(data_folder=args.save_data, train=True)
     n_folds = 5
     splitter = SSFoldSplit(train_ds, n_ss_folds=3, n_folds=n_folds, target_col="target", random_state=args.seed,
-                           labeled_train_size_per_class=1000, unlabeled_train_size_per_class=2000,
+                           labeled_train_size_per_class=100, unlabeled_train_size_per_class=200,
                            equal_target=True, equal_unlabeled_target=False, shuffle=True)
 
     summary_writer = SummaryWriter(log_dir=log_dir, comment=comment)

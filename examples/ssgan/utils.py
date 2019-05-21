@@ -159,17 +159,12 @@ class Generator(nn.Module):
         return output
 
 
-def parse_item_mnist_gan(root, entry, trf):
-    img, target = trf((entry.img, entry.target))
-    return {'data': img, 'target': np.float32(1.0), 'class': target}
-
-
-def parse_item_mnist_ssgan(root, entry, trf):
-    img, target = trf((entry.img, entry.target))
+def parse_item_mnist_ssgan(root, entry, trf, data_key, target_key):
+    img, target = trf((entry[data_key], entry[target_key]))
     ext_y = np.zeros(10+2, dtype=np.float32)
     ext_y[-1] = 1.0
     ext_y[int(round(target))] = 1.0
-    return {'data': img, 'target': ext_y, 'class': target, 'valid': ext_y[-1]}
+    return {data_key: img, target_key: ext_y, 'class': target, 'valid': ext_y[-1]}
 
 
 def init_args():

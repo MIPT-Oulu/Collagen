@@ -67,14 +67,14 @@ if __name__ == "__main__":
     # Data provider
     dataset_name = 'cifar10'
 
-    if dataset_name == 'cifar10':
+    if args.dataset == 'cifar10':
         train_ds, classes = get_cifar10(data_folder=args.save_data, train=True)
         n_channels = 3
-    elif dataset_name == 'mnist':
+    elif args.dataset == 'mnist':
         train_ds, classes = get_mnist(data_folder=args.save_data, train=True)
         n_channels = 1
     else:
-        raise ValueError('Not support dataset {}'.format(dataset_name))
+        raise ValueError('Not support dataset {}'.format(args.dataset))
 
     n_folds = 5
     splitter = SSFoldSplit(train_ds, n_ss_folds=3, n_folds=n_folds, target_col="target", random_state=args.seed,
