@@ -1,7 +1,5 @@
 from sklearn import model_selection
 from sklearn.utils import resample
-from collagen.data import ItemLoader
-from random import shuffle as shuffle_list
 import pandas as pd
 import dill as pickle
 
@@ -69,14 +67,16 @@ class SSFoldSplit(Splitter):
     def __init__(self, ds: pd.DataFrame, n_ss_folds: int = 3, n_folds: int = 5, target_col: str = 'target',
                  random_state: int or None = None, unlabeled_target_col: str = '5means_classes', test_ratio: int = 0.25,
                  labeled_train_size_per_class: int = None, unlabeled_train_size_per_class: int = None,
-                 labeled_train_size: int = None, unlabeled_train_size: int = None, group_col: str = "ID",
+                 labeled_train_size: int = None, unlabeled_train_size: int = None, group_col: str or None = None,
                  equal_target: bool = True, equal_unlabeled_target: bool = True, shuffle: bool = True):
         super().__init__()
 
         self._test_ratio = test_ratio
 
         if equal_target and labeled_train_size_per_class is None:
-            raise ValueError("labeled_train_size_per_class must be determined when equal_target is True, but found None")
+            raise ValueError("labeled_train_size_per_class must be determined when \
+            equal_target is True, but found None")
+
         # Master split into Label/Unlabel
         if group_col is None:
             master_splitter = model_selection.StratifiedKFold(n_splits=n_ss_folds, random_state=random_state)
@@ -90,7 +90,8 @@ class SSFoldSplit(Splitter):
         l_groups = ds[target_col].iloc[labeled_idx]
 
         if not equal_target and labeled_train_size is not None and labeled_train_size > len(labeled_idx):
-            raise ValueError('Input labeled train size {} is larger than actual labeled train size {}'.format(labeled_train_size, len(labeled_idx)))
+            raise ValueError('Input labeled train size {} is larger than actual labeled train size {}'.format(
+                labeled_train_size, len(labeled_idx)))
 
         if unlabeled_train_size is not None and unlabeled_train_size > len(unlabeled_idx):
             unlabeled_train_size = len(unlabeled_idx)
@@ -107,7 +108,8 @@ class SSFoldSplit(Splitter):
             unlabeled_spl_iter = unlabeled_splitter.split(unlabeled_ds, unlabeled_ds[target_col])
         else:
             unlabeled_splitter = model_selection.GroupKFold(n_splits=n_folds)
-            unlabeled_spl_iter = unlabeled_splitter.split(unlabeled_ds, unlabeled_ds[target_col], groups=unlabeled_ds[group_col])
+            unlabeled_spl_iter = unlabeled_splitter.split(unlabeled_ds, unlabeled_ds[target_col],
+                                                          groups=unlabeled_ds[group_col])
 
         if group_col is None:
             labeled_splitter = model_selection.StratifiedKFold(n_splits=n_folds, random_state=random_state+2)

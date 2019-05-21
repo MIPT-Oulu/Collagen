@@ -1,5 +1,4 @@
 import gc
-from ._itemloader import ItemLoader
 
 
 class DataProvider(object):

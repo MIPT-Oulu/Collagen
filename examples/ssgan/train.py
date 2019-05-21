@@ -3,19 +3,18 @@ from torch import optim, Tensor
 from tensorboardX import SummaryWriter
 import yaml
 
-from collagen.core import Module, Session, Trainer
+from collagen.core import Module, Trainer
 from collagen.core.utils import auto_detect_device, to_cpu
-from collagen.callbacks import OnGeneratorBatchFreezer, OnDiscriminatorBatchFreezer, OnSamplingFreezer
-from collagen.callbacks import ProgressbarVisualizer, TensorboardSynthesisVisualizer, ClipGradCallback
+from collagen.callbacks import TensorboardSynthesisVisualizer, ClipGradCallback
 from collagen.callbacks import ConfusionMatrixVisualizer
 from collagen.data import DataProvider, ItemLoader, SSGANFakeSampler, SSFoldSplit
 from collagen.strategies import GANStrategy
-from collagen.metrics import RunningAverageMeter, SSAccuracyMeter, SSValidityMeter
+from collagen.metrics import SSAccuracyMeter, SSValidityMeter
 from collagen.data.utils import get_mnist
 from collagen.logging import MeterLogging
 
-from examples.ssgan.ex_utils import init_args, parse_item_mnist_ssgan, init_mnist_transforms
-from examples.ssgan.ex_utils import Discriminator, Generator
+from examples.ssgan.utils import init_args, parse_item_mnist_ssgan, init_mnist_transforms
+from examples.ssgan.utils import Discriminator, Generator
 
 device = auto_detect_device()
 
@@ -143,38 +142,21 @@ if __name__ == "__main__":
     data_provider = DataProvider(item_loaders)
 
     # Callbacks
-    g_callbacks_train = (RunningAverageMeter(prefix="train/G", name="loss"),
-                         OnGeneratorBatchFreezer(modules=d_network),
-                         ClipGradCallback(g_network, mode="norm", max_norm=0.1, norm_type=2))
+    g_callbacks_train = ClipGradCallback(g_network, mode="norm", max_norm=0.1, norm_type=2)
 
-    g_callbacks_eval = (RunningAverageMeter(prefix="eval/G", name="loss"),)
+    d_callbacks_train = (SSValidityMeter(threshold=0.5, sigmoid=False, prefix="train/D", name="ss_valid"),
+                         SSAccuracyMeter(prefix="train/D", name="ss_acc"))
 
-    d_callbacks_train = (RunningAverageMeter(prefix="train/D", name="loss"),
-                         SSValidityMeter(threshold=0.5, sigmoid=False, prefix="train/D", name="ss_valid"),
-                         SSAccuracyMeter(prefix="train/D", name="ss_acc"),
-                         OnDiscriminatorBatchFreezer(modules=g_network))
-
-    d_callbacks_eval = (RunningAverageMeter(prefix="eval/D", name="loss"),
-                        SSValidityMeter(threshold=0.5, sigmoid=False, prefix="eval/D", name="ss_valid"),
+    d_callbacks_eval = (SSValidityMeter(threshold=0.5, sigmoid=False, prefix="eval/D", name="ss_valid"),
                         SSAccuracyMeter(prefix="eval/D", name="ss_acc"),
                         SSConfusionMatrixVisualizer(writer=summary_writer,
                                                     labels=[str(i) for i in range(10)],
                                                     tag="eval/confusion_matrix"))
 
-    st_callbacks = (ProgressbarVisualizer(update_freq=1),
-                    MeterLogging(writer=summary_writer),
-                    OnSamplingFreezer(modules=(g_network, d_network)),
+    st_callbacks = (MeterLogging(writer=summary_writer),
                     TensorboardSynthesisVisualizer(generator_sampler=item_loaders['fake_unlabeled_gen'],
                                                    writer=summary_writer,
                                                    grid_shape=args.grid_shape))
-
-    d_session = Session(module=d_network,
-                        optimizer=d_optim,
-                        loss=d_crit)
-
-    g_session = Session(module=g_network,
-                        optimizer=g_optim,
-                        loss=g_crit)
 
     with open("settings.yml", "r") as f:
         sampling_config = yaml.load(f)
@@ -182,16 +164,19 @@ if __name__ == "__main__":
     d_trainer = Trainer(data_provider=data_provider,
                         train_loader_names=tuple(sampling_config["train"]["data_provider"]["D"].keys()),
                         val_loader_names=tuple(sampling_config["eval"]["data_provider"]["D"].keys()),
-                        session=d_session,
+                        module=d_network,
+                        optimizer=d_optim,
+                        loss=d_crit,
                         train_callbacks=d_callbacks_train,
                         val_callbacks=d_callbacks_eval)
 
     g_trainer = Trainer(data_provider=data_provider,
                         train_loader_names=tuple(sampling_config["train"]["data_provider"]["G"].keys()),
                         val_loader_names=tuple(sampling_config["eval"]["data_provider"]["G"].keys()),
-                        session=g_session,
-                        train_callbacks=g_callbacks_train,
-                        val_callbacks=g_callbacks_eval)
+                        module=g_network,
+                        optimizer=g_optim,
+                        loss=g_crit,
+                        train_callbacks=g_callbacks_train)
 
     # Strategy
     ssgan = GANStrategy(data_provider=data_provider,

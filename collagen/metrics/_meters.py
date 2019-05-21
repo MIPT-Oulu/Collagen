@@ -394,6 +394,7 @@ class KappaMeter(Meter):
 
     def current(self):
         if len(self.__corrects) != len(self.__predicts):
-            raise ValueError("Predicts and corrects must match, but got {} vs {}".format(len(self.__corrects), len(self.__predicts)))
+            raise ValueError("Predicts and corrects must match, but got {} vs {}".format(len(self.__corrects),
+                                                                                         len(self.__predicts)))
         kappa_score = cohen_kappa_score(self.__corrects, self.__predicts, weights=self.__weight_type)
         return kappa_score

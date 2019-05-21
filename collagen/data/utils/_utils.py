@@ -1,6 +1,4 @@
 import copy
-import torch
-from typing import Tuple
 
 
 class ApplyTransform(object):

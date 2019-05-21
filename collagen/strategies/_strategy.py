@@ -118,7 +118,9 @@ class Strategy(object):
         self.__trainer = Trainer(data_provider=self.__data_provider,
                                  train_loader_names=self.__train_loader_names,
                                  val_loader_names=self.__val_loader_names,
-                                 session=self.__session,
+                                 module=self.__model,
+                                 optimizer=self.__optimizer,
+                                 loss=self.__loss,
                                  train_callbacks=self.__train_callbacks,
                                  val_callbacks=self.__val_callbacks)
 
@@ -136,87 +138,37 @@ class Strategy(object):
         else:
             raise ValueError("Only support `train` and `eval` stage, but got {}".format(stage))
 
-    def _on_epoch_begin_callbacks(self, epoch, stage):
-        for cb in self.get_callbacks_by_stage(stage):
-            cb.on_epoch_begin(epoch=epoch,
-                              n_epochs=self.__n_epochs,
-                              stage=stage,
-                              data_provider=self.__data_provider,
-                              data_key=self.__data_key,
-                              target_key=self.__target_key,
-                              strategy=self)
-
-    def _on_epoch_end_callbacks(self, epoch, stage):
-        for cb in self.get_callbacks_by_stage(stage):
-            cb.on_epoch_end(stage=stage,
-                            epoch=epoch,
-                            n_epochs=self.__n_epochs,
-                            data_provider=self.__data_provider,
-                            data_key=self.__data_key,
-                            target_key=self.__target_key,
-                            strategy=self)
-
-    def _on_batch_begin_callbacks(self, progress_bar, epoch, n_epochs, stage, batch_i):
-        for cb in self.get_callbacks_by_stage(stage):
-            cb.on_batch_begin(epoch=epoch,
-                              n_epochs=n_epochs,
-                              batch_i=batch_i,
-                              progress_bar=progress_bar,
-                              stage=stage,
-                              strategy=self)
-
-    def _on_batch_end_callbacks(self, progress_bar, epoch, n_epochs, stage, batch_i):
-        for cb in self.get_callbacks_by_stage(stage):
-            cb.on_batch_end(epoch=epoch,
-                            n_epochs=n_epochs,
-                            batch_i=batch_i,
-                            progress_bar=progress_bar,
-                            stage=stage,
-                            strategy=self)
-
-    def _on_sample_begin_callbacks(self, epoch, stage, batch_i, progress_bar):
-        for cb in self.get_callbacks_by_stage(stage):
-            cb.on_sample_begin(epoch=epoch,
-                               stage=stage,
-                               batch_i=batch_i,
-                               progress_bar=progress_bar,
-                               data_provider=self.__data_provider,
-                               data_key=self.__data_key,
-                               target_key=self.__target_key,
-                               strategy=self)
-
-    def _on_sample_end_callbacks(self, epoch, stage, batch_i, progress_bar):
-        for cb in self.get_callbacks_by_stage(stage):
-            cb.on_sample_end(epoch=epoch,
-                             stage=stage,
-                             batch_i=batch_i,
-                             progress_bar=progress_bar,
-                             data_provider=self.__data_provider,
-                             data_key=self.__data_key,
-                             target_key=self.__target_key,
-                             session=self.__session)
+    def _call_callbacks_by_name(self, cb_func_name, **kwargs):
+        for cb in self.get_callbacks_by_stage(kwargs['stage']):
+            getattr(cb, cb_func_name)(strategy=self, **kwargs)
 
     def run(self):
         for epoch in range(self.__n_epochs):
             for stage in ['train', 'eval']:
-                self._on_epoch_begin_callbacks(epoch=epoch, stage=stage)
+
+                self._call_callbacks_by_name('on_epoch_begin', epoch=epoch, stage=stage)
                 progress_bar = tqdm(range(self.__num_batches_by_stage[stage]),
                                     total=self.__num_batches_by_stage[stage],
                                     desc=f'Epoch [{epoch}] | {stage}::')
                 for batch_i in progress_bar:
-                    self._on_sample_begin_callbacks(epoch=epoch, stage=stage, batch_i=batch_i,
-                                                    progress_bar=progress_bar)
+                    self._call_callbacks_by_name('on_sample_begin', epoch=epoch, stage=stage, batch_i=batch_i,
+                                                 progress_bar=progress_bar)
                     self.__data_provider.sample(**self.__sampling_kwargs[stage])
-                    self._on_sample_end_callbacks(epoch=epoch, stage=stage, batch_i=batch_i, progress_bar=progress_bar)
-                    self._on_batch_begin_callbacks(progress_bar=progress_bar,
-                                                   epoch=epoch,
-                                                   n_epochs=self.__n_epochs,
-                                                   stage=stage,
-                                                   batch_i=batch_i)
-                    getattr(self.__trainer, stage)(data_key=self.__data_key, target_key=self.__target_key)
-                    self._on_batch_end_callbacks(progress_bar=progress_bar,
+                    self._call_callbacks_by_name('on_sample_end', epoch=epoch, stage=stage, batch_i=batch_i,
+                                                 progress_bar=progress_bar)
+                    self._call_callbacks_by_name('on_batch_begin',
+                                                 progress_bar=progress_bar,
                                                  epoch=epoch,
                                                  n_epochs=self.__n_epochs,
                                                  stage=stage,
                                                  batch_i=batch_i)
-            self._on_epoch_end_callbacks(epoch=epoch, stage=stage)
+
+                    getattr(self.__trainer, stage)(data_key=self.__data_key, target_key=self.__target_key)
+
+                    self._call_callbacks_by_name('on_batch_end',
+                                                 progress_bar=progress_bar,
+                                                 epoch=epoch,
+                                                 n_epochs=self.__n_epochs,
+                                                 stage=stage,
+                                                 batch_i=batch_i)
+            self._call_callbacks_by_name('on_epoch_end', epoch=epoch, stage=stage)

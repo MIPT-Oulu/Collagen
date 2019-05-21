@@ -1,6 +1,9 @@
+from torch.optim import Optimizer
 from ..data import DataProvider
 from ._session import Session
 from typing import Tuple
+from collagen.core.utils import to_tuple
+from collagen.core import Module
 from collagen.core._callback import Callback
 from ..data.utils import cast_tensor
 
@@ -17,8 +20,12 @@ class Trainer(object):
         Name of the training loader, which is a part of DataProvider.
     val_loader_names : str or Tuple[str] or None
         Name of the val loader, which is a part of DataProvider.
-    session : Session
-        Session to operate with
+    module : Module
+        Instantiated collagen module with trainable parameters.
+    optimizer : torch.Optimizer
+        Optimizer to train teh model
+    loss : torch.nn.Module
+        Loss used in the session
     train_callbacks : Tuple[Callback] or Callback or None
         Includes both metrics and callbacks. The callbacks can be schedulers,
         which allow to adjust the session parameters during training (can be useful for implementing super-convergence
@@ -32,7 +39,9 @@ class Trainer(object):
 
     def __init__(self, data_provider: DataProvider,
                  train_loader_names: str or Tuple[str] or None,
-                 session: Session,
+                 module: Module,
+                 optimizer: Optimizer,
+                 loss: Module,
                  val_loader_names: str or Tuple[str] = None,
                  train_callbacks: Tuple[Callback] or Callback or None = None,
                  val_callbacks: Tuple[Callback] or Callback or None = None):
@@ -42,8 +51,12 @@ class Trainer(object):
         if val_callbacks is None:
             val_callbacks = ()
 
+        self.__module = module
+        self.__optimizer = optimizer
+        self.__loss = loss
+
         self.__data_provider: DataProvider = data_provider
-        self.__session: Session = session
+        self.__session: Session = Session(module=module, optimizer=optimizer, loss=loss)
 
         self.__train_loader_names: str or Tuple[str] = train_loader_names
         if isinstance(self.__train_loader_names, str):
@@ -64,6 +77,16 @@ class Trainer(object):
 
         self.__train_batches_count = 0
         self.__eval_batches_count = 0
+
+    def add_train_callbacks(self, cbs):
+        self.__train_callbacks += to_tuple(cbs)
+
+    def add_eval_callbacks(self, cbs):
+        self.__val_callbacks += to_tuple(cbs)
+
+    @property
+    def model(self):
+        return self.__module
 
     def train(self, data_key: Tuple[str] or str = 'img',
               target_key: Tuple[str] or str = 'target',

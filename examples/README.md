@@ -1,8 +1,9 @@
 # Using Collagen
 
-- [ ] Classification
+- [x] Classification
 - [ ] Segmentation
-- [ ] GAN
+- [x] GAN
+- [ ] Metric Learning
 - [ ] VAE
 - [ ] VAE-SSL
 - [ ] VAE-GAN

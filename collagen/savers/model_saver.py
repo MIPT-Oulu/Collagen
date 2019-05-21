@@ -70,7 +70,6 @@ class ModelSaver(Callback):
             raise ValueError("Condition must be `min` or `max`, but got {}".format(cond))
         return is_improved
 
-
     def on_epoch_end(self, epoch, stage, strategy, **kwargs):
         improved_metrics = dict()
         for cb in strategy.get_callbacks_by_name("minibatch", stage=stage):
