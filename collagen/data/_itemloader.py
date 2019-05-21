@@ -152,7 +152,13 @@ class AugmentedGroupSampler(ItemLoader):
             for b in range(imgs.shape[0]):
                 list_imgs = [imgs[b, :, :, :]]
                 for j in range(self.__n_augmentations):
-                    img = imgs[b, 0, :, :]
+                    img = imgs[b, :, :, :]
+                    if img.shape[0] == 1:
+                        img = img[0, :, :]
+                    elif img.shape[0] == 3:
+                        img = img.permute(1, 2, 0)
+                    else:
+                        raise ValueError("Not support channels of {}".format(img.shape[1]))
                     img_cpu = to_cpu(img, use_numpy=True)
                     aug_img, _ = self.__augmentation((img_cpu, target))
                     list_imgs.append(aug_img)

@@ -10,7 +10,7 @@ from collagen.data import SSFoldSplit
 from collagen.data.utils import pimodel_data_provider
 from collagen.strategies import Strategy
 from collagen.metrics import RunningAverageMeter, AccuracyMeter
-from collagen.data.utils import get_mnist
+from collagen.data.utils import get_mnist, get_cifar10
 from collagen.logging import MeterLogging
 
 from examples.pi_model.utils import init_args, parse_item, init_transforms, parse_target_accuracy_meter
@@ -61,17 +61,27 @@ class PiModelLoss(Module):
 if __name__ == "__main__":
     args = init_args()
     log_dir = args.log_dir
-    comment = "ssgan"
+    comment = "PI_model"
 
     # Data provider
-    train_ds, classes = get_mnist(data_folder=args.save_data, train=True)
+    dataset_name = 'cifar10'
+
+    if dataset_name == 'cifar10':
+        train_ds, classes = get_cifar10(data_folder=args.save_data, train=True)
+        n_channels = 3
+    elif dataset_name == 'mnist':
+        train_ds, classes = get_mnist(data_folder=args.save_data, train=True)
+        n_channels = 1
+    else:
+        raise ValueError('Not support dataset {}'.format(dataset_name))
+
     n_folds = 5
     splitter = SSFoldSplit(train_ds, n_ss_folds=3, n_folds=n_folds, target_col="target", random_state=args.seed,
-                           labeled_train_size_per_class=100, unlabeled_train_size_per_class=200,
+                           labeled_train_size_per_class=400, unlabeled_train_size_per_class=2000,
                            equal_target=True, equal_unlabeled_target=True, shuffle=True, unlabeled_target_col='target')
 
     # Initializing Discriminator
-    model = Discriminator(nc=1, ndf=args.n_features).to(device)
+    model = Discriminator(nc=n_channels, ndf=args.n_features).to(device)
     optim = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.wd, betas=(args.beta1, 0.999))
     crit = PiModelLoss(alpha=0.5).to(device)
 
@@ -79,18 +89,20 @@ if __name__ == "__main__":
 
     data_provider = pimodel_data_provider(model=model, train_labeled_data=train_labeled_data, train_unlabeled_data=train_unlabeled_data,
                                           val_labeled_data=val_labeled_data, val_unlabeled_data=val_unlabeled_data,
-                                          transforms=init_transforms(), parse_item=parse_item, bs=args.bs, num_threads=args.num_threads)
+                                          transforms=init_transforms(nc=n_channels), parse_item=parse_item, bs=args.bs, num_threads=args.num_threads)
 
     summary_writer = SummaryWriter(log_dir=log_dir, comment=comment)
     # Callbacks
     callbacks_train = (RunningAverageMeter(prefix='train', name='loss_cls'),
                        RunningAverageMeter(prefix='train', name='loss_cons'),
+                       MeterLogging(writer=summary_writer),
                        AccuracyMeter(prefix="train", name="acc", parse_target=parse_target_accuracy_meter, cond=cond_accuracy_meter))
 
 
     callbacks_eval = (RunningAverageMeter(prefix='train', name='loss_cls'),
                       RunningAverageMeter(prefix='train', name='loss_cons'),
                       AccuracyMeter(prefix="eval", name="acc", parse_target=parse_target_accuracy_meter, cond=cond_accuracy_meter),
+                      MeterLogging(writer=summary_writer),
                       SSConfusionMatrixVisualizer(writer=summary_writer,
                                                   labels=[str(i) for i in range(10)],
                                                   tag="eval/confusion_matrix"))

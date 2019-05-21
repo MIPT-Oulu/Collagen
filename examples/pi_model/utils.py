@@ -55,7 +55,14 @@ def unpack_solt(dc: sld.DataContainer):
     return img/255.0, np.float32(target)
 
 
-def init_transforms():
+def init_transforms(nc=1):
+    if nc == 1:
+        norm_mean_std = Normalize((0.5,), (0.5,))
+    elif nc == 3:
+        norm_mean_std = Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+    else:
+        raise ValueError("Not support channels of {}".format(nc))
+
     train_trf = Compose([
         wrap2solt,
         slc.Stream([
@@ -69,15 +76,14 @@ def init_transforms():
             slt.ImageAdditiveGaussianNoise(p=1.0)
         ]),
         unpack_solt,
-        ApplyTransform(Normalize((0.5,), (0.5,)))
+        ApplyTransform(norm_mean_std)
     ])
 
     test_trf = Compose([
         wrap2solt,
         slt.ResizeTransform(resize_to=(64, 64), interpolation='bilinear'),
         unpack_solt,
-        ApplyTransform(Normalize((0.5,), (0.5,))),
-
+        ApplyTransform(norm_mean_std)
     ])
 
     augment = Compose([
@@ -93,7 +99,7 @@ def init_transforms():
             slt.ImageAdditiveGaussianNoise(p=1.0)
         ]),
         unpack_solt,
-        ApplyTransform(Normalize((0.5,), (0.5,)))
+        ApplyTransform(norm_mean_std)
     ])
 
     return train_trf, test_trf, augment
