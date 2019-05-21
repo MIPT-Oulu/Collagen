@@ -73,39 +73,39 @@ class Model01(Module):
         self._dropout = nn.Dropout(p=self.__drop_rate)
         # input is (nc) x 64 x 64
         self._layer11 = nn.Sequential(nn.Conv2d(nc, ndf, 3, 1, 1, bias=False),
-                                      nn.BatchNorm2d(ndf),
+                                      nn.InstanceNorm2d(ndf),
                                       nn.LeakyReLU(0.1, inplace=True))  # state size. (ndf) x 32 x 32
 
         self._layer12 = nn.Sequential(nn.Conv2d(ndf, ndf, 3, 1, 1, bias=False),
-                                      nn.BatchNorm2d(ndf),
+                                      nn.InstanceNorm2d(ndf),
                                       nn.LeakyReLU(0.1, inplace=True))  # state size. (ndf) x 32 x 32
 
         self._layer13 = nn.Sequential(nn.Conv2d(ndf, ndf, 3, 1, 1, bias=False),
-                                      nn.BatchNorm2d(ndf),
+                                      nn.InstanceNorm2d(ndf),
                                       nn.LeakyReLU(0.1, inplace=True))  # state size. (ndf) x 32 x 32
 
         self._layer21 = nn.Sequential(nn.Conv2d(ndf, ndf*2, 3, 1, 1, bias=False),
-                                      nn.BatchNorm2d(ndf*2),
+                                      nn.InstanceNorm2d(ndf*2),
                                       nn.LeakyReLU(0.1, inplace=True))  # state size. (ndf) x 32 x 32
 
         self._layer22 = nn.Sequential(nn.Conv2d(ndf*2, ndf*2, 3, 1, 1, bias=False),
-                                      nn.BatchNorm2d(ndf * 2),
+                                      nn.InstanceNorm2d(ndf * 2),
                                       nn.LeakyReLU(0.1, inplace=True))  # state size. (ndf) x 32 x 32
 
         self._layer23 = nn.Sequential(nn.Conv2d(ndf*2, ndf*2, 3, 1, 1, bias=False),
-                                      nn.BatchNorm2d(ndf * 2),
+                                      nn.InstanceNorm2d(ndf * 2),
                                       nn.LeakyReLU(0.1, inplace=True))  # state size. (ndf) x 32 x 32
 
         self._layer31 = nn.Sequential(nn.Conv2d(ndf*2, ndf*4, 3, 1, 0, bias=False),
-                                      nn.BatchNorm2d(ndf * 4),
+                                      nn.InstanceNorm2d(ndf * 4),
                                       nn.LeakyReLU(0.1, inplace=True))  # state size. (ndf) x 32 x 32
 
         self._layer32 = nn.Sequential(nn.Conv2d(ndf*4, ndf*2, 1, 1, 1, bias=False),
-                                      nn.BatchNorm2d(ndf * 2),
+                                      nn.InstanceNorm2d(ndf * 2),
                                       nn.LeakyReLU(0.1, inplace=True))  # state size. (ndf) x 32 x 32
 
         self._layer33 = nn.Sequential(nn.Conv2d(ndf*2, ndf, 1, 1, 1, bias=False),
-                                      nn.BatchNorm2d(ndf),
+                                      nn.InstanceNorm2d(ndf),
                                       nn.LeakyReLU(0.1, inplace=True))  # state size. (ndf) x 32 x 32
 
         self._gap = nn.AvgPool2d(6, 6)
