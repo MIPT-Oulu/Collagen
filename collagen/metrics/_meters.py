@@ -94,7 +94,7 @@ class AccuracyMeter(Meter):
         self.__cond = self._default_cond if cond is None else cond
 
     def _default_cond(self, target, output):
-        return isinstance(target, Tensor) and len(target.shape) > 1 and target.shape[1] > 0
+        return True
 
     def on_epoch_begin(self, epoch, *args, **kwargs):
         self.__data_count = 0.0

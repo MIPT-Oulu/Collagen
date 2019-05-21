@@ -7,7 +7,7 @@ import yaml
 from collagen.core import Module
 from collagen.core.utils import auto_detect_device
 from collagen.data import SSFoldSplit
-from collagen.data.utils import pimodel_data_provider
+from collagen.data.data_provider import pimodel_data_provider
 from collagen.strategies import Strategy
 from collagen.metrics import RunningAverageMeter, AccuracyMeter
 from collagen.data.utils import get_mnist, get_cifar10
