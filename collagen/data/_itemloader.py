@@ -155,12 +155,11 @@ class AugmentedGroupSampler(ItemLoader):
                     img = imgs[b, :, :, :]
                     if img.shape[0] == 1:
                         img = img[0, :, :]
-                    elif img.shape[0] == 3:
-                        img = img.permute(1, 2, 0)
                     else:
-                        raise ValueError("Not support channels of {}".format(img.shape[1]))
+                        img = img.permute(1, 2, 0)
+
                     img_cpu = to_cpu(img, use_numpy=True)
-                    aug_img, _ = self.__augmentation((img_cpu, target))
+                    aug_img = self.__augmentation(img_cpu)
                     list_imgs.append(aug_img)
                 batch_imgs = torch.stack(list_imgs, dim=0).to(next(self.__model.parameters()).device)
                 features = self.__model.get_features(batch_imgs)

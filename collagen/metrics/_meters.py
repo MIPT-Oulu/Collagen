@@ -35,6 +35,20 @@ class Meter(Callback):
         return loss_value
 
     @staticmethod
+    def default_parse_class(self, x):
+        if len(x.shape) == 2:
+            output_cpu = to_cpu(x.argmax(dim=1), use_numpy=True)
+        elif len(x.shape) == 1:
+            output_cpu = to_cpu(x, use_numpy=True)
+        else:
+            raise ValueError("Only support dims 1 or 2, but got {}".format(len(x.shape)))
+        return output_cpu
+
+    @staticmethod
+    def default_cond(self, target, output):
+        return True
+
+    @staticmethod
     def default_parse_target(target):
         return target
 
@@ -91,10 +105,7 @@ class AccuracyMeter(Meter):
         self.__accuracy = None
         self.__parse_target = Meter.default_parse_target if parse_target is None else parse_target
         self.__parse_output = Meter.default_parse_output if parse_output is None else parse_output
-        self.__cond = self._default_cond if cond is None else cond
-
-    def _default_cond(self, target, output):
-        return True
+        self.__cond = Meter.default_cond if cond is None else cond
 
     def on_epoch_begin(self, epoch, *args, **kwargs):
         self.__data_count = 0.0
@@ -130,13 +141,16 @@ class AccuracyMeter(Meter):
 
 
 class BalancedAccuracyMeter(Meter):
-    def __init__(self, name: str = "balanced_categorical_accuracy", prefix=""):
+    def __init__(self, name: str = "balanced_categorical_accuracy", prefix="", parse_target=None, parse_output=None, cond=None):
         super().__init__(name=name, prefix=prefix)
         self.__data_count = 0.0
         self.__correct_count = 0.0
         self.__accuracy = None
         self.__corrects = []
         self.__preds = []
+        self.__parse_target = Meter.default_parse_target if parse_target is None else parse_target
+        self.__parse_output = Meter.default_parse_output if parse_output is None else parse_output
+        self.__cond = Meter.default_cond if cond is None else cond
 
     def on_epoch_begin(self, epoch, *args, **kwargs):
         self.__preds = []
@@ -157,7 +171,10 @@ class BalancedAccuracyMeter(Meter):
         self.__preds += output_cls_list
 
     def on_minibatch_end(self, target, output, device=None, **kwargs):
-        self._calc_metric(target, output, device, **kwargs)
+        if self.__cond(target, output):
+            target = self.__parse_target(target)
+            output = self.__parse_target(output)
+            self._calc_metric(target, output, device, **kwargs)
 
     def on_epoch_end(self, epoch, n_epochs, *args, **kwargs):
         self.__accuracy = self.current()
@@ -375,38 +392,35 @@ class SSValidityMeter(Meter):
 
 
 class KappaMeter(Meter):
-    def __init__(self, name: str = "kappa", parse_classes = None, prefix="", weight_type="quadratic"):
+    def __init__(self, name: str = "kappa", prefix="", weight_type="quadratic",
+                 parse_target = None, parse_output = None, cond = None):
         super().__init__(name=name, prefix=prefix)
         self.__predicts = []
         self.__corrects = []
         self.__kappa = None
         self.__weight_type = weight_type
-        if parse_classes is None:
-            self.__parse_classes = self._default_parse_classes
-        else:
-            self.__parse_classes = parse_classes
 
-    def _default_parse_classes(self, output):
-        if len(output.shape) == 2:
-            output_cpu = to_cpu(output.argmax(dim=1), use_numpy=True)
-        elif len(output.shape) == 1:
-            output_cpu = to_cpu(output, use_numpy=True)
-        else:
-            raise ValueError("Only support dims 1 or 2, but got {}".format(len(output.shape)))
+        self.__parse_target = Meter.default_parse_target if parse_target is None else parse_target
+        self.__parse_output = Meter.default_parse_output if parse_output is None else parse_output
+        self.__cond = Meter.default_cond if cond is None else cond
+        # if parse_classes is None:
+        #     self.__parse_classes = self._default_parse_classes
+        # else:
+        #     self.__parse_classes = parse_classes
 
-        return output_cpu
 
     def on_epoch_begin(self, epoch, **kwargs):
         self.__predicts = []
         self.__corrects = []
 
     def on_minibatch_end(self, target, output, **kwargs):
-        target_cpu = self.__parse_classes(target)
-        output_cpu = self.__parse_classes(output)
+        if self.__cond(target, output):
+            target_cpu = self.__parse_target(target)
+            output_cpu = self.__parse_output(output)
 
-        if target_cpu is not None and output_cpu is not None and target_cpu.shape == output_cpu.shape:
-            self.__predicts += output_cpu.tolist()
-            self.__corrects += target_cpu.tolist()
+            if target_cpu is not None and output_cpu is not None and target_cpu.shape == output_cpu.shape:
+                self.__predicts += output_cpu.tolist()
+                self.__corrects += target_cpu.tolist()
 
     def on_epoch_end(self, *args, **kwargs):
         self.__kappa = self.current()
