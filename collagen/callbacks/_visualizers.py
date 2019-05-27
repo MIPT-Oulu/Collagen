@@ -11,7 +11,7 @@ from collagen.metrics import plot_confusion_matrix
 
 
 class ConfusionMatrixVisualizer(Callback):
-    def __init__(self, writer, labels: list or None = None, tag="confusion_matrix", normalize=False, name='cm'):
+    def __init__(self, writer, labels: list or None = None, tag="confusion_matrix", normalize=True, name='cm'):
         """ConfusionMatrixVisualizer class, which is a callback calculating accuracy after each forwarding step and
         exporting confusion matrix to TensorboardX at the end of each epoch
 
@@ -35,6 +35,14 @@ class ConfusionMatrixVisualizer(Callback):
         self._predicts = []
         self._corrects = []
         self._name = name
+
+    @property
+    def targets(self):
+        return self._corrects
+
+    @property
+    def predictions(self):
+        return self._predicts
 
     @property
     def name(self):
