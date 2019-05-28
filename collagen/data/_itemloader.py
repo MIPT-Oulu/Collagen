@@ -193,9 +193,10 @@ class AugmentedGroupStudentTeacherSampler(ItemLoader):
             imgs = sampled_rows[i][self.__data_key]
             target = sampled_rows[i][self.__target_key]
             list_logits = []
-            te_logits = self.__te_model(imgs.to(next(self.__te_model.parameters()).device))
+            with torch.no_grad():
+                te_logits = self.__te_model(imgs.to(next(self.__te_model.parameters()).device))
+            list_imgs = []
             for b in range(imgs.shape[0]):
-                list_imgs = []
                 for j in range(self.__n_augmentations):
                     img = imgs[b, :, :, :]
                     if img.shape[0] == 1:
@@ -203,13 +204,18 @@ class AugmentedGroupStudentTeacherSampler(ItemLoader):
                     else:
                         img = img.permute(1, 2, 0)
 
-                    img_cpu = to_cpu(img, use_numpy=True)
+                    img_cpu = to_cpu(img)
                     aug_img = self.__augmentation(img_cpu)
                     list_imgs.append(aug_img)
-                batch_imgs = torch.stack(list_imgs, dim=0).to(next(self.__st_model.parameters()).device)
-                logits = self.__st_model(batch_imgs)
-                list_logits.append(logits)
-            samples.append({'name': self.__name, 'st_logits': torch.stack(list_logits, dim=1), 'te_logits': te_logits, 'data': imgs, 'target': target})
+
+            batch_imgs = torch.stack(list_imgs, dim=0).to(next(self.__st_model.parameters()).device)
+            logits = to_cpu(self.__st_model(batch_imgs))
+            # del batch_imgs
+            # gc.collect()
+            list_logits.append(logits)
+            st_logits = np.stack(list_logits, axis=0)
+            # st_logits = torch.stack(list_logits, dim=0)
+            samples.append({'name': self.__name, 'st_logits': st_logits, 'te_logits': te_logits, 'data': imgs, 'target': target})
         return samples
 
 

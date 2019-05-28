@@ -124,7 +124,7 @@ class Strategy(object):
 
         self.__default_callbacks_train = (RunningAverageMeter(prefix='train', name='loss'),
                                           ProgressbarVisualizer(update_freq=1))
-        self.__default_callbacks_eval = (RunningAverageMeter(prefix='train', name='loss'),
+        self.__default_callbacks_eval = (RunningAverageMeter(prefix='eval', name='loss'),
                                          ProgressbarVisualizer(update_freq=1),)
 
         self.__train_callbacks = self._auto_add_default_callbacks(self.__default_callbacks_train, self.__train_callbacks)
@@ -177,22 +177,24 @@ class Strategy(object):
         for epoch in range(self.__n_epochs):
             for stage in ['train', 'eval']:
 
-                self._call_callbacks_by_name('on_epoch_begin', epoch=epoch, stage=stage, n_epochs=self.__num_batches_by_stage[stage])
+                self._call_callbacks_by_name('on_epoch_begin', epoch=epoch, stage=stage,
+                                             n_epochs=self.__num_batches_by_stage[stage], trainer=self.__trainer)
                 progress_bar = tqdm(range(self.__num_batches_by_stage[stage]),
                                     total=self.__num_batches_by_stage[stage],
                                     desc=f'Epoch [{epoch}] | {stage}::')
                 for batch_i in progress_bar:
                     self._call_callbacks_by_name('on_sample_begin', epoch=epoch, stage=stage, batch_i=batch_i,
-                                                 progress_bar=progress_bar)
+                                                 progress_bar=progress_bar, trainer=self.__trainer)
                     self.__data_provider.sample(**self.__num_samples_by_stage[stage])
                     self._call_callbacks_by_name('on_sample_end', epoch=epoch, stage=stage, batch_i=batch_i,
-                                                 progress_bar=progress_bar)
+                                                 progress_bar=progress_bar, trainer=self.__trainer)
                     self._call_callbacks_by_name('on_batch_begin',
                                                  progress_bar=progress_bar,
                                                  epoch=epoch,
                                                  n_epochs=self.__n_epochs,
                                                  stage=stage,
-                                                 batch_i=batch_i)
+                                                 batch_i=batch_i,
+                                                 trainer=self.__trainer)
 
                     getattr(self.__trainer, stage)(data_key=self.__data_key_by_stage[stage], target_key=self.__target_key_by_stage[stage])
 
@@ -201,5 +203,7 @@ class Strategy(object):
                                                  epoch=epoch,
                                                  n_epochs=self.__n_epochs,
                                                  stage=stage,
-                                                 batch_i=batch_i)
-                self._call_callbacks_by_name('on_epoch_end', epoch=epoch, stage=stage, n_epochs=self.__num_batches_by_stage[stage])
+                                                 batch_i=batch_i,
+                                                 trainer=self.__trainer)
+                self._call_callbacks_by_name('on_epoch_end', epoch=epoch, stage=stage,
+                                             n_epochs=self.__num_batches_by_stage[stage], trainer=self.__trainer)

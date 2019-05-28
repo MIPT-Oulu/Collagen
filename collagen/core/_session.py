@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 from torch import Tensor
 from typing import Tuple, Any, List
 from collagen.core import Module
@@ -206,10 +207,13 @@ class Session(object):
             elif isinstance(target, dict):
                 target_on_device = dict()
                 for k in target:
-                    if isinstance(target[k], Tensor):
+                    if isinstance(target[k], Tensor) and not target[k].is_cuda:
                         target_on_device[k] = target[k].to(module_device)
+                    elif isinstance(target[k], np.ndarray):
+                        target_on_device[k] = torch.tensor(target[k]).to(module_device)
                     else:
                         target_on_device[k] = target[k]
+
             elif isinstance(target, Tensor):
                 target_on_device = target.to(module_device)
             else:

@@ -199,6 +199,10 @@ class Trainer(object):
                                     target_key=target_key[ind],
                                     session=self.__session)
 
+        # for ind, loader_name in enumerate(self.__train_loader_names):
+        #     cur_loader_state = self.__data_provider.state_dict()[loader_name]
+        #     del cur_loader_state['samples']
+
     def eval(self, data_key: Tuple[str] or str = 'img',
              target_key: Tuple[str] or str = 'target', cast_target=None):
         """
