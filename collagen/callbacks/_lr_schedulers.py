@@ -4,7 +4,7 @@ from collagen.core import Callback
 
 class LRScheduler(Callback):
     def __init__(self, metric_name, lr_scheduler):
-        super().__init__(ctype="lr_scheduler")
+        super().__init__(ctype="lr_scheduler", name="lr_scheduler")
         self.__lr_scheduler: optim = lr_scheduler
         self.__metric_name: str = metric_name
 

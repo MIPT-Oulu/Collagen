@@ -168,6 +168,51 @@ class AugmentedGroupSampler(ItemLoader):
         return samples
 
 
+class AugmentedGroupStudentTeacherSampler(ItemLoader):
+    def __init__(self, name:str, teacher_model: nn.Module, student_model: nn.Module, augmentation, n_augmentations=1, data_key: str = "data", target_key: str = 'target',
+                 parse_item_cb: callable or None = None, meta_data: pd.DataFrame or None = None,
+                 root: str or None = None, batch_size: int = 1, num_workers: int = 0, shuffle: bool = False,
+                 pin_memory: bool = False, collate_fn: callable = default_collate, transform: callable or None = None,
+                 sampler: torch.utils.data.sampler.Sampler or None = None, batch_sampler=None,
+                 drop_last: bool = True, timeout: int = 0):
+        super().__init__(meta_data=meta_data, parse_item_cb=parse_item_cb, root=root, batch_size=batch_size,
+                         num_workers=num_workers, shuffle=shuffle, pin_memory=pin_memory, collate_fn=collate_fn,
+                         transform=transform, sampler=sampler, batch_sampler=batch_sampler, drop_last=drop_last, timeout=timeout)
+        self.__name: str = name
+        self.__te_model: nn.Module = teacher_model
+        self.__st_model: nn.Module = student_model
+        self.__n_augmentations = n_augmentations
+        self.__augmentation = augmentation
+        self.__data_key = data_key
+        self.__target_key = target_key
+
+    def sample(self, k=1):
+        samples = []
+        sampled_rows = super().sample(k)
+        for i in range(k):
+            imgs = sampled_rows[i][self.__data_key]
+            target = sampled_rows[i][self.__target_key]
+            list_logits = []
+            te_logits = self.__te_model(imgs.to(next(self.__te_model.parameters()).device))
+            for b in range(imgs.shape[0]):
+                list_imgs = []
+                for j in range(self.__n_augmentations):
+                    img = imgs[b, :, :, :]
+                    if img.shape[0] == 1:
+                        img = img[0, :, :]
+                    else:
+                        img = img.permute(1, 2, 0)
+
+                    img_cpu = to_cpu(img, use_numpy=True)
+                    aug_img = self.__augmentation(img_cpu)
+                    list_imgs.append(aug_img)
+                batch_imgs = torch.stack(list_imgs, dim=0).to(next(self.__st_model.parameters()).device)
+                logits = self.__st_model(batch_imgs)
+                list_logits.append(logits)
+            samples.append({'name': self.__name, 'st_logits': torch.stack(list_logits, dim=1), 'te_logits': te_logits, 'data': imgs, 'target': target})
+        return samples
+
+
 class FeatureMatchingSampler(ItemLoader):
     def __init__(self, model: nn.Module, latent_size: int, data_key: str = "data", meta_data: pd.DataFrame or None = None,
                  parse_item_cb: callable or None = None,

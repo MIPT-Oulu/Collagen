@@ -173,7 +173,7 @@ class BalancedAccuracyMeter(Meter):
     def on_minibatch_end(self, target, output, device=None, **kwargs):
         if self.__cond(target, output):
             target = self.__parse_target(target)
-            output = self.__parse_target(output)
+            output = self.__parse_output(output)
             self._calc_metric(target, output, device, **kwargs)
 
     def on_epoch_end(self, epoch, n_epochs, *args, **kwargs):

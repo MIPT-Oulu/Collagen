@@ -202,4 +202,4 @@ class Strategy(object):
                                                  n_epochs=self.__n_epochs,
                                                  stage=stage,
                                                  batch_i=batch_i)
-            self._call_callbacks_by_name('on_epoch_end', epoch=epoch, stage=stage, n_epochs=self.__num_batches_by_stage[stage])
+                self._call_callbacks_by_name('on_epoch_end', epoch=epoch, stage=stage, n_epochs=self.__num_batches_by_stage[stage])
