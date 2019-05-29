@@ -126,7 +126,7 @@ class ItemLoader(object):
 
 
 class AugmentedGroupSampler(ItemLoader):
-    def __init__(self, model: nn.Module, augmentation, n_augmentations=1, data_key: str = "data", target_key: str = 'target',
+    def __init__(self, model: nn.Module, name: str, augmentation, n_augmentations=1, data_key: str = "data", target_key: str = 'target',
                  parse_item_cb: callable or None = None, meta_data: pd.DataFrame or None = None,
                  root: str or None = None, batch_size: int = 1, num_workers: int = 0, shuffle: bool = False,
                  pin_memory: bool = False, collate_fn: callable = default_collate, transform: callable or None = None,
@@ -135,6 +135,7 @@ class AugmentedGroupSampler(ItemLoader):
         super().__init__(meta_data=meta_data, parse_item_cb=parse_item_cb, root=root, batch_size=batch_size,
                          num_workers=num_workers, shuffle=shuffle, pin_memory=pin_memory, collate_fn=collate_fn,
                          transform=transform, sampler=sampler, batch_sampler=batch_sampler, drop_last=drop_last, timeout=timeout)
+        self.__name = name
         self.__model: nn.Module = model
         self.__n_augmentations = n_augmentations
         self.__augmentation = augmentation
@@ -164,7 +165,7 @@ class AugmentedGroupSampler(ItemLoader):
                 batch_imgs = torch.stack(list_imgs, dim=0).to(next(self.__model.parameters()).device)
                 features = self.__model.get_features(batch_imgs)
                 list_features.append(features)
-            samples.append({'features': torch.stack(list_features, dim=1), 'data': imgs, 'target': target})
+            samples.append({'name': self.__name, 'features': torch.stack(list_features, dim=1), 'data': imgs, 'target': target})
         return samples
 
 
@@ -213,7 +214,12 @@ class AugmentedGroupStudentTeacherSampler(ItemLoader):
             # del batch_imgs
             # gc.collect()
             list_logits.append(logits)
-            st_logits = np.stack(list_logits, axis=0)
+            if len(list_logits) > 1:
+                st_logits = np.stack(list_logits, axis=1)
+            elif len(list_logits) == 1:
+                st_logits = list_logits[0]
+            else:
+                raise ValueError('Empty list!')
             # st_logits = torch.stack(list_logits, dim=0)
             samples.append({'name': self.__name, 'st_logits': st_logits, 'te_logits': te_logits, 'data': imgs, 'target': target})
         return samples
