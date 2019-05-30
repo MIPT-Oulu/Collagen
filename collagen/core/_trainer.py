@@ -132,7 +132,6 @@ class Trainer(object):
                                           session=self.__session)
 
                 input_data = batch[data_key[ind]]
-                # target = tuple([cast_tensor(batch[key_i], cast_target) for key_i in target_key])
                 if isinstance(target_key[ind], str):
                     target = cast_tensor(batch[target_key[ind]], cast_target)
                 elif isinstance(target_key[ind], list) or isinstance(target_key[ind], tuple):

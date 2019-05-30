@@ -9,12 +9,12 @@ from collagen.core.utils import auto_detect_device
 from collagen.data import SSFoldSplit
 from collagen.data.data_provider import pimodel_data_provider
 from collagen.strategies import Strategy
-from collagen.metrics import RunningAverageMeter, AccuracyMeter
+from collagen.metrics import RunningAverageMeter, BalancedAccuracyMeter, KappaMeter
 from collagen.data.utils import get_mnist, get_cifar10
 from collagen.logging import MeterLogging
 
 from examples.pi_model.utils import init_args, parse_item, init_transforms, parse_target_accuracy_meter
-from examples.pi_model.utils import SSConfusionMatrixVisualizer, cond_accuracy_meter
+from examples.pi_model.utils import SSConfusionMatrixVisualizer, cond_accuracy_meter, parse_class
 from examples.pi_model.networks import Model01
 
 device = auto_detect_device()
@@ -29,26 +29,27 @@ class PiModelLoss(Module):
         self.__losses = {'loss_cls': None, 'loss_cons': None}
 
     def forward(self, pred: Tensor, target: Tensor):
-        if isinstance(target, tuple) and len(target) == 2:
-            target_cls = target[0].type(torch.int64)
-            features = target[1].view(target[1].shape[0], -1)
-            loss_cls = self.__loss_cls(pred, target_cls)
-            if features.shape[0] != 2:
-                raise ValueError("Num of features must be 2, but found {}".format(features.shape[0]))
-            loss_cons = self.__loss_mse(features[0, :], features[1, :])
-            _loss = self.__alpha*loss_cls + (1 - self.__alpha)*loss_cons
-            self.__losses['loss_cons'] = loss_cons
-            self.__losses['loss_cls'] = loss_cls
-            self.__losses['loss'] = _loss
+        if target['name'] == 'u':
+            aug_logit = target['logits']
+            loss_cons = self.__loss_mse(aug_logit, pred)
 
-        elif (isinstance(target, tuple) and len(target) == 1) or (isinstance(target, Tensor) and len(target.shape) == 1):
-            target_cls = target.type(torch.int64)
-            _loss = self.__loss_cls(pred, target_cls)
-            self.__losses['loss_cons'] = None
-            self.__losses['loss_cls'] = _loss
-            self.__losses['loss'] = _loss
+            self.__losses['loss_cons'] = (1 - self.__alpha) * loss_cons
+            self.__losses['loss_cls'] = None
+            self.__losses['loss'] = self.__losses['loss_cons']
+            _loss = self.__losses['loss']
+
+        elif target['name'] == 'l':
+            aug_logit = target['logits']
+            target_cls = target['target'].type(torch.int64)
+
+            loss_cls = self.__loss_cls(pred, target_cls)
+            loss_cons = self.__loss_mse(aug_logit, pred)
+            self.__losses['loss_cons'] = (1-self.__alpha)*loss_cons
+            self.__losses['loss_cls'] = self.__alpha*loss_cls
+            self.__losses['loss'] = self.__losses['loss_cls'] + self.__losses['loss_cons']
+            _loss = self.__losses['loss']
         else:
-            raise ValueError("Target length is 1 or 2, but found {}".format(len(target)))
+            raise ValueError("Not support target name {}".format(target['name']))
 
         return _loss
 
@@ -97,16 +98,25 @@ if __name__ == "__main__":
     callbacks_train = (RunningAverageMeter(prefix='train', name='loss_cls'),
                        RunningAverageMeter(prefix='train', name='loss_cons'),
                        MeterLogging(writer=summary_writer),
-                       AccuracyMeter(prefix="train", name="acc", parse_target=parse_target_accuracy_meter, cond=cond_accuracy_meter))
+                       KappaMeter(prefix='train', name='kappa', parse_target=parse_class, parse_output=parse_class,
+                                  cond=cond_accuracy_meter),
+                       BalancedAccuracyMeter(prefix="train", name="acc", parse_target=parse_target_accuracy_meter,
+                                             cond=cond_accuracy_meter),
+                       SSConfusionMatrixVisualizer(writer=summary_writer, cond=cond_accuracy_meter,
+                                                   parse_class=parse_class,
+                                                   labels=[str(i) for i in range(10)], tag="train/confusion_matrix")
+                       )
 
 
-    callbacks_eval = (RunningAverageMeter(prefix='train', name='loss_cls'),
-                      RunningAverageMeter(prefix='train', name='loss_cons'),
-                      AccuracyMeter(prefix="eval", name="acc", parse_target=parse_target_accuracy_meter, cond=cond_accuracy_meter),
+    callbacks_eval = (RunningAverageMeter(prefix='eval', name='loss_cls'),
+                      RunningAverageMeter(prefix='eval', name='loss_cons'),
+                      BalancedAccuracyMeter(prefix="eval", name="acc", parse_target=parse_target_accuracy_meter,
+                                            cond=cond_accuracy_meter),
                       MeterLogging(writer=summary_writer),
-                      SSConfusionMatrixVisualizer(writer=summary_writer,
-                                                  labels=[str(i) for i in range(10)],
-                                                  tag="eval/confusion_matrix"))
+                      KappaMeter(prefix='eval', name='kappa', parse_target=parse_class, parse_output=parse_class,
+                                 cond=cond_accuracy_meter),
+                      SSConfusionMatrixVisualizer(writer=summary_writer, cond=cond_accuracy_meter, parse_class=parse_class,
+                                                  labels=[str(i) for i in range(10)], tag="eval/confusion_matrix"))
 
     st_callbacks = MeterLogging(writer=summary_writer)
 
@@ -116,8 +126,6 @@ if __name__ == "__main__":
     pi_model = Strategy(data_provider=data_provider,
                         train_loader_names=tuple(sampling_config["train"]["data_provider"].keys()),
                         val_loader_names=tuple(sampling_config["eval"]["data_provider"].keys()),
-                        data_key=("data", "data"),
-                        target_key=("target", "features"),
                         data_sampling_config=sampling_config,
                         loss=crit,
                         model=model,

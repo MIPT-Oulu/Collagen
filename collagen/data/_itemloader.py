@@ -148,10 +148,10 @@ class AugmentedGroupSampler(ItemLoader):
         for i in range(k):
             imgs = sampled_rows[i][self.__data_key]
             target = sampled_rows[i][self.__target_key]
-            list_features = []
+            list_logits = []
 
+            list_imgs = []
             for b in range(imgs.shape[0]):
-                list_imgs = [imgs[b, :, :, :]]
                 for j in range(self.__n_augmentations):
                     img = imgs[b, :, :, :]
                     if img.shape[0] == 1:
@@ -159,13 +159,23 @@ class AugmentedGroupSampler(ItemLoader):
                     else:
                         img = img.permute(1, 2, 0)
 
-                    img_cpu = to_cpu(img, use_numpy=True)
+                    img_cpu = to_cpu(img)
                     aug_img = self.__augmentation(img_cpu)
                     list_imgs.append(aug_img)
-                batch_imgs = torch.stack(list_imgs, dim=0).to(next(self.__model.parameters()).device)
-                features = self.__model.get_features(batch_imgs)
-                list_features.append(features)
-            samples.append({'name': self.__name, 'features': torch.stack(list_features, dim=1), 'data': imgs, 'target': target})
+
+            batch_imgs = torch.stack(list_imgs, dim=0)
+            batch_imgs = batch_imgs.to(next(self.__model.parameters()).device)
+            logits = to_cpu(self.__model(batch_imgs), use_numpy=False)
+
+            list_logits.append(logits)
+            if len(list_logits) > 1:
+                logits = np.stack(list_logits, axis=1)
+            elif len(list_logits) == 1:
+                logits = list_logits[0]
+            else:
+                raise ValueError('Empty list!')
+
+            samples.append({'name': self.__name, 'logits': logits, 'data': imgs, 'target': target})
         return samples
 
 

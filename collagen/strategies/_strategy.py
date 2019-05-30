@@ -34,12 +34,13 @@ class Strategy(object):
             Includes both metrics and callbacks. Validation callbacks can be checkpointers, loggers,
             learning rate schedulers (E.g. reduce on plateau-like things). On the other hand,
              the callbacks can also be meters batch-wise, which compute metrics.
+        n_training_batches: int
+            The number of training batches of each epoch. If None, the number of batches will be auto computed
         """
 
     def __init__(self, data_provider: DataProvider,
                  train_loader_names: Tuple[str] or str,
                  val_loader_names: Tuple[str] or str,
-                 data_key: Tuple[str] or str, target_key: Tuple[str] or str,
                  data_sampling_config: dict,
                  loss: nn.Module,
                  model: Module,
@@ -49,6 +50,7 @@ class Strategy(object):
                  val_num_samples: Tuple[int] or int or None = None,
                  train_callbacks: Tuple[Callback] or Callback = None,
                  val_callbacks: Tuple[Callback] or Callback = None,
+                 n_training_batches: int or None = None,
                  device: str or None = "cuda"):
         self.__data_provider: DataProvider = data_provider
         self.__loss: nn.Module = loss
@@ -60,8 +62,6 @@ class Strategy(object):
 
         self.__n_epochs: int = n_epochs
 
-        # self.__data_key = to_tuple(data_key)
-        # self.__target_key = to_tuple(target_key)
         self.__data_sampling_config = data_sampling_config
         self.__train_callbacks: Tuple[Callback] = to_tuple(train_callbacks)
         self.__val_callbacks: Tuple[Callback] = to_tuple(val_callbacks)
@@ -115,6 +115,9 @@ class Strategy(object):
             self.__target_key_by_stage[stage] = tuple(target_keys)
 
             self.__num_samples_by_stage[stage] = n_samples_dict
+
+        if n_training_batches is not None:
+            self.__num_batches_by_stage['train'] = n_training_batches
 
         self.__use_cuda = torch.cuda.is_available() and device == "cuda"
         self.__device = torch.device("cuda" if self.__use_cuda and torch.cuda.is_available() else "cpu")

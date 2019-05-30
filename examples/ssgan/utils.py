@@ -84,13 +84,13 @@ class Discriminator(Module):
                                      nn.LeakyReLU(0.2, inplace=True))  # state size. (ndf*4) x 4 x 4
 
         self.main_flow = nn.Sequential(OrderedDict([("conv_block1", self._layer1),
-                                                    # ("dropout1", self.dropout),
+                                                    ("dropout1", self.dropout),
                                                     ("conv_block2", self._layer2),
-                                                    # ("dropout2", self.dropout),
+                                                    ("dropout2", self.dropout),
                                                     ("conv_block3", self._layer3),
-                                                    # ("dropout3", self.dropout),
+                                                    ("dropout3", self.dropout),
                                                     ("conv_block4", self._layer4),
-                                                    # ("dropout3", self.dropout),
+                                                    ("dropout3", self.dropout),
                                                     # ("conv_final", self._layer5)
                                                     ]))
 

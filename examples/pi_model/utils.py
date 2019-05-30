@@ -9,31 +9,58 @@ from collagen.callbacks import ConfusionMatrixVisualizer
 import solt.core as slc
 import solt.transforms as slt
 
-class SSConfusionMatrixVisualizer(ConfusionMatrixVisualizer):
-    def __init__(self, writer, labels: list or None = None, tag="confusion_matrix"):
-        super().__init__(writer=writer, labels=labels, tag=tag)
-
-    def on_forward_end(self, output, target, **kwargs):
-        if isinstance(target, Tensor):
-            target_cls = target.type(torch.int64)
-        elif isinstance(target, tuple):
-            target_cls = target[0].type(torch.int64)
-        pred_cls = output
-        decoded_pred_cls = pred_cls.argmax(dim=-1)
-        # decoded_target_cls = target_cls.argmax(dim=-1)
-        self._corrects += [self._labels[i] for i in to_cpu(target_cls, use_numpy=True).tolist()]
-        self._predicts += [self._labels[i] for i in to_cpu(decoded_pred_cls, use_numpy=True).tolist()]
 
 def cond_accuracy_meter(target, output):
-    return True
+    return target['name'] == 'l'
 
 def parse_target_accuracy_meter(target):
-    if isinstance(target, Tensor):
-        return target
-    elif isinstance(target, tuple):
-        return target[0]
+    if target['name'] == 'l':
+        return target['target']
     else:
-        raise ValueError("Invalid target!")
+        return None
+
+def parse_class(output):
+    if isinstance(output, dict) and output['name'] == 'l':
+        output = output['target']
+    elif isinstance(output, Tensor):
+        pass
+    else:
+        return None
+
+    if output is None:
+        return None
+    elif len(output.shape) == 2:
+        output_cpu = to_cpu(output.argmax(dim=1), use_numpy=True)
+    elif len(output.shape) == 1:
+        output_cpu = to_cpu(output, use_numpy=True)
+    else:
+        raise ValueError("Only support dims 1 or 2, but got {}".format(len(output.shape)))
+    output_cpu = output_cpu.astype(int)
+    return output_cpu
+
+class SSConfusionMatrixVisualizer(ConfusionMatrixVisualizer):
+    def __init__(self, cond, parse_class, writer, labels: list or None = None, tag="confusion_matrix", normalize=False):
+        super().__init__(writer=writer, labels=labels, tag=tag, normalize=normalize)
+        self.__cond = cond
+        self.__parse_class = parse_class
+
+    def on_forward_end(self, output, target, **kwargs):
+        if self.__cond(target, output):
+            target_cls = self.__parse_class(target)
+            pred_cls = self.__parse_class(output)
+            if target_cls is not None and pred_cls is not None:
+                # decoded_pred_cls = pred_cls.argmax(dim=-1)
+                self._corrects += [self._labels[i] for i in to_cpu(target_cls, use_numpy=True).tolist()]
+                self._predicts += [self._labels[i] for i in to_cpu(pred_cls, use_numpy=True).tolist()]
+
+def cond_accuracy_meter(target, output):
+    return target['name'] == 'l'
+
+def parse_target_accuracy_meter(target):
+    if target['name'] == 'l':
+        return target['target']
+    else:
+        return None
 
 
 def wrap2solt(inp):
@@ -82,23 +109,27 @@ def init_transforms(nc=1):
         ApplyTransform(norm_mean_std)
     ])
 
-    augment = Compose([
-        wrap2solt,
-        slc.Stream([
-            slt.ResizeTransform(resize_to=(32, 32), interpolation='bilinear'),
-            slt.RandomScale(range_x=(0.9, 1.1), same=False, p=0.5),
-            slt.RandomShear(range_x=(-0.05, 0.05), p=0.5),
-            slt.RandomRotate(rotation_range=(-10, 10), p=0.5),
-            # slt.RandomRotate(rotation_range=(-5, 5), p=0.5),
-            slt.PadTransform(pad_to=36),
-            slt.CropTransform(crop_size=32, crop_mode='r'),
-            slt.ImageAdditiveGaussianNoise(p=1.0)
-        ]),
-        unpack_solt,
-        ApplyTransform(norm_mean_std)
-    ])
+    def custom_augment(img):
+        tr = Compose([
+            wrap2solt,
+            slc.Stream([
+                slt.ResizeTransform(resize_to=(32, 32), interpolation='bilinear'),
+                slt.RandomScale(range_x=(0.9, 1.1), same=False, p=0.5),
+                slt.RandomShear(range_x=(-0.05, 0.05), p=0.5),
+                slt.RandomRotate(rotation_range=(-10, 10), p=0.5),
+                # slt.RandomRotate(rotation_range=(-5, 5), p=0.5),
+                slt.PadTransform(pad_to=36),
+                slt.CropTransform(crop_size=32, crop_mode='r'),
+                slt.ImageAdditiveGaussianNoise(p=1.0)
+            ]),
+            unpack_solt,
+            ApplyTransform(norm_mean_std)
+        ])
 
-    return train_trf, test_trf, augment
+        img_tr, _ = tr((img, 0))
+        return img_tr
+
+    return train_trf, test_trf, custom_augment
 
 
 def parse_item(root, entry, trf, data_key, target_key):

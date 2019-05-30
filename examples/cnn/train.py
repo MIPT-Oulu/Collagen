@@ -83,8 +83,6 @@ if __name__ == "__main__":
                             train_loader_names=tuple(sampling_config['train']['data_provider'].keys()),
                             val_loader_names=tuple(sampling_config['eval']['data_provider'].keys()),
                             data_sampling_config=sampling_config,
-                            data_key="img",
-                            target_key="target",
                             loss=criterion,
                             model=model,
                             n_epochs=args.n_epochs,

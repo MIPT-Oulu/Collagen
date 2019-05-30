@@ -45,7 +45,7 @@ class Meter(Callback):
         return output_cpu
 
     @staticmethod
-    def default_cond(self, target, output):
+    def default_cond(target, output):
         return True
 
     @staticmethod
