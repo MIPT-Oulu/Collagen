@@ -1,4 +1,6 @@
 import torch
+import numpy as np
+from torch import Tensor
 from typing import Tuple, Any, List
 from collagen.core import Module
 
@@ -144,7 +146,7 @@ class Session(object):
                                  return_out=return_out, callbacks=callbacks)
 
     def __batch_step(self, batch: torch.Tensor or Tuple[torch.Tensor],
-                     target: torch.Tensor or Tuple[torch.Tensor],  with_grad: bool = True,
+                     target: torch.Tensor or Tuple[torch.Tensor] or dict,  with_grad: bool = True,
                      with_backward: bool = True, eval_mode: bool = False,
                      return_out: bool = False,
                      callbacks: Tuple[callable] or List[callable] or None = None) -> Tuple[float, Any] or float:
@@ -201,9 +203,21 @@ class Session(object):
                 batch_on_device = batch.to(module_device)
 
             if isinstance(target, tuple) or isinstance(target, list):
-                target_on_device = tuple([t.to(module_device) for t in target])
-            else:
+                target_on_device = tuple([t.to(module_device) if isinstance(t, Tensor) else t for t in target])
+            elif isinstance(target, dict):
+                target_on_device = dict()
+                for k in target:
+                    if isinstance(target[k], Tensor) and not target[k].is_cuda:
+                        target_on_device[k] = target[k].to(module_device)
+                    elif isinstance(target[k], np.ndarray):
+                        target_on_device[k] = torch.tensor(target[k]).to(module_device)
+                    else:
+                        target_on_device[k] = target[k]
+
+            elif isinstance(target, Tensor):
                 target_on_device = target.to(module_device)
+            else:
+                raise ValueError('Not support target type {}'.format(type(target)))
 
             # Forward
             for cb in callbacks:
@@ -274,7 +288,7 @@ class Session(object):
                 self.__optimizer.step()
 
                 for cb in callbacks:
-                    cb.on_optimizer_step_begin(module=self.__module,
+                    cb.on_optimizer_step_end(module=self.__module,
                                                loss=loss,
                                                input=batch_on_device,
                                                target=target_on_device,

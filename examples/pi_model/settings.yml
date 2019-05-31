@@ -5,13 +5,16 @@ train:
       num_samples: 1
       data_key: "data"
       target_key:
-        - "target"
-        - "features"
+        - "name"
+        - "logits"
     labeled_train:
       cate: ItemLoader
-      num_samples: 3
+      num_samples: 1
       data_key: "data"
-      target_key: "target"
+      target_key:
+        - "target"
+        - "logits"
+        - "name"
 
 eval:
   data_provider:
@@ -19,11 +22,15 @@ eval:
       cate: ItemLoader
       num_samples: 1
       data_key: "data"
-      target_key: "target"
+      target_key:
+        - "target"
+        - "logits"
+        - "name"
+
     unlabeled_eval:
       cate: AugmentedGroupSampler
       num_samples: 1
       data_key: "data"
       target_key:
-        - "target"
-        - "features"
+        - "name"
+        - "logits"

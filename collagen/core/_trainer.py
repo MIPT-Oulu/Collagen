@@ -132,11 +132,15 @@ class Trainer(object):
                                           session=self.__session)
 
                 input_data = batch[data_key[ind]]
-                # target = tuple([cast_tensor(batch[key_i], cast_target) for key_i in target_key])
                 if isinstance(target_key[ind], str):
                     target = cast_tensor(batch[target_key[ind]], cast_target)
                 elif isinstance(target_key[ind], list) or isinstance(target_key[ind], tuple):
-                    target = tuple([cast_tensor(batch[key_i], cast_target) for key_i in target_key[ind]])
+                    target = {}
+                    for key_i in target_key[ind]:
+                        if key_i in batch:
+                            target[key_i] = cast_tensor(batch[key_i], cast_target)
+                        else:
+                            raise ValueError('Not found key {} in sampled batch'.format(key_i))
 
                 loss, train_result = self.__session.train_step(input_data,
                                                                target,
@@ -169,7 +173,12 @@ class Trainer(object):
             if isinstance(target_key[ind], str):
                 target = cast_tensor(batch[target_key[ind]], cast_target)
             elif isinstance(target_key[ind], list) or isinstance(target_key[ind], tuple):
-                target = tuple([cast_tensor(batch[key_i], cast_target) for key_i in target_key[ind]])
+                target = {}
+                for key_i in target_key[ind]:
+                    if key_i in batch:
+                        target[key_i] = cast_tensor(batch[key_i], cast_target)
+                    else:
+                        raise ValueError('Not found key {} in sampled batch'.format(key_i))
 
             loss, train_result = self.__session.train_step(input_data,
                                                            target,
@@ -188,6 +197,10 @@ class Trainer(object):
                                     data_key=data_key[ind],
                                     target_key=target_key[ind],
                                     session=self.__session)
+
+        # for ind, loader_name in enumerate(self.__train_loader_names):
+        #     cur_loader_state = self.__data_provider.state_dict()[loader_name]
+        #     del cur_loader_state['samples']
 
     def eval(self, data_key: Tuple[str] or str = 'img',
              target_key: Tuple[str] or str = 'target', cast_target=None):
@@ -235,7 +248,12 @@ class Trainer(object):
                 if isinstance(target_key[ind], str):
                     target = cast_tensor(batch[target_key[ind]], cast_target)
                 elif isinstance(target_key[ind], list) or isinstance(target_key[ind], tuple):
-                    target = tuple([cast_tensor(batch[key_i], cast_target) for key_i in target_key[ind]])
+                    target = {}
+                    for key_i in target_key[ind]:
+                        if key_i in batch:
+                            target[key_i] = cast_tensor(batch[key_i], cast_target)
+                        else:
+                            raise ValueError('Not found key {} in sampled batch'.format(key_i))
                 loss, eval_result = self.__session.eval_step(input_data,
                                                              target,
                                                              return_out=True,
@@ -266,7 +284,12 @@ class Trainer(object):
             if isinstance(target_key[ind], str):
                 target = cast_tensor(batch[target_key[ind]], cast_target)
             elif isinstance(target_key[ind], list) or isinstance(target_key[ind], tuple):
-                target = tuple([cast_tensor(batch[key_i], cast_target) for key_i in target_key[ind]])
+                target = {}
+                for key_i in target_key[ind]:
+                    if key_i in batch:
+                        target[key_i] = cast_tensor(batch[key_i], cast_target)
+                    else:
+                        raise ValueError('Not found key {} in sampled batch'.format(key_i))
 
             # target = cast_tensor(batch[key_i], cast_target)
             loss, eval_result = self.__session.eval_step(input_data,
