@@ -125,7 +125,7 @@ if __name__ == "__main__":
     # Initializing Discriminator
     model = Model01(nc=n_channels, ndf=args.n_features, drop_rate=0.5).to(device)
     optim = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.wd, betas=(args.beta1, 0.999))
-    crit = PiModelLoss(alpha=.9).to(device)
+    crit = PiModelLoss(alpha=10.0).to(device)
 
     train_labeled_data, val_labeled_data, train_unlabeled_data, val_unlabeled_data = next(splitter)
     t_tr_l = train_labeled_data['target']

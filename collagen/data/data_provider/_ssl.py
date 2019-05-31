@@ -2,7 +2,7 @@ from collagen.data import ItemLoader, AugmentedGroupSampler, AugmentedGroupStude
 
 
 def pimodel_data_provider(model, train_labeled_data, train_unlabeled_data, val_labeled_data, val_unlabeled_data,
-                          transforms, parse_item, bs, num_threads, item_loaders=dict(), root=""):
+                          transforms, parse_item, bs, num_threads, item_loaders=dict(), root="", n_augmentations=1):
     """
     Default setting of data provider for Pi-Model
 
@@ -15,7 +15,7 @@ def pimodel_data_provider(model, train_labeled_data, train_unlabeled_data, val_l
 
     item_loaders["labeled_train"] = AugmentedGroupSampler(root=root, model=model, name='l',
                                                             meta_data=train_labeled_data,
-                                                            n_augmentations=1,
+                                                            n_augmentations=n_augmentations,
                                                             augmentation=transforms[2],
                                                             transform=transforms[1],
                                                             parse_item_cb=parse_item,
@@ -24,7 +24,7 @@ def pimodel_data_provider(model, train_labeled_data, train_unlabeled_data, val_l
 
     item_loaders["unlabeled_train"] = AugmentedGroupSampler(root=root, model=model, name='u',
                                                             meta_data=train_unlabeled_data,
-                                                            n_augmentations=1,
+                                                            n_augmentations=n_augmentations,
                                                             augmentation=transforms[2],
                                                             transform=transforms[1],
                                                             parse_item_cb=parse_item,
@@ -39,7 +39,7 @@ def pimodel_data_provider(model, train_labeled_data, train_unlabeled_data, val_l
 
     item_loaders["labeled_eval"] = AugmentedGroupSampler(root=root, model=model, name='l',
                                                            meta_data=val_labeled_data,
-                                                           n_augmentations=1,
+                                                           n_augmentations=n_augmentations,
                                                            augmentation=transforms[2],
                                                            transform=transforms[1],
                                                            parse_item_cb=parse_item,
@@ -48,7 +48,7 @@ def pimodel_data_provider(model, train_labeled_data, train_unlabeled_data, val_l
 
     item_loaders["unlabeled_eval"] = AugmentedGroupSampler(root=root, model=model, name='u',
                                                            meta_data=val_unlabeled_data,
-                                                           n_augmentations=1,
+                                                           n_augmentations=n_augmentations,
                                                            augmentation=transforms[2],
                                                            transform=transforms[1],
                                                            parse_item_cb=parse_item,
@@ -60,7 +60,7 @@ def pimodel_data_provider(model, train_labeled_data, train_unlabeled_data, val_l
 
 def mt_data_provider(st_model, te_model, train_labeled_data, train_unlabeled_data, val_labeled_data,
                      val_unlabeled_data,
-                     transforms, parse_item, bs, num_threads, item_loaders=dict(), root=""):
+                     transforms, parse_item, bs, num_threads, item_loaders=dict(), output_type='logits', root=""):
     """
     Default setting of data provider for Mean-Teacher
 
@@ -69,7 +69,7 @@ def mt_data_provider(st_model, te_model, train_labeled_data, train_unlabeled_dat
                                                                         meta_data=train_labeled_data,
                                                                         student_model=st_model,
                                                                         teacher_model=te_model,
-                                                                        n_augmentations=1,
+                                                                        n_augmentations=2,
                                                                         augmentation=transforms[2],
                                                                         transform=transforms[1],
                                                                         parse_item_cb=parse_item,
@@ -80,7 +80,7 @@ def mt_data_provider(st_model, te_model, train_labeled_data, train_unlabeled_dat
                                                                           student_model=st_model,
                                                                           teacher_model=te_model,
                                                                           meta_data=train_unlabeled_data,
-                                                                          n_augmentations=1,
+                                                                          n_augmentations=2,
                                                                           augmentation=transforms[2],
                                                                           transform=transforms[1],
                                                                           parse_item_cb=parse_item,
@@ -91,7 +91,7 @@ def mt_data_provider(st_model, te_model, train_labeled_data, train_unlabeled_dat
                                                                        meta_data=val_labeled_data,
                                                                        student_model=st_model,
                                                                        teacher_model=te_model,
-                                                                       n_augmentations=1,
+                                                                       n_augmentations=2,
                                                                        augmentation=transforms[2],
                                                                        transform=transforms[1],
                                                                        parse_item_cb=parse_item,
@@ -102,7 +102,7 @@ def mt_data_provider(st_model, te_model, train_labeled_data, train_unlabeled_dat
                                                                          student_model=st_model,
                                                                          teacher_model=te_model,
                                                                          meta_data=val_unlabeled_data,
-                                                                         n_augmentations=1,
+                                                                         n_augmentations=2,
                                                                          augmentation=transforms[2],
                                                                          transform=transforms[1],
                                                                          parse_item_cb=parse_item,

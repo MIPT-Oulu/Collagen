@@ -2,13 +2,15 @@ import torch
 from typing import Tuple
 
 
-def to_cpu(x: torch.Tensor or torch.cuda.FloatTensor, use_numpy=True):
+def to_cpu(x: torch.Tensor or torch.cuda.FloatTensor, required_grad=False, use_numpy=True):
     x_cpu = x
 
     if isinstance(x, torch.Tensor):
         if x.is_cuda:
             if use_numpy:
                 x_cpu = x.cpu().data.numpy()
+            elif required_grad:
+                x_cpu = x.cpu()
             else:
                 x_cpu = x.cpu().data
         elif use_numpy:

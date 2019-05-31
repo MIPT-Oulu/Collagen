@@ -45,7 +45,7 @@ class ItemLoader(object):
         Set to ``True`` to drop the last incomplete batch,
         if the dataset size is not divisible by the batch size. If ``False`` and
         the size of dataset is not divisible by the batch size, then the last batch
-        will be smaller. (the default is True)
+        will be smaller. (the default is False)
     timeout : int, optional
         If positive, the timeout value for collecting a batch from workers.
         If ``0``, ignores ``timeout`` notion. Must be non-negative. (the default is 0)
@@ -56,7 +56,7 @@ class ItemLoader(object):
                  num_workers: int = 0, shuffle: bool = False, pin_memory: bool = False,
                  collate_fn: callable = default_collate, transform: callable or None = None,
                  sampler: torch.utils.data.sampler.Sampler or None = None,
-                 batch_sampler=None, drop_last: bool = True, timeout: int = 0):
+                 batch_sampler=None, drop_last: bool = False, timeout: int = 0):
         if root is None:
             root = ''
 
@@ -126,12 +126,12 @@ class ItemLoader(object):
 
 
 class AugmentedGroupSampler(ItemLoader):
-    def __init__(self, model: nn.Module, name: str, augmentation, n_augmentations=1, data_key: str = "data", target_key: str = 'target',
+    def __init__(self, model: nn.Module, name: str, augmentation, n_augmentations=1, output_type='logits', data_key: str = "data", target_key: str = 'target',
                  parse_item_cb: callable or None = None, meta_data: pd.DataFrame or None = None,
                  root: str or None = None, batch_size: int = 1, num_workers: int = 0, shuffle: bool = False,
                  pin_memory: bool = False, collate_fn: callable = default_collate, transform: callable or None = None,
                  sampler: torch.utils.data.sampler.Sampler or None = None, batch_sampler=None,
-                 drop_last: bool = True, timeout: int = 0):
+                 drop_last: bool = False, timeout: int = 0):
         super().__init__(meta_data=meta_data, parse_item_cb=parse_item_cb, root=root, batch_size=batch_size,
                          num_workers=num_workers, shuffle=shuffle, pin_memory=pin_memory, collate_fn=collate_fn,
                          transform=transform, sampler=sampler, batch_sampler=batch_sampler, drop_last=drop_last, timeout=timeout)
@@ -141,6 +141,7 @@ class AugmentedGroupSampler(ItemLoader):
         self.__augmentation = augmentation
         self.__data_key = data_key
         self.__target_key = target_key
+        self.__output_type = output_type
 
     def sample(self, k=1):
         samples = []
@@ -148,6 +149,7 @@ class AugmentedGroupSampler(ItemLoader):
         for i in range(k):
             imgs = sampled_rows[i][self.__data_key]
             target = sampled_rows[i][self.__target_key]
+            batch_size = imgs.shape[0]
             list_logits = []
 
             list_imgs = []
@@ -165,11 +167,16 @@ class AugmentedGroupSampler(ItemLoader):
 
             batch_imgs = torch.stack(list_imgs, dim=0)
             batch_imgs = batch_imgs.to(next(self.__model.parameters()).device)
-            logits = to_cpu(self.__model(batch_imgs), use_numpy=False)
+            if self.__output_type == 'logits':
+                out = self.__model(batch_imgs)
+                logits = to_cpu(out, use_numpy=False, required_grad=True)
+            elif self.__output_type == 'features':
+                out = self.__model.get_features(batch_imgs)
+                logits = to_cpu(out, use_numpy=False, required_grad=True)
 
             list_logits.append(logits)
-            if len(list_logits) > 1:
-                logits = np.stack(list_logits, axis=1)
+            if self.__n_augmentations > 1:
+                logits = logits.view(self.__n_augmentations, batch_size, -1)
             elif len(list_logits) == 1:
                 logits = list_logits[0]
             else:
@@ -185,7 +192,7 @@ class AugmentedGroupStudentTeacherSampler(ItemLoader):
                  root: str or None = None, batch_size: int = 1, num_workers: int = 0, shuffle: bool = False,
                  pin_memory: bool = False, collate_fn: callable = default_collate, transform: callable or None = None,
                  sampler: torch.utils.data.sampler.Sampler or None = None, batch_sampler=None,
-                 drop_last: bool = True, timeout: int = 0):
+                 drop_last: bool = False, timeout: int = 0):
         super().__init__(meta_data=meta_data, parse_item_cb=parse_item_cb, root=root, batch_size=batch_size,
                          num_workers=num_workers, shuffle=shuffle, pin_memory=pin_memory, collate_fn=collate_fn,
                          transform=transform, sampler=sampler, batch_sampler=batch_sampler, drop_last=drop_last, timeout=timeout)
@@ -206,6 +213,7 @@ class AugmentedGroupStudentTeacherSampler(ItemLoader):
             list_logits = []
             with torch.no_grad():
                 te_logits = self.__te_model(imgs.to(next(self.__te_model.parameters()).device))
+                te_logits = to_cpu(te_logits, use_numpy=False, required_grad=False)
             list_imgs = []
             for b in range(imgs.shape[0]):
                 for j in range(self.__n_augmentations):
@@ -220,7 +228,7 @@ class AugmentedGroupStudentTeacherSampler(ItemLoader):
                     list_imgs.append(aug_img)
 
             batch_imgs = torch.stack(list_imgs, dim=0).to(next(self.__st_model.parameters()).device)
-            logits = to_cpu(self.__st_model(batch_imgs))
+            logits = to_cpu(self.__st_model(batch_imgs), use_numpy=False, required_grad=True)
             # del batch_imgs
             # gc.collect()
             list_logits.append(logits)
@@ -241,7 +249,7 @@ class FeatureMatchingSampler(ItemLoader):
                  root: str or None = None, batch_size: int = 1, num_workers: int = 0, shuffle: bool = False,
                  pin_memory: bool = False, collate_fn: callable = default_collate, transform: callable or None = None,
                  sampler: torch.utils.data.sampler.Sampler or None = None, batch_sampler=None,
-                 drop_last: bool = True, timeout: int = 0):
+                 drop_last: bool = False, timeout: int = 0):
         super().__init__(meta_data=meta_data, parse_item_cb=parse_item_cb, root=root, batch_size=batch_size,
                          num_workers=num_workers, shuffle=shuffle, pin_memory=pin_memory, collate_fn=collate_fn,
                          transform=transform, sampler=sampler, batch_sampler=batch_sampler, drop_last=drop_last, timeout=timeout)
