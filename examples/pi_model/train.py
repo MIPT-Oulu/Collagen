@@ -3,13 +3,14 @@ from torch import optim, Tensor
 import torch
 from tensorboardX import SummaryWriter
 import yaml
+from torch.nn import functional as F
 
 from collagen.core import Module
 from collagen.core.utils import auto_detect_device
 from collagen.data import SSFoldSplit
 from collagen.data.data_provider import pimodel_data_provider
 from collagen.strategies import Strategy
-from collagen.metrics import RunningAverageMeter, BalancedAccuracyMeter, KappaMeter
+from collagen.metrics import RunningAverageMeter, AccuracyMeter, KappaMeter
 from collagen.data.utils import get_mnist, get_cifar10
 from collagen.logging import MeterLogging
 
@@ -21,19 +22,58 @@ device = auto_detect_device()
 
 
 class PiModelLoss(Module):
-    def __init__(self, alpha=0.5):
+    def __init__(self, alpha=0.5, cons_mode='mse'):
         super().__init__()
-        self.__loss_mse = MSELoss()
-        self.__loss_cls = CrossEntropyLoss()
+        self.__cons_mode = cons_mode
+        if cons_mode == 'mse':
+            self.__loss_cons = self.softmax_mse_loss
+        elif cons_mode == 'kl':
+            self.__loss_cons = self.softmax_kl_loss
+        self.__loss_cls = CrossEntropyLoss(reduction='sum')
         self.__alpha = alpha
         self.__losses = {'loss_cls': None, 'loss_cons': None}
 
+        self.__n_minibatches = 2.0
+
+    @staticmethod
+    def softmax_kl_loss(input_logits, target_logits):
+        """Takes softmax on both sides and returns KL divergence
+
+        Note:
+        - Returns the sum over all examples. Divide by the batch size afterwards
+          if you want the mean.
+        - Sends gradients to inputs but not the targets.
+        """
+        assert input_logits.size() == target_logits.size()
+        input_log_softmax = F.log_softmax(input_logits, dim=1)
+        target_softmax = F.softmax(target_logits, dim=1)
+        n_classes = target_logits.shape[1]
+        return F.kl_div(input_log_softmax, target_softmax, reduction='sum') / n_classes
+
+    @staticmethod
+    def softmax_mse_loss(input_logits, target_logits):
+        """Takes softmax on both sides and returns MSE loss
+
+        Note:
+        - Returns the sum over all examples. Divide by the batch size afterwards
+          if you want the mean.
+        - Sends gradients to inputs but not the targets.
+        """
+        assert input_logits.size() == target_logits.size()
+        input_softmax = F.softmax(input_logits, dim=1)
+        target_softmax = F.softmax(target_logits, dim=1)
+        n_classes = input_logits.size()[1]
+        return F.mse_loss(input_softmax, target_softmax, reduction='sum') / n_classes
+
+
     def forward(self, pred: Tensor, target: Tensor):
+        n_minibatch_size = pred.shape[0]
         if target['name'] == 'u':
             aug_logit = target['logits']
-            loss_cons = self.__loss_mse(aug_logit, pred)
 
-            self.__losses['loss_cons'] = (1 - self.__alpha) * loss_cons
+            loss_cons = self.__loss_cons(aug_logit, pred)
+
+            self.__losses['loss_cons'] = self.__alpha * loss_cons / (self.__n_minibatches*n_minibatch_size)
             self.__losses['loss_cls'] = None
             self.__losses['loss'] = self.__losses['loss_cons']
             _loss = self.__losses['loss']
@@ -43,9 +83,9 @@ class PiModelLoss(Module):
             target_cls = target['target'].type(torch.int64)
 
             loss_cls = self.__loss_cls(pred, target_cls)
-            loss_cons = self.__loss_mse(aug_logit, pred)
-            self.__losses['loss_cons'] = (1-self.__alpha)*loss_cons
-            self.__losses['loss_cls'] = self.__alpha*loss_cls
+            loss_cons = self.__loss_cons(aug_logit, pred)
+            self.__losses['loss_cons'] = self.__alpha*loss_cons / (self.__n_minibatches*n_minibatch_size)
+            self.__losses['loss_cls'] = loss_cls / (self.__n_minibatches*n_minibatch_size)
             self.__losses['loss'] = self.__losses['loss_cls'] + self.__losses['loss_cons']
             _loss = self.__losses['loss']
         else:
@@ -83,12 +123,13 @@ if __name__ == "__main__":
                            equal_target=True, equal_unlabeled_target=True, shuffle=True, unlabeled_target_col='target')
 
     # Initializing Discriminator
-    model = Model01(nc=n_channels, ndf=args.n_features).to(device)
+    model = Model01(nc=n_channels, ndf=args.n_features, drop_rate=0.5).to(device)
     optim = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.wd, betas=(args.beta1, 0.999))
-    crit = PiModelLoss(alpha=0.5).to(device)
+    crit = PiModelLoss(alpha=.9).to(device)
 
     train_labeled_data, val_labeled_data, train_unlabeled_data, val_unlabeled_data = next(splitter)
-
+    t_tr_l = train_labeled_data['target']
+    t_va_l = val_labeled_data['target']
     data_provider = pimodel_data_provider(model=model, train_labeled_data=train_labeled_data, train_unlabeled_data=train_unlabeled_data,
                                           val_labeled_data=val_labeled_data, val_unlabeled_data=val_unlabeled_data,
                                           transforms=init_transforms(nc=n_channels), parse_item=parse_item, bs=args.bs, num_threads=args.num_threads)
@@ -98,10 +139,10 @@ if __name__ == "__main__":
     callbacks_train = (RunningAverageMeter(prefix='train', name='loss_cls'),
                        RunningAverageMeter(prefix='train', name='loss_cons'),
                        MeterLogging(writer=summary_writer),
+                       AccuracyMeter(prefix="train", name="acc", parse_target=parse_target_accuracy_meter,
+                                             cond=cond_accuracy_meter),
                        KappaMeter(prefix='train', name='kappa', parse_target=parse_class, parse_output=parse_class,
                                   cond=cond_accuracy_meter),
-                       BalancedAccuracyMeter(prefix="train", name="acc", parse_target=parse_target_accuracy_meter,
-                                             cond=cond_accuracy_meter),
                        SSConfusionMatrixVisualizer(writer=summary_writer, cond=cond_accuracy_meter,
                                                    parse_class=parse_class,
                                                    labels=[str(i) for i in range(10)], tag="train/confusion_matrix")
@@ -110,7 +151,7 @@ if __name__ == "__main__":
 
     callbacks_eval = (RunningAverageMeter(prefix='eval', name='loss_cls'),
                       RunningAverageMeter(prefix='eval', name='loss_cons'),
-                      BalancedAccuracyMeter(prefix="eval", name="acc", parse_target=parse_target_accuracy_meter,
+                      AccuracyMeter(prefix="eval", name="acc", parse_target=parse_target_accuracy_meter,
                                             cond=cond_accuracy_meter),
                       MeterLogging(writer=summary_writer),
                       KappaMeter(prefix='eval', name='kappa', parse_target=parse_class, parse_output=parse_class,
