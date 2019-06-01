@@ -83,7 +83,7 @@ class Session(object):
 
     def train_step(self, batch: torch.Tensor or Tuple[torch.Tensor],
                    target: torch.Tensor or Tuple[torch.Tensor],
-                   accumulate_grad: bool = False, return_out=False,
+                   accumulate_grad: bool = False, return_out=False, with_step: bool = True,
                    callbacks: Tuple[callable] or List[callable] or None = None) -> float:
         """
         Performs one training iteration using the given mini-batch.
@@ -113,7 +113,7 @@ class Session(object):
             self.__optimizer.zero_grad()
 
         return self.__batch_step(batch=batch, target=target, with_grad=True,
-                                 with_backward=True,
+                                 with_backward=True, with_step=with_step,
                                  return_out=return_out, callbacks=callbacks)
 
     def eval_step(self, batch: torch.Tensor or Tuple[torch.Tensor],
@@ -141,13 +141,13 @@ class Session(object):
         """
 
         return self.__batch_step(batch, target, with_grad=False,
-                                 with_backward=False,
+                                 with_backward=False, with_step=False,
                                  eval_mode=True,
                                  return_out=return_out, callbacks=callbacks)
 
     def __batch_step(self, batch: torch.Tensor or Tuple[torch.Tensor],
                      target: torch.Tensor or Tuple[torch.Tensor] or dict,  with_grad: bool = True,
-                     with_backward: bool = True, eval_mode: bool = False,
+                     with_backward: bool = True, eval_mode: bool = False, with_step: bool = True,
                      return_out: bool = False,
                      callbacks: Tuple[callable] or List[callable] or None = None) -> Tuple[float, Any] or float:
         """
@@ -161,6 +161,8 @@ class Session(object):
             One or multiple targets
         with_grad : bool
             Whether to evaluate the given batch with gradient
+        with_step : bool
+            Whether to evaluate if optimizer step (default: True)
         with_backward : bool
             Whether to perform a backward pass
         eval_mode : bool
@@ -275,26 +277,27 @@ class Session(object):
                                        optimizer=self.__optimizer,
                                        criterion=self.__loss)
 
-                # Optimizer step
-                for cb in callbacks:
-                    cb.on_optimizer_step_begin(module=self.__module,
-                                               loss=loss,
-                                               input=batch_on_device,
-                                               target=target_on_device,
-                                               output=out,
-                                               optimizer=self.__optimizer,
-                                               criterion=self.__loss)
+                if with_step:
+                    # Optimizer step
+                    for cb in callbacks:
+                        cb.on_optimizer_step_begin(module=self.__module,
+                                                   loss=loss,
+                                                   input=batch_on_device,
+                                                   target=target_on_device,
+                                                   output=out,
+                                                   optimizer=self.__optimizer,
+                                                   criterion=self.__loss)
 
-                self.__optimizer.step()
+                    self.__optimizer.step()
 
-                for cb in callbacks:
-                    cb.on_optimizer_step_end(module=self.__module,
-                                               loss=loss,
-                                               input=batch_on_device,
-                                               target=target_on_device,
-                                               output=out,
-                                               optimizer=self.__optimizer,
-                                               criterion=self.__loss)
+                    for cb in callbacks:
+                        cb.on_optimizer_step_end(module=self.__module,
+                                                   loss=loss,
+                                                   input=batch_on_device,
+                                                   target=target_on_device,
+                                                   output=out,
+                                                   optimizer=self.__optimizer,
+                                                   criterion=self.__loss)
 
             if not return_out:
                 return loss.item()

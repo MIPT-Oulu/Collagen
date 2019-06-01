@@ -144,7 +144,7 @@ class Trainer(object):
 
                 loss, train_result = self.__session.train_step(input_data,
                                                                target,
-                                                               accumulate_grad=accumulate_grad,
+                                                               accumulate_grad=accumulate_grad, with_step=False,
                                                                return_out=True, callbacks=self.__train_callbacks)
                 self.__train_batches_count += 1
 
@@ -180,9 +180,8 @@ class Trainer(object):
                     else:
                         raise ValueError('Not found key {} in sampled batch'.format(key_i))
 
-            loss, train_result = self.__session.train_step(input_data,
-                                                           target,
-                                                           accumulate_grad=False,
+            loss, train_result = self.__session.train_step(input_data, target,
+                                                           accumulate_grad=False, with_step=True,
                                                            return_out=True,
                                                            callbacks=self.__train_callbacks)
             self.__train_batches_count += 1

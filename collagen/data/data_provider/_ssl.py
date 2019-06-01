@@ -2,7 +2,7 @@ from collagen.data import ItemLoader, AugmentedGroupSampler, AugmentedGroupStude
 
 
 def pimodel_data_provider(model, train_labeled_data, train_unlabeled_data, val_labeled_data, val_unlabeled_data,
-                          transforms, parse_item, bs, num_threads, item_loaders=dict(), root="", n_augmentations=1):
+                          transforms, parse_item, bs, num_threads, item_loaders=dict(), root="", n_augmentations=1, output_type='logits'):
     """
     Default setting of data provider for Pi-Model
 
@@ -13,7 +13,7 @@ def pimodel_data_provider(model, train_labeled_data, train_unlabeled_data, val_l
     #                                            batch_size=bs, num_workers=num_threads,
     #                                            shuffle=True)
 
-    item_loaders["labeled_train"] = AugmentedGroupSampler(root=root, model=model, name='l',
+    item_loaders["labeled_train"] = AugmentedGroupSampler(root=root, model=model, name='l', output_type=output_type,
                                                             meta_data=train_labeled_data,
                                                             n_augmentations=n_augmentations,
                                                             augmentation=transforms[2],
@@ -22,7 +22,7 @@ def pimodel_data_provider(model, train_labeled_data, train_unlabeled_data, val_l
                                                             batch_size=bs, num_workers=num_threads,
                                                             shuffle=True)
 
-    item_loaders["unlabeled_train"] = AugmentedGroupSampler(root=root, model=model, name='u',
+    item_loaders["unlabeled_train"] = AugmentedGroupSampler(root=root, model=model, name='u', output_type=output_type,
                                                             meta_data=train_unlabeled_data,
                                                             n_augmentations=n_augmentations,
                                                             augmentation=transforms[2],
@@ -37,7 +37,7 @@ def pimodel_data_provider(model, train_labeled_data, train_unlabeled_data, val_l
     #                                           batch_size=bs, num_workers=num_threads,
     #                                           shuffle=False)
 
-    item_loaders["labeled_eval"] = AugmentedGroupSampler(root=root, model=model, name='l',
+    item_loaders["labeled_eval"] = AugmentedGroupSampler(root=root, model=model, name='l', output_type=output_type,
                                                            meta_data=val_labeled_data,
                                                            n_augmentations=n_augmentations,
                                                            augmentation=transforms[2],
@@ -46,7 +46,7 @@ def pimodel_data_provider(model, train_labeled_data, train_unlabeled_data, val_l
                                                            batch_size=bs, num_workers=num_threads,
                                                            shuffle=False)
 
-    item_loaders["unlabeled_eval"] = AugmentedGroupSampler(root=root, model=model, name='u',
+    item_loaders["unlabeled_eval"] = AugmentedGroupSampler(root=root, model=model, name='u', output_type=output_type,
                                                            meta_data=val_unlabeled_data,
                                                            n_augmentations=n_augmentations,
                                                            augmentation=transforms[2],
