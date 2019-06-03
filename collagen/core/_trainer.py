@@ -2,7 +2,7 @@ from torch.optim import Optimizer
 from ..data import DataProvider
 from ._session import Session
 from typing import Tuple
-from collagen.core.utils import to_tuple
+from collagen.core.utils import wrap_tuple
 from collagen.core import Module
 from collagen.core._callback import Callback
 from ..data.utils import cast_tensor
@@ -79,10 +79,10 @@ class Trainer(object):
         self.__eval_batches_count = 0
 
     def add_train_callbacks(self, cbs):
-        self.__train_callbacks += to_tuple(cbs)
+        self.__train_callbacks += wrap_tuple(cbs)
 
     def add_eval_callbacks(self, cbs):
-        self.__val_callbacks += to_tuple(cbs)
+        self.__val_callbacks += wrap_tuple(cbs)
 
     @property
     def model(self):
@@ -142,9 +142,10 @@ class Trainer(object):
                         else:
                             raise ValueError('Not found key {} in sampled batch'.format(key_i))
 
+                first_minibatch = ind == 0 and i == 0
                 loss, train_result = self.__session.train_step(input_data,
-                                                               target,
-                                                               accumulate_grad=accumulate_grad, with_step=False,
+                                                               target, retain_graph=True,
+                                                               accumulate_grad=accumulate_grad or not first_minibatch, with_step=False,
                                                                return_out=True, callbacks=self.__train_callbacks)
                 self.__train_batches_count += 1
 
@@ -180,8 +181,10 @@ class Trainer(object):
                     else:
                         raise ValueError('Not found key {} in sampled batch'.format(key_i))
 
+            first_minibatch = ind == 0 and i == 0
+            last_minibatch = ind == len(self.__train_loader_names) - 1 and i == n_iter - 1
             loss, train_result = self.__session.train_step(input_data, target,
-                                                           accumulate_grad=False, with_step=True,
+                                                           accumulate_grad=accumulate_grad or not first_minibatch, with_step=last_minibatch,
                                                            return_out=True,
                                                            callbacks=self.__train_callbacks)
             self.__train_batches_count += 1

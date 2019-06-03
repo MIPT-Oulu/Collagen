@@ -1,10 +1,10 @@
 from typing import Tuple
 from torch.nn.utils import clip_grad_value_, clip_grad_norm_
 from collagen.core import Callback, Module
-from collagen.core.utils import to_tuple
+from collagen.core.utils import wrap_tuple
 
 
-class BackwardCallback(Callback):
+class UpdateBackwardParamCallback(Callback):
     def __init__(self, retain_graph=True, create_graph=False):
         super().__init__()
         self.__retain_graph = retain_graph
@@ -23,7 +23,7 @@ class ClipGradCallback(Callback):
             raise ValueError("Mode must be in {}".format(self.modes))
 
         self.__mode: str = mode
-        self.__modules: Tuple[Module] = to_tuple(modules)
+        self.__modules: Tuple[Module] = wrap_tuple(modules)
         self.__kwargs = kwargs
 
     def on_backward_end(self, *args, **kwargs):

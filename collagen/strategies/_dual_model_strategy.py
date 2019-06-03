@@ -9,7 +9,7 @@ import torch
 from tqdm import tqdm
 
 
-class GANStrategy(object):
+class DualModelStrategy(object):
     """
         Implements a part of the training loop by passing the available batches through the model.
 
@@ -21,7 +21,8 @@ class GANStrategy(object):
 
     def __init__(self, data_provider: DataProvider,
                  data_sampling_config: dict,
-                 d_trainer: Trainer, g_trainer: Trainer,
+                 m1_trainer: Trainer, m0_trainer: Trainer,
+                 model_names: Tuple[str] = ("M0", "M1"),
                  n_epochs: int or None = 100,
                  callbacks: Tuple[Callback] or Callback = None,
                  device: str or None = "cuda",
@@ -34,9 +35,9 @@ class GANStrategy(object):
             Provides batches of data to D and G models
         data_sampling_config: dict
             Configuration of the itemloader names and the corresponding numbers of samples
-        d_trainer: Trainer
+        m1_trainer: Trainer
             Trainer of Discriminative model
-        g_trainer: Trainer
+        m0_trainer: Trainer
             Trainer of Generative model
         n_epochs: int
             The number of epochs
@@ -48,7 +49,7 @@ class GANStrategy(object):
             The number of training batches of each epoch. If None, the number of batches will be auto computed
         """
         self.__stage_names = ("train", "eval")
-        self.__model_names = ("G", "D")
+        self.__model_names = model_names
         self.__n_epochs = n_epochs
         self.__callbacks = wrap_tuple(callbacks)
         self.__data_provider = data_provider
@@ -90,23 +91,21 @@ class GANStrategy(object):
 
         self.__use_cuda = torch.cuda.is_available() and device == "cuda"
         self.__device = torch.device("cuda" if self.__use_cuda and torch.cuda.is_available() else "cpu")
-        self.__trainers = {"D": d_trainer, "G": g_trainer}
+        self.__trainers = {self.model_names[0]: m0_trainer, self.model_names[1]: m1_trainer}
 
         # Default minibatch level callbacks
-        self.__default_g_callbacks_train = (RunningAverageMeter(prefix="train/G", name="loss"),
-                                            GeneratorBatchFreezer(modules=d_trainer.model))
-        self.__default_d_callbacks_train = (RunningAverageMeter(prefix="train/D", name="loss"),
-                                            DiscriminatorBatchFreezer(modules=g_trainer.model))
-        self.__default_g_callbacks_eval = RunningAverageMeter(prefix="eval/G", name="loss")
-        self.__default_d_callbacks_eval = RunningAverageMeter(prefix="eval/D", name="loss")
+        self.__default_0_callbacks_train = RunningAverageMeter(prefix=f"train/{self.model_names[0]}", name="loss")
+        self.__default_1_callbacks_train = RunningAverageMeter(prefix=f"train/{self.model_names[1]}", name="loss")
+        self.__default_0_callbacks_eval = RunningAverageMeter(prefix=f"eval/{self.model_names[0]}", name="loss")
+        self.__default_1_callbacks_eval = RunningAverageMeter(prefix=f"eval/{self.model_names[1]}", name="loss")
 
-        self.__trainers["G"].add_train_callbacks(self.__default_g_callbacks_train)
-        self.__trainers["D"].add_train_callbacks(self.__default_d_callbacks_train)
-        self.__trainers["G"].add_eval_callbacks(self.__default_g_callbacks_eval)
-        self.__trainers["D"].add_eval_callbacks(self.__default_d_callbacks_eval)
+        self.__trainers[self.model_names[0]].add_train_callbacks(self.__default_0_callbacks_train)
+        self.__trainers[self.model_names[1]].add_train_callbacks(self.__default_1_callbacks_train)
+        self.__trainers[self.model_names[0]].add_eval_callbacks(self.__default_0_callbacks_eval)
+        self.__trainers[self.model_names[1]].add_eval_callbacks(self.__default_1_callbacks_eval)
 
         # Default epoch level callbacks
-        self.__default_st_callbacks = (SamplingFreezer(modules=wrap_tuple(d_trainer.model) + wrap_tuple(g_trainer.model)),
+        self.__default_st_callbacks = (SamplingFreezer(modules=wrap_tuple(m1_trainer.model) + wrap_tuple(m0_trainer.model)),
                                        ProgressbarVisualizer(update_freq=1))
         self.__callbacks += self.__default_st_callbacks
 
@@ -123,18 +122,25 @@ class GANStrategy(object):
 
 
     def get_callbacks_by_name(self, name, stage):
-        if name == "D":
+        if name == self.model_names[1]:
             return self.__trainers[name].get_callbacks_by_stage(stage)
-        elif name == "G":
+        elif name == self.model_names[0]:
             return self.__trainers[name].get_callbacks_by_stage(stage)
         elif name == "minibatch":
-            return self.__trainers["D"].get_callbacks_by_stage(stage) + self.__trainers["G"].get_callbacks_by_stage(stage)
+            return self.__trainers[self.model_names[1]].get_callbacks_by_stage(stage) + self.__trainers[self.model_names[0]].get_callbacks_by_stage(stage)
         elif name == "batch":
             return self.__callbacks
         elif name == "all":
-            return self.__trainers["D"].get_callbacks_by_stage(stage) \
-                   + self.__trainers["G"].get_callbacks_by_stage(stage) \
+            return self.__trainers[self.model_names[1]].get_callbacks_by_stage(stage) \
+                   + self.__trainers[self.model_names[0]].get_callbacks_by_stage(stage) \
                    + self.__callbacks
+
+    @property
+    def model_name(self, i):
+        if i > len(self.__model_names) - 1:
+            raise ValueError("Out of range index for model name, expected in [0,{}] but found {}".format(len(self.model_names)-1), i)
+        else:
+            return self.__model_names[i]
 
     def run(self):
         for epoch in range(self.__n_epochs):
@@ -167,33 +173,35 @@ class GANStrategy(object):
                                                    stage=stage,
                                                    batch_i=batch_i)
 
-                    self._call_callbacks_by_name(cb_func_name='on_gan_d_batch_begin',
+                    self._call_callbacks_by_name(cb_func_name='on_m1_batch_begin',
                                                    progress_bar=progress_bar,
                                                    epoch=epoch,
                                                    n_epochs=self.__n_epochs,
                                                    stage=stage,
                                                    batch_i=batch_i)
 
-                    if "D" in self.__data_key_by_stage[stage]:
-                        getattr(self.__trainers["D"], stage)(data_key=self.__data_key_by_stage[stage]["D"],
-                                                             target_key=self.__target_key_by_stage[stage]["D"])
-                    self._call_callbacks_by_name(cb_func_name='on_gan_d_batch_end',
+                    if self.model_names[0] in self.__data_key_by_stage[stage]:
+                        getattr(self.__trainers[self.model_names[0]], stage)(data_key=self.__data_key_by_stage[stage][self.model_names[0]],
+                                                             target_key=self.__target_key_by_stage[stage][self.model_names[0]])
+
+                    self._call_callbacks_by_name(cb_func_name='on_m1_batch_end',
                                                    progress_bar=progress_bar,
                                                    epoch=epoch,
                                                    n_epochs=self.__n_epochs,
                                                    stage=stage,
                                                    batch_i=batch_i)
-                    self._call_callbacks_by_name(cb_func_name='on_gan_g_batch_begin',
+                    self._call_callbacks_by_name(cb_func_name='on_m2_batch_begin',
                                                    progress_bar=progress_bar,
                                                    epoch=epoch,
                                                    n_epochs=self.__n_epochs,
                                                    stage=stage,
                                                    batch_i=batch_i)
 
-                    if "G" in self.__data_key_by_stage[stage]:
-                        getattr(self.__trainers["G"], stage)(data_key=self.__data_key_by_stage[stage]["G"],
-                                                             target_key=self.__target_key_by_stage[stage]["G"])
-                    self._call_callbacks_by_name(cb_func_name='on_gan_d_batch_end',
+                    if self.model_names[1] in self.__data_key_by_stage[stage]:
+                        getattr(self.__trainers[self.model_names[1]], stage)(data_key=self.__data_key_by_stage[stage][self.model_names[1]],
+                                                             target_key=self.__target_key_by_stage[stage][self.model_names[1]])
+
+                    self._call_callbacks_by_name(cb_func_name='on_m2_batch_end',
                                                    progress_bar=progress_bar,
                                                    epoch=epoch,
                                                    n_epochs=self.__n_epochs,

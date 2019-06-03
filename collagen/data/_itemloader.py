@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
+import gc
 from torch.utils.data.sampler import SequentialSampler
 from torch.utils.data.dataloader import default_collate
 
@@ -169,16 +170,18 @@ class AugmentedGroupSampler(ItemLoader):
             batch_imgs = batch_imgs.to(next(self.__model.parameters()).device)
             if self.__output_type == 'logits':
                 out = self.__model(batch_imgs)
-                logits = to_cpu(out, use_numpy=False, required_grad=True)
+                # logits = to_cpu(out, use_numpy=False, required_grad=True)
+                logits = out
             elif self.__output_type == 'features':
                 out = self.__model.get_features(batch_imgs)
-                logits = to_cpu(out, use_numpy=False, required_grad=True)
+                # logits = to_cpu(out, use_numpy=False, required_grad=True)
+                logits = out
 
-            list_logits.append(logits)
+
             if self.__n_augmentations > 1:
                 logits = logits.view(self.__n_augmentations, batch_size, -1)
-            elif len(list_logits) == 1:
-                logits = list_logits[0]
+            elif self.__n_augmentations == 1:
+                pass
             else:
                 raise ValueError('Empty list!')
 
@@ -210,10 +213,13 @@ class AugmentedGroupStudentTeacherSampler(ItemLoader):
         for i in range(k):
             imgs = sampled_rows[i][self.__data_key]
             target = sampled_rows[i][self.__target_key]
+            batch_size = imgs.shape[0]
             list_logits = []
+
             with torch.no_grad():
-                te_logits = self.__te_model(imgs.to(next(self.__te_model.parameters()).device))
-                te_logits = to_cpu(te_logits, use_numpy=False, required_grad=False)
+                imgs_gpu = imgs.to(next(self.__te_model.parameters()).device)
+                te_logits = self.__te_model(imgs_gpu).detach()
+
             list_imgs = []
             for b in range(imgs.shape[0]):
                 for j in range(self.__n_augmentations):
@@ -227,19 +233,24 @@ class AugmentedGroupStudentTeacherSampler(ItemLoader):
                     aug_img = self.__augmentation(img_cpu)
                     list_imgs.append(aug_img)
 
-            batch_imgs = torch.stack(list_imgs, dim=0).to(next(self.__st_model.parameters()).device)
-            logits = to_cpu(self.__st_model(batch_imgs), use_numpy=False, required_grad=True)
-            # del batch_imgs
-            # gc.collect()
-            list_logits.append(logits)
-            if len(list_logits) > 1:
-                st_logits = np.stack(list_logits, axis=1)
-            elif len(list_logits) == 1:
-                st_logits = list_logits[0]
+            batch_imgs = torch.stack(list_imgs, dim=0)
+            batch_imgs = batch_imgs.to(next(self.__st_model.parameters()).device)
+
+            with torch.no_grad():
+                te_input = imgs.to(next(self.__st_model.parameters()).device)
+                te_logits = self.__te_model(te_input)
+
+            out = self.__st_model(batch_imgs)
+            logits = out
+
+            if self.__n_augmentations > 1:
+                logits = logits.view(self.__n_augmentations, batch_size, -1)
+            elif self.__n_augmentations == 1:
+                pass
             else:
                 raise ValueError('Empty list!')
-            # st_logits = torch.stack(list_logits, dim=0)
-            samples.append({'name': self.__name, 'st_logits': st_logits, 'te_logits': te_logits, 'data': imgs, 'target': target})
+
+            samples.append({'name': self.__name, 'st_logits': logits, 'te_logits': logits[0, :, :] , 'data': imgs, 'target': target})
         return samples
 
 
