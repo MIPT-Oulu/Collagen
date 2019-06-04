@@ -75,8 +75,11 @@ class ConfusionMatrixVisualizer(Callback):
         self._predicts += [self._labels[i] for i in to_cpu(decoded_pred_cls, use_numpy=True).tolist()]
 
     def on_epoch_end(self, *args, **kwargs):
-        fig = plot_confusion_matrix(np.array(self._corrects), np.array(self._predicts), labels=self._labels, normalize=self._normalize)
-        self._writer.add_figure(self._tag, fig, global_step=self.__epoch)
+        if len(self._corrects) != len(self._predicts):
+            raise ValueError('Num of predictions and groundtruths must match, but found {} and {}'.format(len(self._predicts), len(self._corrects)))
+        elif len(self._corrects) > 0:
+            fig = plot_confusion_matrix(np.array(self._corrects), np.array(self._predicts), labels=self._labels, normalize=self._normalize)
+            self._writer.add_figure(self._tag, fig, global_step=self.__epoch)
 
 
 class ProgressbarVisualizer(Callback):
