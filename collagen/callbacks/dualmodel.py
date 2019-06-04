@@ -43,3 +43,16 @@ class M2BatchFreezer(DualModelCallback):
 
     def on_m2_batch_end(self, *args, **kwargs):
         freeze_modules(self.__modules, invert=True)
+
+class UpdateEMA(Callback):
+    def __init__(self, st_model, te_model, decay=0.97):
+        super().__init__(ctype="update_weight")
+        self.__st_model = st_model
+        self.__te_model = te_model
+        self.__alpha = decay
+
+    def on_batch_end(self, epoch, *args, **kwargs):
+        # Use the true average until the exponential average is more correct
+        alpha = min(1 - 1 / (epoch + 1), self.__alpha)
+        for ema_param, param in zip(self.__te_model.parameters(), self.__st_model.parameters()):
+            ema_param.data.mul_(alpha).add_(1 - alpha, param.data)

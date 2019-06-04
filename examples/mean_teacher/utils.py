@@ -13,7 +13,7 @@ import solt.transforms as slt
 def cond_accuracy_meter(target, output):
     return target['name'].startswith('l')
 
-def parse_target_accuracy_meter(target):
+def parse_target(target):
     if target['name'].startswith('l'):
         return target['target']
     else:

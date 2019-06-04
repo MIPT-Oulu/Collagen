@@ -12,8 +12,9 @@ from collagen.logging import MeterLogging
 from collagen.losses.ssl import MTLoss
 from collagen.callbacks.visualizer import ProgressbarVisualizer
 from collagen.metrics import RunningAverageMeter, AccuracyMeter, KappaMeter
+from collagen.callbacks.dualmodel import UpdateEMA
 
-from examples.mean_teacher.utils import init_args, parse_item, init_transforms, parse_target_accuracy_meter, parse_class
+from examples.mean_teacher.utils import init_args, parse_item, init_transforms, parse_target, parse_class
 from examples.mean_teacher.utils import SSConfusionMatrixVisualizer, cond_accuracy_meter
 from examples.mean_teacher.networks import Model01
 
@@ -65,63 +66,58 @@ if __name__ == "__main__":
                                      parse_item=parse_item, bs=args.bs, num_threads=args.num_threads,
                                      output_type='logits')
     # Setting up the callbacks
-    stra_callbacks = (MeterLogging(writer=summary_writer), ProgressbarVisualizer())
+    stra_cbs = (MeterLogging(writer=summary_writer), ProgressbarVisualizer())
 
     # Trainers
-    st_train_callbacks = (RunningAverageMeter(prefix='train/S', name='loss_cls'),
+    st_train_cbs = (RunningAverageMeter(prefix='train/S', name='loss_cls'),
                           RunningAverageMeter(prefix='train/S', name='loss_s_t_cons'),
                           RunningAverageMeter(prefix='train/S', name='loss_aug_cons'),
-                          AccuracyMeter(prefix="train/S", name="acc", parse_target=parse_target_accuracy_meter,
-                                        cond=cond_accuracy_meter),
-                          KappaMeter(prefix='train/S', name='kappa', parse_target=parse_class,
-                                     parse_output=parse_class,
+                          AccuracyMeter(prefix="train/S", name="acc", parse_target=parse_target, cond=cond_accuracy_meter),
+                          KappaMeter(prefix='train/S', name='kappa', parse_target=parse_class, parse_output=parse_class,
                                      cond=cond_accuracy_meter),
                           SSConfusionMatrixVisualizer(writer=summary_writer, cond=cond_accuracy_meter,
                                                       parse_class=parse_class,
                                                       labels=[str(i) for i in range(10)],
                                                       tag="train/S/confusion_matrix"))
 
-    st_eval_callbacks = (RunningAverageMeter(prefix='eval/S', name='loss_cls'),
+    st_eval_cbs = (RunningAverageMeter(prefix='eval/S', name='loss_cls'),
                          RunningAverageMeter(prefix='eval/S', name='loss_s_t_cons'),
                          RunningAverageMeter(prefix='eval/S', name='loss_aug_cons'),
-                         AccuracyMeter(prefix="eval/S", name="acc", parse_target=parse_target_accuracy_meter,
-                                       cond=cond_accuracy_meter),
-                         KappaMeter(prefix='eval/S', name='kappa', parse_target=parse_class,
-                                    parse_output=parse_class,
+                         AccuracyMeter(prefix="eval/S", name="acc", parse_target=parse_target, cond=cond_accuracy_meter),
+                         KappaMeter(prefix='eval/S', name='kappa', parse_target=parse_class, parse_output=parse_class,
                                     cond=cond_accuracy_meter),
                          SSConfusionMatrixVisualizer(writer=summary_writer, cond=cond_accuracy_meter,
-                                                     parse_class=parse_class,
-                                                     labels=[str(i) for i in range(10)],
+                                                     parse_class=parse_class, labels=[str(i) for i in range(10)],
                                                      tag="eval/S/confusion_matrix"))
 
-    te_eval_callbacks = (RunningAverageMeter(prefix='eval/T', name='loss_cls'),
-                         AccuracyMeter(prefix="eval/T", name="acc", parse_target=parse_target_accuracy_meter,
-                                       cond=cond_accuracy_meter),
+    te_train_cbs = (UpdateEMA(st_model=st_network, te_model=te_network),)
+
+    te_eval_cbs = (RunningAverageMeter(prefix='eval/T', name='loss_cls'),
+                         AccuracyMeter(prefix="eval/T", name="acc", parse_target=parse_target, cond=cond_accuracy_meter),
                          KappaMeter(prefix='eval/T', name='kappa', parse_target=parse_class, parse_output=parse_class,
                                     cond=cond_accuracy_meter),
                          SSConfusionMatrixVisualizer(writer=summary_writer, cond=cond_accuracy_meter,
-                                                     parse_class=parse_class,
-                                                     labels=[str(i) for i in range(10)],
+                                                     parse_class=parse_class, labels=[str(i) for i in range(10)],
                                                      tag="eval/T/confusion_matrix"))
 
     st_trainer = Trainer(data_provider=data_provider,
                          train_loader_names=tuple(sampling_config["train"]["data_provider"]["S"].keys()),
                          val_loader_names=tuple(sampling_config["eval"]["data_provider"]["S"].keys()),
                          module=st_network, optimizer=st_optim, loss=st_crit,
-                         train_callbacks=st_train_callbacks, val_callbacks=st_eval_callbacks)
+                         train_callbacks=st_train_cbs, val_callbacks=st_eval_cbs)
 
     te_trainer = Trainer(data_provider=data_provider,
                          train_loader_names=None,
                          val_loader_names=tuple(sampling_config["eval"]["data_provider"]["T"].keys()),
                          module=te_network, optimizer=te_optim, loss=te_crit,
-                         train_callbacks=None, val_callbacks=te_eval_callbacks)
+                         train_callbacks=None, val_callbacks=te_eval_cbs)
 
     # Strategy
     mt_strategy = DualModelStrategy(data_provider=data_provider, data_sampling_config=sampling_config,
                                     model_names=("S", "T"),
                                     m0_trainer=st_trainer, m1_trainer=te_trainer,
                                     n_epochs=args.n_epochs,
-                                    callbacks=stra_callbacks,
+                                    callbacks=stra_cbs,
                                     device=args.device)
 
     mt_strategy.run()
