@@ -1,6 +1,6 @@
 train:
   data_provider:
-    student:
+    S:
       unlabeled_train_st:
         cate: AugmentedGroupSampler
         num_samples: 1
@@ -37,7 +37,7 @@ train:
 
 eval:
   data_provider:
-    student:
+    S:
       unlabeled_eval_st:
         cate: AugmentedGroupSampler
         num_samples: 1
@@ -56,7 +56,7 @@ eval:
           - "st_logits"
           - "te_logits"
           - "name"
-    teacher:
+    T:
       labeled_eval_te:
         cate: ItemLoader
         num_samples: 1
