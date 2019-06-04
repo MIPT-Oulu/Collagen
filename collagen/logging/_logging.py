@@ -25,7 +25,7 @@ class MeterLogging(Logging):
 
     def on_epoch_end(self, epoch, strategy, stage, **kwargs):
         for cb in strategy.get_callbacks_by_name("minibatch", stage=stage):
-            if cb.ctype == "meter":
+            if cb.ctype == "meter" and cb.current() is not None:
                 self.__summary_writer.add_scalar(tag=cb.desc, scalar_value=cb.current(), global_step=epoch)
 
 
