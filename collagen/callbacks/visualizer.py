@@ -110,7 +110,7 @@ class ProgressbarVisualizer(Callback):
             list_metrics_desc = []
             postfix_progress = OrderedDict()
             for cb in strategy.get_callbacks_by_name("minibatch", stage=stage):
-                if cb.ctype == "meter":
+                if cb.ctype == "meter" and cb.current() is not None:
                     list_metrics_desc.append(str(cb))
                     postfix_progress[cb.desc] = f'{cb.current():.03f}'
 

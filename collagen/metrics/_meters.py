@@ -93,7 +93,7 @@ class RunningAverageMeter(Meter):
 
     def current(self):
         if self.__count == 0:
-            return self.__value
+            return None
         return self.__value / self.__count
 
 
@@ -135,9 +135,9 @@ class AccuracyMeter(Meter):
     def current(self):
         if self.__data_count > 0:
             acc = self.__correct_count / self.__data_count
+            return to_cpu(acc, use_numpy=True)
         else:
-            acc = 0.0
-        return to_cpu(acc, use_numpy=True)
+            return None
 
 
 class BalancedAccuracyMeter(Meter):
@@ -181,10 +181,9 @@ class BalancedAccuracyMeter(Meter):
 
     def current(self):
         if len(self.__corrects) > 0:
-            acc = balanced_accuracy_score(y_true=self.__corrects, y_pred=self.__preds)
+            return balanced_accuracy_score(y_true=self.__corrects, y_pred=self.__preds)
         else:
-            acc = 0.0
-        return acc
+            return None
 
 
 class AccuracyThresholdMeter(Meter):
@@ -223,9 +222,9 @@ class AccuracyThresholdMeter(Meter):
     def current(self):
         if self.__data_count > 0:
             acc = self.__correct_count / self.__data_count
+            return to_cpu(acc, use_numpy=True)
         else:
-            acc = 0.0
-        return to_cpu(acc, use_numpy=True)
+            return None
 
 
 class SSAccuracyMeter(Meter):
@@ -277,9 +276,9 @@ class SSAccuracyMeter(Meter):
     def current(self):
         if self.__data_count > 0:
             acc = self.__correct_count / self.__data_count
+            to_cpu(acc, use_numpy=True)
         else:
-            acc = 0.0
-        return to_cpu(acc, use_numpy=True)
+            return None
 
 
 class SSBalancedAccuracyMeter(Meter):
@@ -326,10 +325,9 @@ class SSBalancedAccuracyMeter(Meter):
 
     def current(self):
         if len(self.__corrects) > 0:
-            acc = balanced_accuracy_score(y_true=self.__corrects, y_pred=self.__preds)
+            return balanced_accuracy_score(y_true=self.__corrects, y_pred=self.__preds)
         else:
-            acc = 0.0
-        return acc
+            return None
 
 
 class SSValidityMeter(Meter):
@@ -377,8 +375,6 @@ class SSValidityMeter(Meter):
         fp = valid.sum()
         self.__correct_count += fp
         self.__data_count += n
-        acc = self.__correct_count/self.__data_count
-        acc1 = acc
 
     def on_epoch_end(self, epoch, n_epochs, *args, **kwargs):
         self.__accuracy = self.current()
@@ -386,9 +382,9 @@ class SSValidityMeter(Meter):
     def current(self):
         if self.__data_count > 0:
             acc = self.__correct_count / self.__data_count
+            return to_cpu(acc, use_numpy=True)
         else:
-            acc = 0.0
-        return to_cpu(acc, use_numpy=True)
+            return None
 
 
 class KappaMeter(Meter):
@@ -403,11 +399,6 @@ class KappaMeter(Meter):
         self.__parse_target = Meter.default_parse_target if parse_target is None else parse_target
         self.__parse_output = Meter.default_parse_output if parse_output is None else parse_output
         self.__cond = Meter.default_cond if cond is None else cond
-        # if parse_classes is None:
-        #     self.__parse_classes = self._default_parse_classes
-        # else:
-        #     self.__parse_classes = parse_classes
-
 
     def on_epoch_begin(self, epoch, **kwargs):
         self.__predicts = []
@@ -429,5 +420,7 @@ class KappaMeter(Meter):
         if len(self.__corrects) != len(self.__predicts):
             raise ValueError("Predicts and corrects must match, but got {} vs {}".format(len(self.__corrects),
                                                                                          len(self.__predicts)))
-        kappa_score = cohen_kappa_score(self.__corrects, self.__predicts, weights=self.__weight_type)
-        return kappa_score
+        elif len(self.__corrects) == 0:
+            return None
+        else:
+            return cohen_kappa_score(self.__corrects, self.__predicts, weights=self.__weight_type)
