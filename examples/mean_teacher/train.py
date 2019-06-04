@@ -39,7 +39,7 @@ if __name__ == "__main__":
 
     n_folds = 5
     splitter = SSFoldSplit(train_ds, n_ss_folds=3, n_folds=n_folds, target_col="target", random_state=args.seed,
-                           labeled_train_size_per_class=400, unlabeled_train_size_per_class=2000,
+                           labeled_train_size_per_class=400, unlabeled_train_size_per_class=5000,
                            equal_target=True, equal_unlabeled_target=True, shuffle=True, unlabeled_target_col='target')
 
     train_labeled_data, val_labeled_data, train_unlabeled_data, val_unlabeled_data = next(splitter)
@@ -49,12 +49,12 @@ if __name__ == "__main__":
     # Initializing Discriminator
     te_network = Model01(nc=n_channels, ndf=args.n_features).to(device)
     te_optim = optim.Adam(te_network.group_parameters(), lr=args.lr, betas=(args.beta1, 0.999))
-    te_crit = MTLoss(alpha_cls=1.0, alpha_st_cons=1.0, alpha_aug_cons=1.0).to(device)
+    te_crit = MTLoss(alpha_cls=1.0, alpha_st_cons=1.0, alpha_aug_cons=.1).to(device)
 
     # Initializing Generator
     st_network = Model01(nc=n_channels, ndf=args.n_features).to(device)
     st_optim = optim.Adam(st_network.group_parameters(), lr=args.lr, betas=(args.beta1, 0.999))
-    st_crit = MTLoss(alpha_cls=1.0, alpha_st_cons=1.0, alpha_aug_cons=1.0).to(device)
+    st_crit = MTLoss(alpha_cls=1.0, alpha_st_cons=1.0, alpha_aug_cons=.1).to(device)
 
     with open("settings.yml", "r") as f:
         sampling_config = yaml.load(f)
@@ -109,11 +109,8 @@ if __name__ == "__main__":
                          train_callbacks=te_train_cbs, val_callbacks=te_eval_cbs)
 
     # Strategy
-    mt_strategy = DualModelStrategy(data_provider=data_provider, data_sampling_config=sampling_config,
-                                    model_names=("S", "T"),
-                                    m0_trainer=st_trainer, m1_trainer=te_trainer,
-                                    n_epochs=args.n_epochs,
-                                    callbacks=stra_cbs,
-                                    device=args.device)
+    mt_strategy = DualModelStrategy(data_provider=data_provider, data_sampling_config=sampling_config, model_names=("S", "T"),
+                                    m0_trainer=st_trainer, m1_trainer=te_trainer, n_epochs=args.n_epochs,
+                                    n_training_batches=args.n_training_batches, callbacks=stra_cbs, device=args.device)
 
     mt_strategy.run()
