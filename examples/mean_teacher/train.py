@@ -49,12 +49,12 @@ if __name__ == "__main__":
     # Initializing Discriminator
     te_network = Model01(nc=n_channels, ndf=args.n_features).to(device)
     te_optim = optim.Adam(te_network.group_parameters(), lr=args.lr, betas=(args.beta1, 0.999))
-    te_crit = MTLoss(alpha_cls=0.6, alpha_st_cons=0.2, alpha_aug_cons=0.2).to(device)
+    te_crit = MTLoss(alpha_cls=1.0, alpha_st_cons=1.0, alpha_aug_cons=1.0).to(device)
 
     # Initializing Generator
     st_network = Model01(nc=n_channels, ndf=args.n_features).to(device)
     st_optim = optim.Adam(st_network.group_parameters(), lr=args.lr, betas=(args.beta1, 0.999))
-    st_crit = MTLoss(alpha_cls=0.6, alpha_st_cons=0.2, alpha_aug_cons=0.2).to(device)
+    st_crit = MTLoss(alpha_cls=1.0, alpha_st_cons=1.0, alpha_aug_cons=1.0).to(device)
 
     with open("settings.yml", "r") as f:
         sampling_config = yaml.load(f)
@@ -70,35 +70,31 @@ if __name__ == "__main__":
 
     # Trainers
     st_train_cbs = (RunningAverageMeter(prefix='train/S', name='loss_cls'),
-                          RunningAverageMeter(prefix='train/S', name='loss_s_t_cons'),
-                          RunningAverageMeter(prefix='train/S', name='loss_aug_cons'),
-                          AccuracyMeter(prefix="train/S", name="acc", parse_target=parse_target, cond=cond_accuracy_meter),
-                          KappaMeter(prefix='train/S', name='kappa', parse_target=parse_class, parse_output=parse_class,
-                                     cond=cond_accuracy_meter),
-                          SSConfusionMatrixVisualizer(writer=summary_writer, cond=cond_accuracy_meter,
-                                                      parse_class=parse_class,
-                                                      labels=[str(i) for i in range(10)],
-                                                      tag="train/S/confusion_matrix"))
+                    RunningAverageMeter(prefix='train/S', name='loss_s_t_cons'),
+                    RunningAverageMeter(prefix='train/S', name='loss_aug_cons'),
+                    AccuracyMeter(prefix="train/S", name="acc", parse_target=parse_target, cond=cond_accuracy_meter),
+                    KappaMeter(prefix='train/S', name='kappa', parse_target=parse_class, parse_output=parse_class,
+                               cond=cond_accuracy_meter),
+                    SSConfusionMatrixVisualizer(writer=summary_writer, cond=cond_accuracy_meter, parse_class=parse_class,
+                                                labels=[str(i) for i in range(10)], tag="train/S/confusion_matrix"))
 
     st_eval_cbs = (RunningAverageMeter(prefix='eval/S', name='loss_cls'),
-                         RunningAverageMeter(prefix='eval/S', name='loss_s_t_cons'),
-                         RunningAverageMeter(prefix='eval/S', name='loss_aug_cons'),
-                         AccuracyMeter(prefix="eval/S", name="acc", parse_target=parse_target, cond=cond_accuracy_meter),
-                         KappaMeter(prefix='eval/S', name='kappa', parse_target=parse_class, parse_output=parse_class,
-                                    cond=cond_accuracy_meter),
-                         SSConfusionMatrixVisualizer(writer=summary_writer, cond=cond_accuracy_meter,
-                                                     parse_class=parse_class, labels=[str(i) for i in range(10)],
-                                                     tag="eval/S/confusion_matrix"))
+                   RunningAverageMeter(prefix='eval/S', name='loss_s_t_cons'),
+                   RunningAverageMeter(prefix='eval/S', name='loss_aug_cons'),
+                   AccuracyMeter(prefix="eval/S", name="acc", parse_target=parse_target, cond=cond_accuracy_meter),
+                   KappaMeter(prefix='eval/S', name='kappa', parse_target=parse_class, parse_output=parse_class,
+                              cond=cond_accuracy_meter),
+                   SSConfusionMatrixVisualizer(writer=summary_writer, cond=cond_accuracy_meter, parse_class=parse_class,
+                                               labels=[str(i) for i in range(10)], tag="eval/S/confusion_matrix"))
 
     te_train_cbs = (UpdateEMA(st_model=st_network, te_model=te_network),)
 
     te_eval_cbs = (RunningAverageMeter(prefix='eval/T', name='loss_cls'),
-                         AccuracyMeter(prefix="eval/T", name="acc", parse_target=parse_target, cond=cond_accuracy_meter),
-                         KappaMeter(prefix='eval/T', name='kappa', parse_target=parse_class, parse_output=parse_class,
-                                    cond=cond_accuracy_meter),
-                         SSConfusionMatrixVisualizer(writer=summary_writer, cond=cond_accuracy_meter,
-                                                     parse_class=parse_class, labels=[str(i) for i in range(10)],
-                                                     tag="eval/T/confusion_matrix"))
+                   AccuracyMeter(prefix="eval/T", name="acc", parse_target=parse_target, cond=cond_accuracy_meter),
+                   KappaMeter(prefix='eval/T', name='kappa', parse_target=parse_class, parse_output=parse_class,
+                              cond=cond_accuracy_meter),
+                   SSConfusionMatrixVisualizer(writer=summary_writer, cond=cond_accuracy_meter, parse_class=parse_class,
+                                               labels=[str(i) for i in range(10)], tag="eval/T/confusion_matrix"))
 
     st_trainer = Trainer(data_provider=data_provider,
                          train_loader_names=tuple(sampling_config["train"]["data_provider"]["S"].keys()),
@@ -110,7 +106,7 @@ if __name__ == "__main__":
                          train_loader_names=None,
                          val_loader_names=tuple(sampling_config["eval"]["data_provider"]["T"].keys()),
                          module=te_network, optimizer=te_optim, loss=te_crit,
-                         train_callbacks=None, val_callbacks=te_eval_cbs)
+                         train_callbacks=te_train_cbs, val_callbacks=te_eval_cbs)
 
     # Strategy
     mt_strategy = DualModelStrategy(data_provider=data_provider, data_sampling_config=sampling_config,

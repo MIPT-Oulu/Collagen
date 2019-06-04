@@ -96,6 +96,7 @@ def mt_data_provider(st_model, te_model, train_labeled_data, train_unlabeled_dat
                                                              transform=transforms[1],
                                                              parse_item_cb=parse_item,
                                                              batch_size=bs, num_workers=num_threads,
+                                                             detach=True,
                                                              shuffle=True)
 
     item_loaders["unlabeled_train_te"] = AugmentedGroupSampler(root=root, name='u_te',
@@ -106,6 +107,7 @@ def mt_data_provider(st_model, te_model, train_labeled_data, train_unlabeled_dat
                                                                transform=transforms[1],
                                                                parse_item_cb=parse_item,
                                                                batch_size=bs, num_workers=num_threads,
+                                                               detach=True,
                                                                shuffle=True)
 
     # Eval

@@ -135,7 +135,7 @@ class AugmentedGroupSampler(ItemLoader):
                  root: str or None = None, batch_size: int = 1, num_workers: int = 0, shuffle: bool = False,
                  pin_memory: bool = False, collate_fn: callable = default_collate, transform: callable or None = None,
                  sampler: torch.utils.data.sampler.Sampler or None = None, batch_sampler=None,
-                 drop_last: bool = False, timeout: int = 0):
+                 drop_last: bool = False, timeout: int = 0, detach: bool = False):
         super().__init__(meta_data=meta_data, parse_item_cb=parse_item_cb, root=root, batch_size=batch_size,
                          num_workers=num_workers, shuffle=shuffle, pin_memory=pin_memory, collate_fn=collate_fn,
                          transform=transform, sampler=sampler, batch_sampler=batch_sampler, drop_last=drop_last, timeout=timeout)
@@ -146,6 +146,7 @@ class AugmentedGroupSampler(ItemLoader):
         self.__data_key = data_key
         self.__target_key = target_key
         self.__output_type = output_type
+        self.__detach = detach
 
     def __len__(self):
         return super().__len__()
@@ -191,7 +192,10 @@ class AugmentedGroupSampler(ItemLoader):
             else:
                 raise ValueError('Empty list!')
 
-            samples.append({'name': self.__name, 'logits': logits, 'data': imgs, 'target': target})
+            if self.__detach:
+                logits = logits.detach()
+
+            samples.append({'name': self.__name, 'logits': logits , 'data': imgs, 'target': target})
         return samples
 
 

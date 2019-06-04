@@ -53,7 +53,7 @@ class MTLoss(nn.Module):
             target_cls = target['target'].type(torch.int64)
             st_logits = target['logits']
 
-            loss_aug_cons = self.softmax_mse_loss(st_logits, pred) / minibatch_size
+            loss_aug_cons = self.symmetric_mse_loss(st_logits, pred) / minibatch_size
             loss_cls = self.__loss_cls(pred, target_cls) / minibatch_size
 
             self.__losses['loss_cls'] = loss_cls
@@ -63,7 +63,7 @@ class MTLoss(nn.Module):
         elif target['name'] == 'u_st':
             st_logits = target['logits']
 
-            loss_aug_cons = self.softmax_mse_loss(st_logits, pred) / minibatch_size
+            loss_aug_cons = self.symmetric_mse_loss(st_logits, pred) / minibatch_size
 
             self.__losses['loss_cls'] = None
             self.__losses['loss_s_t_cons'] = None
@@ -74,34 +74,22 @@ class MTLoss(nn.Module):
             target_cls = target['target'].type(torch.int64)
 
             loss_cls = self.__loss_cls(pred, target_cls) / minibatch_size
-            loss_st_cons = self.symmetric_mse_loss(te_logits, pred) / minibatch_size
+            loss_st_cons = self.softmax_mse_loss(te_logits, pred) / minibatch_size
 
             self.__losses['loss_cls'] = loss_cls
             self.__losses['loss_s_t_cons'] = self.get_current_consistency_weight() * loss_st_cons
             self.__losses['loss_aug_cons'] = None
             _loss = self.__losses['loss_s_t_cons'] + self.__losses['loss_cls']
-            self.__losses['loss'] = _loss
 
         elif target['name'] == 'u_te':
             te_logits = target['logits']
 
-            loss_st_cons = self.symmetric_mse_loss(te_logits, pred) / minibatch_size
+            loss_st_cons = self.softmax_mse_loss(te_logits, pred) / minibatch_size
 
             self.__losses['loss_cls'] = None
             self.__losses['loss_s_t_cons'] = self.get_current_consistency_weight() * loss_st_cons
             self.__losses['loss_aug_cons'] = None
             _loss = self.__losses['loss_s_t_cons']
-        elif target['name'] == 'l_te':
-            target_cls = target['target'].type(torch.int64)
-            te_logits = target['logits']
-
-            loss_cls = self.__loss_cls(pred, target_cls) / minibatch_size
-            loss_st_cons = self.symmetric_mse_loss(te_logits, pred) / minibatch_size
-
-            self.__losses['loss_cls'] = loss_cls
-            self.__losses['loss_s_t_cons'] = self.get_current_consistency_weight() * loss_st_cons
-            self.__losses['loss_aug_cons'] = None
-            _loss = self.__losses['loss_st_cons'] + self.__losses['loss_cls']
         elif target['name'] == 'l_te_eval':
             target_cls = target['target'].type(torch.int64)
 

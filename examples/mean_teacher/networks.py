@@ -12,54 +12,6 @@ def weights_init(m):
         m.weight.data.normal_(1.0, 0.02)
         m.bias.data.fill_(0)
 
-class Discriminator(Module):
-    def __init__(self, nc=1, ndf=64, n_cls=10, ngpu=1, drop_rate=0.35):
-        super(Discriminator, self).__init__()
-        # input is (nc) x 32 x 32
-        self.__ngpu = ngpu
-        self.__drop_rate = drop_rate
-
-        self.dropout = nn.Dropout(p=self.__drop_rate)
-        # input is (nc) x 64 x 64
-        self._layer1 = nn.Sequential(nn.Conv2d(nc, ndf, 4, 2, 1, bias=False),
-                                     nn.LeakyReLU(0.2, inplace=True))  # state size. (ndf) x 32 x 32
-
-        self._layer2 = nn.Sequential(nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False),
-                                     nn.BatchNorm2d(ndf * 2),
-                                     nn.LeakyReLU(0.2, inplace=True))  # state size. (ndf*2) x 16 x 16
-
-        self._layer3 = nn.Sequential(nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1, bias=False),
-                                     nn.BatchNorm2d(ndf * 4),
-                                     nn.LeakyReLU(0.2, inplace=True))  # state size. (ndf*4) x 8 x 8
-
-        self._layer4 = nn.Sequential(nn.Conv2d(ndf * 4, ndf * 8, 4, 2, 1, bias=False),
-                                     nn.BatchNorm2d(ndf * 8),
-                                     nn.LeakyReLU(0.2, inplace=True))  # state size. (ndf*4) x 4 x 4
-
-        self.main_flow = nn.Sequential(OrderedDict([("conv_block1", self._layer1),
-                                                    # ("dropout1", self.dropout),
-                                                    ("conv_block2", self._layer2),
-                                                    # ("dropout2", self.dropout),
-                                                    ("conv_block3", self._layer3),
-                                                    # ("dropout3", self.dropout),
-                                                    ("conv_block4", self._layer4),
-                                                    # ("dropout3", self.dropout),
-                                                    # ("conv_final", self._layer5)
-                                                    ]))
-
-        self.classify = nn.Sequential(nn.Conv2d(ndf * 8, n_cls, 4, 1, 0, bias=False),
-                                      nn.Softmax(dim=1))  # state size. n_clsx1x1
-
-        self.apply(weights_init)
-
-    def get_features(self, x):
-        f = self.main_flow(x)
-        return f
-
-    def forward(self, x):
-        o3 = self.main_flow(x)
-        classifier = self.classify(o3).squeeze(-1).squeeze(-1)
-        return classifier
 
 class Model01(Module):
     def __init__(self, nc=1, ndf=64, n_cls=10, ngpu=1, drop_rate=0.5):
@@ -142,5 +94,4 @@ class Model01(Module):
         f = self.main_flow(x)
         f = self._gap(f)
         classifier = self._classifier(f).squeeze(-1).squeeze(-1)
-        classifier = F.softmax(classifier, dim=-1)
         return classifier
