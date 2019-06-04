@@ -8,12 +8,12 @@ from collagen.data.utils import get_cifar10, get_mnist
 from collagen.data.data_provider import mt_data_provider
 from collagen.core.utils import auto_detect_device
 from collagen.strategies import DualModelStrategy
-from collagen.logging import MeterLogging, BatchLRLogging, EpochLRLogging
+from collagen.logging import MeterLogging, EpochLRLogging
 from collagen.callbacks.lr_scheduler import SingleRampUpDownScheduler, CycleRampUpDownScheduler
 from collagen.losses.ssl import MTLoss
 from collagen.callbacks.visualizer import ProgressbarVisualizer
 from collagen.metrics import RunningAverageMeter, AccuracyMeter, KappaMeter
-from collagen.callbacks.dualmodel import UpdateEMA
+from collagen.callbacks.swa import UpdateSWA
 
 from examples.mean_teacher.utils import init_args, parse_item, init_transforms, parse_target, parse_class
 from examples.mean_teacher.utils import SSConfusionMatrixVisualizer, cond_accuracy_meter
@@ -95,7 +95,8 @@ if __name__ == "__main__":
                    SSConfusionMatrixVisualizer(writer=summary_writer, cond=cond_accuracy_meter, parse_class=parse_class,
                                                labels=[str(i) for i in range(10)], tag="eval/S/confusion_matrix"))
 
-    te_train_cbs = (UpdateEMA(st_model=st_network, te_model=te_network),)
+    te_train_cbs = UpdateSWA(swa_model=te_network, student_model=st_network, start_cycle_epoch=args.start_cycle_epoch,
+                              cycle_interval=args.cycle_interval),
 
     te_eval_cbs = (RunningAverageMeter(prefix='eval/T', name='loss_cls'),
                    AccuracyMeter(prefix="eval/T", name="acc", parse_target=parse_target, cond=cond_accuracy_meter),
@@ -117,8 +118,8 @@ if __name__ == "__main__":
                          train_callbacks=te_train_cbs, val_callbacks=te_eval_cbs)
 
     # Strategy
-    mt_strategy = DualModelStrategy(data_provider=data_provider, data_sampling_config=sampling_config, model_names=("S", "T"),
+    swa_strategy = DualModelStrategy(data_provider=data_provider, data_sampling_config=sampling_config, model_names=("S", "T"),
                                     m0_trainer=st_trainer, m1_trainer=te_trainer, n_epochs=args.n_epochs,
                                     n_training_batches=args.n_training_batches, callbacks=stra_cbs, device=args.device)
 
-    mt_strategy.run()
+    swa_strategy.run()

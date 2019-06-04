@@ -1,0 +1,64 @@
+train:
+  data_provider:
+    S:
+      unlabeled_train_st:
+        cate: AugmentedGroupSampler
+        num_samples: 1
+        data_key: "data"
+        target_key:
+          - "logits"
+          - "name"
+
+      labeled_train_st:
+        cate: AugmentedGroupSampler
+        num_samples: 1
+        data_key: "data"
+        target_key:
+          - "target"
+          - "logits"
+          - "name"
+
+      unlabeled_train_te:
+        cate: AugmentedGroupSampler
+        num_samples: 1
+        data_key: "data"
+        target_key:
+          - "logits"
+          - "name"
+
+      labeled_train_te:
+        cate: AugmentedGroupSampler
+        num_samples: 1
+        data_key: "data"
+        target_key:
+          - "target"
+          - "logits"
+          - "name"
+
+eval:
+  data_provider:
+    S:
+      unlabeled_eval_st:
+        cate: AugmentedGroupSampler
+        num_samples: 1
+        data_key: "data"
+        target_key:
+          - "logits"
+          - "name"
+
+      labeled_eval_st:
+        cate: AugmentedGroupSampler
+        num_samples: 1
+        data_key: "data"
+        target_key:
+          - "target"
+          - "logits"
+          - "name"
+    T:
+      labeled_eval_te:
+        cate: ItemLoader
+        num_samples: 1
+        data_key: "data"
+        target_key:
+          - "target"
+          - "name"

@@ -42,7 +42,7 @@ class SingleRampUpDownScheduler(LRScheduler):
         self.__lr = lr
         self.__lr_rampdown_epochs = lr_rampdown_epochs
 
-    def on_batch_begin(self, epoch, n_epochs, batch_i, n_batches, *args, **kwargs):
+    def on_batch_begin(self, epoch, batch_i, n_batches, *args, **kwargs):
         epoch = epoch + batch_i / n_batches
 
         # LR warm-up to handle large minibatch sizes from https://arxiv.org/abs/1706.02677
@@ -50,7 +50,6 @@ class SingleRampUpDownScheduler(LRScheduler):
 
         # Cosine LR rampdown from https://arxiv.org/abs/1608.03983 (but one cycle only)
         if self.__lr_rampdown_epochs:
-            assert self.__lr_rampdown_epochs >= n_epochs
             lr *= ramps.cosine_rampdown(epoch, self.__lr_rampdown_epochs)
 
         for param_group in self.__optim.param_groups:
@@ -58,8 +57,8 @@ class SingleRampUpDownScheduler(LRScheduler):
 
 
 class CycleRampUpDownScheduler(LRScheduler):
-    def __init__(self, optimizer, initial_lr, lr_rampup, lr, lr_rampdown_epochs, constant_lr, start_cycle_epoch,
-                 constant_lr_epoch, cycle_rampdown_epochs, cycle_interval, name='cycle_rampupdown_lrs'):
+    def __init__(self, optimizer, initial_lr, lr_rampup, lr, lr_rampdown_epochs, start_cycle_epoch,
+                 cycle_rampdown_epochs, cycle_interval, constant_lr_epoch = 10, constant_lr = None, name='cycle_rampupdown_lrs'):
         super().__init__(name=name)
         self.__optim = optimizer
         self.__initial_lr = initial_lr
