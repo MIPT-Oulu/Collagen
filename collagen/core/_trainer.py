@@ -293,7 +293,6 @@ class Trainer(object):
                     else:
                         raise ValueError('Not found key {} in sampled batch'.format(key_i))
 
-            # target = cast_tensor(batch[key_i], cast_target)
             loss, eval_result = self.__session.eval_step(input_data,
                                                          target,
                                                          return_out=True,

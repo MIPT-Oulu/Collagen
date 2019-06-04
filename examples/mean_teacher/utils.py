@@ -11,16 +11,16 @@ import solt.transforms as slt
 
 
 def cond_accuracy_meter(target, output):
-    return target['name'] == 'l'
+    return target['name'].startswith('l')
 
 def parse_target_accuracy_meter(target):
-    if target['name'] == 'l':
+    if target['name'].startswith('l'):
         return target['target']
     else:
         return None
 
 def parse_class(output):
-    if isinstance(output, dict) and output['name'] == 'l':
+    if isinstance(output, dict) and output['name'].startswith('l'):
         output = output['target']
     elif isinstance(output, Tensor):
         pass
@@ -52,15 +52,6 @@ class SSConfusionMatrixVisualizer(ConfusionMatrixVisualizer):
                 # decoded_pred_cls = pred_cls.argmax(dim=-1)
                 self._corrects += [self._labels[i] for i in to_cpu(target_cls, use_numpy=True).tolist()]
                 self._predicts += [self._labels[i] for i in to_cpu(pred_cls, use_numpy=True).tolist()]
-
-def cond_accuracy_meter(target, output):
-    return target['name'] == 'l'
-
-def parse_target_accuracy_meter(target):
-    if target['name'] == 'l':
-        return target['target']
-    else:
-        return None
 
 
 def wrap2solt(inp):

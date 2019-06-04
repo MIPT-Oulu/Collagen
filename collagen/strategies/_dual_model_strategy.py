@@ -91,18 +91,18 @@ class DualModelStrategy(object):
 
         self.__use_cuda = torch.cuda.is_available() and device == "cuda"
         self.__device = torch.device("cuda" if self.__use_cuda and torch.cuda.is_available() else "cpu")
-        self.__trainers = {self.model_names[0]: m0_trainer, self.model_names[1]: m1_trainer}
+        self.__trainers = {self.__model_names[0]: m0_trainer, self.__model_names[1]: m1_trainer}
 
         # Default minibatch level callbacks
-        self.__default_0_callbacks_train = RunningAverageMeter(prefix=f"train/{self.model_names[0]}", name="loss")
-        self.__default_1_callbacks_train = RunningAverageMeter(prefix=f"train/{self.model_names[1]}", name="loss")
-        self.__default_0_callbacks_eval = RunningAverageMeter(prefix=f"eval/{self.model_names[0]}", name="loss")
-        self.__default_1_callbacks_eval = RunningAverageMeter(prefix=f"eval/{self.model_names[1]}", name="loss")
+        self.__default_0_callbacks_train = RunningAverageMeter(prefix=f"train/{self.__model_names[0]}", name="loss")
+        self.__default_1_callbacks_train = RunningAverageMeter(prefix=f"train/{self.__model_names[1]}", name="loss")
+        self.__default_0_callbacks_eval = RunningAverageMeter(prefix=f"eval/{self.__model_names[0]}", name="loss")
+        self.__default_1_callbacks_eval = RunningAverageMeter(prefix=f"eval/{self.__model_names[1]}", name="loss")
 
-        self.__trainers[self.model_names[0]].add_train_callbacks(self.__default_0_callbacks_train)
-        self.__trainers[self.model_names[1]].add_train_callbacks(self.__default_1_callbacks_train)
-        self.__trainers[self.model_names[0]].add_eval_callbacks(self.__default_0_callbacks_eval)
-        self.__trainers[self.model_names[1]].add_eval_callbacks(self.__default_1_callbacks_eval)
+        self.__trainers[self.__model_names[0]].add_train_callbacks(self.__default_0_callbacks_train)
+        self.__trainers[self.__model_names[1]].add_train_callbacks(self.__default_1_callbacks_train)
+        self.__trainers[self.__model_names[0]].add_eval_callbacks(self.__default_0_callbacks_eval)
+        self.__trainers[self.__model_names[1]].add_eval_callbacks(self.__default_1_callbacks_eval)
 
         # Default epoch level callbacks
         self.__default_st_callbacks = (SamplingFreezer(modules=wrap_tuple(m1_trainer.model) + wrap_tuple(m0_trainer.model)),
@@ -122,25 +122,18 @@ class DualModelStrategy(object):
 
 
     def get_callbacks_by_name(self, name, stage):
-        if name == self.model_names[1]:
+        if name == self.__model_names[1]:
             return self.__trainers[name].get_callbacks_by_stage(stage)
-        elif name == self.model_names[0]:
+        elif name == self.__model_names[0]:
             return self.__trainers[name].get_callbacks_by_stage(stage)
         elif name == "minibatch":
-            return self.__trainers[self.model_names[1]].get_callbacks_by_stage(stage) + self.__trainers[self.model_names[0]].get_callbacks_by_stage(stage)
+            return self.__trainers[self.__model_names[1]].get_callbacks_by_stage(stage) + self.__trainers[self.__model_names[0]].get_callbacks_by_stage(stage)
         elif name == "batch":
             return self.__callbacks
         elif name == "all":
-            return self.__trainers[self.model_names[1]].get_callbacks_by_stage(stage) \
-                   + self.__trainers[self.model_names[0]].get_callbacks_by_stage(stage) \
+            return self.__trainers[self.__model_names[1]].get_callbacks_by_stage(stage) \
+                   + self.__trainers[self.__model_names[0]].get_callbacks_by_stage(stage) \
                    + self.__callbacks
-
-    @property
-    def model_name(self, i):
-        if i > len(self.__model_names) - 1:
-            raise ValueError("Out of range index for model name, expected in [0,{}] but found {}".format(len(self.model_names)-1), i)
-        else:
-            return self.__model_names[i]
 
     def run(self):
         for epoch in range(self.__n_epochs):
@@ -180,9 +173,9 @@ class DualModelStrategy(object):
                                                    stage=stage,
                                                    batch_i=batch_i)
 
-                    if self.model_names[0] in self.__data_key_by_stage[stage]:
-                        getattr(self.__trainers[self.model_names[0]], stage)(data_key=self.__data_key_by_stage[stage][self.model_names[0]],
-                                                             target_key=self.__target_key_by_stage[stage][self.model_names[0]])
+                    if self.__model_names[0] in self.__data_key_by_stage[stage]:
+                        getattr(self.__trainers[self.__model_names[0]], stage)(data_key=self.__data_key_by_stage[stage][self.__model_names[0]],
+                                                             target_key=self.__target_key_by_stage[stage][self.__model_names[0]])
 
                     self._call_callbacks_by_name(cb_func_name='on_m1_batch_end',
                                                    progress_bar=progress_bar,
@@ -197,9 +190,9 @@ class DualModelStrategy(object):
                                                    stage=stage,
                                                    batch_i=batch_i)
 
-                    if self.model_names[1] in self.__data_key_by_stage[stage]:
-                        getattr(self.__trainers[self.model_names[1]], stage)(data_key=self.__data_key_by_stage[stage][self.model_names[1]],
-                                                             target_key=self.__target_key_by_stage[stage][self.model_names[1]])
+                    if self.__model_names[1] in self.__data_key_by_stage[stage]:
+                        getattr(self.__trainers[self.__model_names[1]], stage)(data_key=self.__data_key_by_stage[stage][self.__model_names[1]],
+                                                             target_key=self.__target_key_by_stage[stage][self.__model_names[1]])
 
                     self._call_callbacks_by_name(cb_func_name='on_m2_batch_end',
                                                    progress_bar=progress_bar,

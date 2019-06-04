@@ -57,9 +57,11 @@ class ItemLoader(object):
                  num_workers: int = 0, shuffle: bool = False, pin_memory: bool = False,
                  collate_fn: callable = default_collate, transform: callable or None = None,
                  sampler: torch.utils.data.sampler.Sampler or None = None,
-                 batch_sampler=None, drop_last: bool = False, timeout: int = 0):
+                 batch_sampler=None, drop_last: bool = False, timeout: int = 0, name:str = "loader"):
         if root is None:
             root = ''
+
+        self.__name = name
 
         if meta_data is None:
             self.__dataset = None
@@ -121,6 +123,7 @@ class ItemLoader(object):
                 self.__iter_loader = iter(self.__data_loader)
                 batch = next(self.__iter_loader)
 
+            batch['name'] = self.__name
             samples.append(batch)
 
         return samples
@@ -143,6 +146,9 @@ class AugmentedGroupSampler(ItemLoader):
         self.__data_key = data_key
         self.__target_key = target_key
         self.__output_type = output_type
+
+    def __len__(self):
+        return super().__len__()
 
     def sample(self, k=1):
         samples = []
@@ -206,6 +212,9 @@ class AugmentedGroupStudentTeacherSampler(ItemLoader):
         self.__augmentation = augmentation
         self.__data_key = data_key
         self.__target_key = target_key
+
+    def __len__(self):
+        return super().__len__()
 
     def sample(self, k=1):
         samples = []

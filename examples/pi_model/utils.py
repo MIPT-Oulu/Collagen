@@ -49,7 +49,6 @@ class SSConfusionMatrixVisualizer(ConfusionMatrixVisualizer):
             target_cls = self.__parse_class(target)
             pred_cls = self.__parse_class(output)
             if target_cls is not None and pred_cls is not None:
-                # decoded_pred_cls = pred_cls.argmax(dim=-1)
                 self._corrects += [self._labels[i] for i in to_cpu(target_cls, use_numpy=True).tolist()]
                 self._predicts += [self._labels[i] for i in to_cpu(pred_cls, use_numpy=True).tolist()]
 

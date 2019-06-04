@@ -3,6 +3,8 @@ import torch.nn as nn
 from torch.nn import functional as F
 from torch.nn import CrossEntropyLoss
 
+from collagen.lrscheduler.utils.ramps import sigmoid_rampup
+
 class MTLoss(nn.Module):
     def __init__(self, alpha_cls=0.4, alpha_st_cons=0.3, alpha_aug_cons=0.01):
         super().__init__()
@@ -11,7 +13,7 @@ class MTLoss(nn.Module):
         self.__alpha_st = alpha_st_cons
         self.__alpha_aug_cons = alpha_aug_cons
         self.consistency_rampup = 5.0
-        self.__losses = {'loss': None, 'loss_aug_cons': None, 'loss_st_cons': None}
+        self.__losses = {'loss': None, 'loss_aug_cons': None, 'loss_s_t_cons': None}
         self.__count = 0
         self.__consistency = 5 # 100
 
@@ -47,38 +49,72 @@ class MTLoss(nn.Module):
 
     def forward(self, pred: torch.Tensor, target: torch.Tensor or tuple):
         minibatch_size = pred.shape[0]
-        if target['name'] == 'l':
+        if target['name'] == 'l_st':
             target_cls = target['target'].type(torch.int64)
-            st_logits = target['st_logits']
-            te_logits = target['te_logits']
+            st_logits = target['logits']
+
+            loss_aug_cons = self.softmax_mse_loss(st_logits, pred) / minibatch_size
             loss_cls = self.__loss_cls(pred, target_cls) / minibatch_size
-            if st_logits.shape[0] < 1:
-                raise ValueError("Num of features must be at least 1, but found {}".format(st_logits.shape[0]))
-            loss_aug_cons = self.softmax_mse_loss(st_logits[0, :, :], st_logits[1, :, :]) / minibatch_size
+
+            self.__losses['loss_cls'] = loss_cls
+            self.__losses['loss_s_t_cons'] = None
+            self.__losses['loss_aug_cons'] = self.__alpha_aug_cons * loss_aug_cons
+            _loss = self.__losses['loss_cls'] + self.__losses['loss_aug_cons']
+        elif target['name'] == 'u_st':
+            st_logits = target['logits']
+
+            loss_aug_cons = self.softmax_mse_loss(st_logits, pred) / minibatch_size
+
+            self.__losses['loss_cls'] = None
+            self.__losses['loss_s_t_cons'] = None
+            self.__losses['loss_aug_cons'] = self.__alpha_aug_cons * loss_aug_cons
+            _loss = self.__losses['loss_aug_cons']
+        elif target['name'] == 'l_te':
+            te_logits = target['logits']
+            target_cls = target['target'].type(torch.int64)
+
+            loss_cls = self.__loss_cls(pred, target_cls) / minibatch_size
             loss_st_cons = self.symmetric_mse_loss(te_logits, pred) / minibatch_size
 
             self.__losses['loss_cls'] = loss_cls
-            self.__losses['loss_st_cons'] = self.get_current_consistency_weight() * loss_st_cons
-            self.__losses['loss_aug_cons'] = self.__alpha_aug_cons * loss_aug_cons
-            _loss = self.__losses['loss_cls'] + self.__losses['loss_st_cons'] + self.__losses['loss_st_cons']
+            self.__losses['loss_s_t_cons'] = self.get_current_consistency_weight() * loss_st_cons
+            self.__losses['loss_aug_cons'] = None
+            _loss = self.__losses['loss_s_t_cons'] + self.__losses['loss_cls']
             self.__losses['loss'] = _loss
 
-        elif target['name'] == 'u':
-            st_logits = target['st_logits']
-            te_logits = target['te_logits']
-            if st_logits.shape[0] < 1:
-                raise ValueError("Num of features must be at least 1, but found {}".format(st_logits.shape[0]))
-            loss_aug_cons = self.softmax_mse_loss(st_logits[0, :, :], st_logits[1, :, :]) / minibatch_size
+        elif target['name'] == 'u_te':
+            te_logits = target['logits']
+
             loss_st_cons = self.symmetric_mse_loss(te_logits, pred) / minibatch_size
 
             self.__losses['loss_cls'] = None
-            self.__losses['loss_st_cons'] = self.get_current_consistency_weight() * loss_st_cons
-            self.__losses['loss_aug_cons'] = self.__alpha_aug_cons* loss_aug_cons
-            _loss = self.__losses['loss_st_cons'] + self.__losses['loss_st_cons']
-            self.__losses['loss'] = _loss
+            self.__losses['loss_s_t_cons'] = self.get_current_consistency_weight() * loss_st_cons
+            self.__losses['loss_aug_cons'] = None
+            _loss = self.__losses['loss_s_t_cons']
+        elif target['name'] == 'l_te':
+            target_cls = target['target'].type(torch.int64)
+            te_logits = target['logits']
+
+            loss_cls = self.__loss_cls(pred, target_cls) / minibatch_size
+            loss_st_cons = self.symmetric_mse_loss(te_logits, pred) / minibatch_size
+
+            self.__losses['loss_cls'] = loss_cls
+            self.__losses['loss_s_t_cons'] = self.get_current_consistency_weight() * loss_st_cons
+            self.__losses['loss_aug_cons'] = None
+            _loss = self.__losses['loss_st_cons'] + self.__losses['loss_cls']
+        elif target['name'] == 'l_te_eval':
+            target_cls = target['target'].type(torch.int64)
+
+            loss_cls = self.__loss_cls(pred, target_cls) / minibatch_size
+
+            self.__losses['loss_cls'] = loss_cls
+            self.__losses['loss_s_t_cons'] = None
+            self.__losses['loss_aug_cons'] = None
+            _loss = self.__losses['loss_cls']
         else:
             raise ValueError("Target length is 1 or 3, but found {}".format(len(target)))
 
+        self.__losses['loss'] = _loss
         self.__count += 1
         return _loss
 
