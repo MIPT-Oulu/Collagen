@@ -6,16 +6,15 @@ from torch.nn import CrossEntropyLoss
 from collagen.lrscheduler.utils.ramps import sigmoid_rampup
 
 class MTLoss(nn.Module):
-    def __init__(self, alpha_cls=0.4, alpha_st_cons=0.3, alpha_aug_cons=0.01):
+    def __init__(self, alpha_cls=1.0, logit_distance_cost=0.01):
         super().__init__()
         self.__loss_cls = CrossEntropyLoss(size_average=False)
         self.__alpha_cls = alpha_cls
-        self.__alpha_st = alpha_st_cons
-        self.__alpha_aug_cons = alpha_aug_cons
+        self.__logit_distance_cost = logit_distance_cost
         self.consistency_rampup = 5.0
         self.__losses = {'loss': None, 'loss_aug_cons': None, 'loss_s_t_cons': None}
         self.__count = 0
-        self.__consistency = 5 # 100
+        self.__consistency = 100
 
     def softmax_mse_loss(self, input_logits, target_logits):
         """Takes softmax on both sides and returns MSE loss
@@ -58,7 +57,7 @@ class MTLoss(nn.Module):
 
             self.__losses['loss_cls'] = loss_cls
             self.__losses['loss_s_t_cons'] = None
-            self.__losses['loss_aug_cons'] = self.__alpha_aug_cons * loss_aug_cons
+            self.__losses['loss_aug_cons'] = self.__logit_distance_cost * loss_aug_cons
             _loss = self.__losses['loss_cls'] + self.__losses['loss_aug_cons']
         elif target['name'] == 'u_st':
             st_logits = target['logits']
@@ -67,7 +66,7 @@ class MTLoss(nn.Module):
 
             self.__losses['loss_cls'] = None
             self.__losses['loss_s_t_cons'] = None
-            self.__losses['loss_aug_cons'] = self.__alpha_aug_cons * loss_aug_cons
+            self.__losses['loss_aug_cons'] = self.__logit_distance_cost * loss_aug_cons
             _loss = self.__losses['loss_aug_cons']
         elif target['name'] == 'l_te':
             te_logits = target['logits']

@@ -15,9 +15,9 @@ from collagen.callbacks.visualizer import ProgressbarVisualizer
 from collagen.metrics import RunningAverageMeter, AccuracyMeter, KappaMeter
 from collagen.callbacks.swa import UpdateSWA
 
-from examples.mean_teacher.utils import init_args, parse_item, init_transforms, parse_target, parse_class
-from examples.mean_teacher.utils import SSConfusionMatrixVisualizer, cond_accuracy_meter
-from examples.mean_teacher.networks import Model01
+from examples.swa.utils import init_args, parse_item, init_transforms, parse_target, parse_class
+from examples.swa.utils import SSConfusionMatrixVisualizer, cond_accuracy_meter
+from examples.swa.networks import Model01
 
 device = auto_detect_device()
 
@@ -50,12 +50,12 @@ if __name__ == "__main__":
     # Initializing Discriminator
     te_network = Model01(nc=n_channels, ndf=args.n_features).to(device)
     te_optim = optim.Adam(te_network.parameters(), lr=args.lr, betas=(args.beta1, 0.999))
-    te_crit = MTLoss(alpha_cls=1.0, alpha_st_cons=1.0, alpha_aug_cons=.1).to(device)
+    te_crit = MTLoss(alpha_cls=1.0, logit_distance_cost=0.01).to(device)
 
     # Initializing Generator
     st_network = Model01(nc=n_channels, ndf=args.n_features).to(device)
     st_optim = optim.Adam(st_network.parameters(), lr=args.lr, betas=(args.beta1, 0.999))
-    st_crit = MTLoss(alpha_cls=1.0, alpha_st_cons=1.0, alpha_aug_cons=.1).to(device)
+    st_crit = MTLoss(alpha_cls=1.0, logit_distance_cost=0.01).to(device)
 
     with open("settings.yml", "r") as f:
         sampling_config = yaml.load(f)

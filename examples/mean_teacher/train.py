@@ -14,12 +14,22 @@ from collagen.losses.ssl import MTLoss
 from collagen.callbacks.visualizer import ProgressbarVisualizer
 from collagen.metrics import RunningAverageMeter, AccuracyMeter, KappaMeter
 from collagen.callbacks.dualmodel import UpdateEMA
+from collagen.core import Callback
 
 from examples.mean_teacher.utils import init_args, parse_item, init_transforms, parse_target, parse_class
 from examples.mean_teacher.utils import SSConfusionMatrixVisualizer, cond_accuracy_meter
 from examples.mean_teacher.networks import Model01
 
 device = auto_detect_device()
+
+class SetTeacherTrain(Callback):
+    def __init__(self, te_model):
+        super().__init__(ctype='custom')
+        self.__te_model = te_model
+
+    def on_batch_begin(self, *args, **kwargs):
+        self.__te_model.train(True)
+
 
 if __name__ == "__main__":
     args = init_args()
@@ -49,13 +59,16 @@ if __name__ == "__main__":
 
     # Initializing Discriminator
     te_network = Model01(nc=n_channels, ndf=args.n_features).to(device)
-    te_optim = optim.Adam(te_network.parameters(), lr=args.lr, betas=(args.beta1, 0.999))
-    te_crit = MTLoss(alpha_cls=1.0, alpha_st_cons=1.0, alpha_aug_cons=.1).to(device)
+    for param in te_network.parameters():
+        param.detach_()
+    
+    te_optim = None # optim.Adam(te_network.parameters(), lr=args.lr, betas=(args.beta1, 0.999))
+    te_crit = MTLoss(alpha_cls=1.0, logit_distance_cost=.01).to(device)
 
     # Initializing Generator
     st_network = Model01(nc=n_channels, ndf=args.n_features).to(device)
-    st_optim = optim.Adam(st_network.parameters(), lr=args.lr, betas=(args.beta1, 0.999))
-    st_crit = MTLoss(alpha_cls=1.0, alpha_st_cons=1.0, alpha_aug_cons=.1).to(device)
+    st_optim = optim.SGD(st_network.parameters(), lr=args.lr, weight_decay=args.wd, nesterov=args.nesterov, momentum=args.momentum)
+    st_crit = MTLoss(alpha_cls=1.0, logit_distance_cost=.01).to(device)
 
     with open("settings.yml", "r") as f:
         sampling_config = yaml.load(f)
@@ -70,12 +83,12 @@ if __name__ == "__main__":
     stra_cbs = (MeterLogging(writer=summary_writer), ProgressbarVisualizer())
 
     # Trainers
-    st_train_cbs = (CycleRampUpDownScheduler(optimizer=st_optim, initial_lr=args.initial_lr, lr_rampup=args.lr_rampup,
-                                             lr=args.lr, lr_rampdown_epochs=args.lr_rampdown_epochs,
-                                             start_cycle_epoch=args.start_cycle_epoch, cycle_interval=args.cycle_interval,
-                                             cycle_rampdown_epochs=args.cycle_rampdown_epochs),
-                    # SingleRampUpDownScheduler(optimizer=st_optim, initial_lr=args.initial_lr, lr_rampup=args.lr_rampup,
-                    #                           lr=args.lr, lr_rampdown_epochs=args.lr_rampdown_epochs),
+    st_train_cbs = (#CycleRampUpDownScheduler(optimizer=st_optim, initial_lr=args.initial_lr, lr_rampup=args.lr_rampup,
+                    #                         lr=args.lr, lr_rampdown_epochs=args.lr_rampdown_epochs,
+                    #                         start_cycle_epoch=args.start_cycle_epoch, cycle_interval=args.cycle_interval,
+                    #                         cycle_rampdown_epochs=args.cycle_rampdown_epochs),
+                     SingleRampUpDownScheduler(optimizer=st_optim, initial_lr=args.initial_lr, lr_rampup=args.lr_rampup,
+                                               lr=args.lr, lr_rampdown_epochs=args.lr_rampdown_epochs),
                     RunningAverageMeter(prefix='train/S', name='loss_cls'),
                     RunningAverageMeter(prefix='train/S', name='loss_s_t_cons'),
                     RunningAverageMeter(prefix='train/S', name='loss_aug_cons'),
@@ -95,7 +108,7 @@ if __name__ == "__main__":
                    SSConfusionMatrixVisualizer(writer=summary_writer, cond=cond_accuracy_meter, parse_class=parse_class,
                                                labels=[str(i) for i in range(10)], tag="eval/S/confusion_matrix"))
 
-    te_train_cbs = (UpdateEMA(st_model=st_network, te_model=te_network),)
+    te_train_cbs = (SetTeacherTrain(te_network), UpdateEMA(st_model=st_network, te_model=te_network, decay=0.99),)
 
     te_eval_cbs = (RunningAverageMeter(prefix='eval/T', name='loss_cls'),
                    AccuracyMeter(prefix="eval/T", name="acc", parse_target=parse_target, cond=cond_accuracy_meter),
