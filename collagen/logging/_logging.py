@@ -70,7 +70,7 @@ class EpochLRLogging(Logging):
     def on_epoch_end(self, epoch, *args, **kwargs):
         if self.__single:
             assert len(self.__optims[0].param_groups) > 0, "Not found parameter in optimizer"
-            self.__summary_writer.add_scalar(tag=self.__tag, scalar_value=self.__optims[0].param_groups[0]['lr'])
+            self.__summary_writer.add_scalar(self.__tag, self.__optims[0].param_groups[0]['lr'], epoch)
         else:
             lrs = dict()
             for optim, name in zip(self.__optims, self.__names):
