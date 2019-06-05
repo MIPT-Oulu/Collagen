@@ -33,6 +33,7 @@ class SetTeacherTrain(Callback):
 
 if __name__ == "__main__":
     args = init_args()
+    print(args)
     log_dir = args.log_dir
     comment = "MT"
 

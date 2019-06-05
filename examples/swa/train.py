@@ -14,6 +14,7 @@ from collagen.losses.ssl import MTLoss
 from collagen.callbacks.visualizer import ProgressbarVisualizer
 from collagen.metrics import RunningAverageMeter, AccuracyMeter, KappaMeter
 from collagen.callbacks.swa import UpdateSWA
+from collagen.core import Callback
 
 from examples.swa.utils import init_args, parse_item, init_transforms, parse_target, parse_class
 from examples.swa.utils import SSConfusionMatrixVisualizer, cond_accuracy_meter
@@ -21,10 +22,20 @@ from examples.swa.networks import Model01
 
 device = auto_detect_device()
 
+
+class SetTeacherTrain(Callback):
+    def __init__(self, te_model):
+        super().__init__(ctype='custom')
+        self.__te_model = te_model
+
+    def on_batch_begin(self, *args, **kwargs):
+        self.__te_model.train(True)
+
+
 if __name__ == "__main__":
     args = init_args()
     log_dir = args.log_dir
-    comment = "MT"
+    comment = "SWA"
 
     # Data provider
     dataset_name = 'cifar10'
@@ -95,8 +106,8 @@ if __name__ == "__main__":
                    SSConfusionMatrixVisualizer(writer=summary_writer, cond=cond_accuracy_meter, parse_class=parse_class,
                                                labels=[str(i) for i in range(10)], tag="eval/S/confusion_matrix"))
 
-    te_train_cbs = UpdateSWA(swa_model=te_network, student_model=st_network, start_cycle_epoch=args.start_cycle_epoch,
-                              cycle_interval=args.cycle_interval),
+    te_train_cbs = (SetTeacherTrain(te_network), UpdateSWA(swa_model=te_network, student_model=st_network,
+                    start_cycle_epoch=args.start_cycle_epoch, cycle_interval=args.cycle_interval))
 
     te_eval_cbs = (RunningAverageMeter(prefix='eval/T', name='loss_cls'),
                    AccuracyMeter(prefix="eval/T", name="acc", parse_target=parse_target, cond=cond_accuracy_meter),

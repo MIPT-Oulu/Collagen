@@ -86,7 +86,7 @@ class DualModelStrategy(object):
 
             self.__num_samples_by_stage[stage] = n_samples_dict
 
-        if n_training_batches is not None:
+        if n_training_batches is not None and n_training_batches > 0:
             self.__num_batches_by_stage['train'] = n_training_batches
 
         self.__use_cuda = torch.cuda.is_available() and device == "cuda"

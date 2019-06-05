@@ -48,21 +48,22 @@ class MTLoss(nn.Module):
 
     def forward(self, pred: torch.Tensor, target: torch.Tensor or tuple):
         minibatch_size = pred.shape[0]
+        n_minibatches = 2
         if target['name'] == 'l_st':
             target_cls = target['target'].type(torch.int64)
             st_logits = target['logits']
 
-            loss_aug_cons = self.symmetric_mse_loss(st_logits, pred) / minibatch_size
-            loss_cls = self.__loss_cls(pred, target_cls) / minibatch_size
+            loss_aug_cons = self.symmetric_mse_loss(st_logits, pred) / (minibatch_size*n_minibatches)
+            loss_cls = self.__loss_cls(pred, target_cls) / (minibatch_size*n_minibatches)
 
             self.__losses['loss_cls'] = loss_cls
             self.__losses['loss_s_t_cons'] = None
             self.__losses['loss_aug_cons'] = self.__logit_distance_cost * loss_aug_cons
-            _loss = self.__losses['loss_cls'] + self.__losses['loss_aug_cons']
+            _loss = (self.__losses['loss_cls'] + self.__losses['loss_aug_cons'])
         elif target['name'] == 'u_st':
             st_logits = target['logits']
 
-            loss_aug_cons = self.symmetric_mse_loss(st_logits, pred) / minibatch_size
+            loss_aug_cons = self.symmetric_mse_loss(st_logits, pred) / (minibatch_size*n_minibatches)
 
             self.__losses['loss_cls'] = None
             self.__losses['loss_s_t_cons'] = None
@@ -72,8 +73,8 @@ class MTLoss(nn.Module):
             te_logits = target['logits']
             target_cls = target['target'].type(torch.int64)
 
-            loss_cls = self.__loss_cls(pred, target_cls) / minibatch_size
-            loss_st_cons = self.softmax_mse_loss(te_logits, pred) / minibatch_size
+            loss_cls = self.__loss_cls(pred, target_cls) / (minibatch_size*n_minibatches)
+            loss_st_cons = self.softmax_mse_loss(te_logits, pred) / (minibatch_size*n_minibatches)
 
             self.__losses['loss_cls'] = loss_cls
             self.__losses['loss_s_t_cons'] = self.get_current_consistency_weight() * loss_st_cons
@@ -83,7 +84,7 @@ class MTLoss(nn.Module):
         elif target['name'] == 'u_te':
             te_logits = target['logits']
 
-            loss_st_cons = self.softmax_mse_loss(te_logits, pred) / minibatch_size
+            loss_st_cons = self.softmax_mse_loss(te_logits, pred) / (minibatch_size*n_minibatches)
 
             self.__losses['loss_cls'] = None
             self.__losses['loss_s_t_cons'] = self.get_current_consistency_weight() * loss_st_cons

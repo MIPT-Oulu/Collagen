@@ -80,14 +80,16 @@ def init_transforms(nc=1):
     train_trf = Compose([
         wrap2solt,
         slc.Stream([
-            slt.ResizeTransform(resize_to=(32, 32), interpolation='bilinear'),
-            slt.RandomScale(range_x=(0.9, 1.1), same=False, p=0.5),
-            slt.RandomShear(range_x=(-0.05, 0.05), p=0.5),
+            # slt.ResizeTransform(resize_to=(32, 32), interpolation='bilinear'),
+            slt.RandomScale(range_x=(0.95, 1.05), same=False, p=0.5),
+            # slt.RandomShear(range_x=(-0.05, 0.05), p=0.5),
             slt.RandomRotate(rotation_range=(-10, 10), p=0.5),
+            slt.RandomFlip(p=0.5, axis=1),
             # slt.RandomRotate(rotation_range=(-5, 5), p=0.5),
-            slt.PadTransform(pad_to=36),
-            slt.CropTransform(crop_size=32, crop_mode='r'),
-            slt.ImageAdditiveGaussianNoise(p=1.0)
+            slt.RandomTranslate(range_x=3, range_y=3),
+            # slt.PadTransform(pad_to=34),
+            # slt.CropTransform(crop_size=32, crop_mode='r'),
+            # slt.ImageAdditiveGaussianNoise(p=1.0)
         ]),
         unpack_solt,
         ApplyTransform(norm_mean_std)
@@ -140,7 +142,7 @@ def init_args():
     parser.add_argument('--start_cycle_epoch', default=300, type=int, help='Epoch to start cycle')
     parser.add_argument('--cycle_rampdown_epochs', default=0, type=int, help='Length of epoch cycle to ramp down')
     parser.add_argument('--cycle_interval', default=20, type=int, help='Length of epoch for a cosine annealing cycle')
-
+    parser.add_argument('--nesterov', action='store_true', help='Use nesterov momentum')
     parser.add_argument('--wd', type=float, default=2e-4, help='Weight decay')
     parser.add_argument('--momentum', type=float, default=0.9, help='Momentum')
     parser.add_argument('--beta1', type=float, default=0.5, help='Weight decay')

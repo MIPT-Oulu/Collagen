@@ -8,7 +8,7 @@ def to_cpu(x: torch.Tensor or torch.cuda.FloatTensor, required_grad=False, use_n
     if isinstance(x, torch.Tensor):
         if x.is_cuda:
             if use_numpy:
-                x_cpu = x.to('cpu').numpy()
+                x_cpu = x.to('cpu').detach().numpy()
             elif required_grad:
                 x_cpu = x.to('cpu')
             else:
