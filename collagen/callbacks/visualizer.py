@@ -11,7 +11,8 @@ from collagen.metrics import plot_confusion_matrix
 
 
 class ConfusionMatrixVisualizer(Callback):
-    def __init__(self, writer, labels: list or None = None, tag="confusion_matrix", normalize=True, name='cm'):
+    def __init__(self, writer, labels: list or None = None, tag="confusion_matrix", normalize=True, name='cm',
+                 cond=None, parse_class=None):
         """ConfusionMatrixVisualizer class, which is a callback calculating accuracy after each forwarding step and
         exporting confusion matrix to TensorboardX at the end of each epoch
 
@@ -35,6 +36,17 @@ class ConfusionMatrixVisualizer(Callback):
         self._predicts = []
         self._corrects = []
         self._name = name
+        self.__cond = self._default_cond if cond is None else cond
+        self.__parse_class = self._default_parse_class if parse_class is None else parse_class
+
+    @staticmethod
+    def _default_cond(target, output):
+        return True
+
+    @staticmethod
+    def _default_parse_class(y):
+        return y
+
 
     @property
     def targets(self):
@@ -56,23 +68,14 @@ class ConfusionMatrixVisualizer(Callback):
         self.__epoch = epoch
         self._reset()
 
-    def on_forward_end(self, output: Tensor, target: Tensor, **kwargs):
-        if len(target.shape) > 1 and target.shape[1] > 1:
-            decoded_target_cls = target.argmax(dim=-1)
-        elif len(target.shape) == 1:
-            decoded_target_cls = target.type(torch.int64)
-        else:
-            raise ValueError("target dims ({}) must be 1 or 2, but got {}".format(target.shape, len(target.shape)))
-
-        if len(output.shape) > 1 and output.shape[1] > 1:
-            decoded_pred_cls = output.argmax(dim=-1)
-        elif len(output.shape) == 1:
-            decoded_pred_cls = output.type(torch.int64)
-        else:
-            raise ValueError("pred dims ({}) must be 1 or 2, but got {}".format(output.shape, len(output.shape)))
-
-        self._corrects += [self._labels[i] for i in to_cpu(decoded_target_cls, use_numpy=True).tolist()]
-        self._predicts += [self._labels[i] for i in to_cpu(decoded_pred_cls, use_numpy=True).tolist()]
+    def on_forward_end(self, output: Tensor, target: Tensor or dict, **kwargs):
+        if self.__cond(target, output):
+            target_cls = self.__parse_class(target)
+            pred_cls = self.__parse_class(output)
+            if target_cls is not None and pred_cls is not None:
+                # decoded_pred_cls = pred_cls.argmax(dim=-1)
+                self._corrects += [self._labels[i] for i in to_cpu(target_cls, use_numpy=True).tolist()]
+                self._predicts += [self._labels[i] for i in to_cpu(pred_cls, use_numpy=True).tolist()]
 
     def on_epoch_end(self, *args, **kwargs):
         if len(self._corrects) != len(self._predicts):

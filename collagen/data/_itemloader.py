@@ -199,23 +199,25 @@ class AugmentedGroupSampler(ItemLoader):
         return samples
 
 
-class AugmentedGroupStudentTeacherSampler(ItemLoader):
-    def __init__(self, name:str, teacher_model: nn.Module, student_model: nn.Module, augmentation, n_augmentations=1, data_key: str = "data", target_key: str = 'target',
+class AugmentedGroupSampler2(ItemLoader):
+    def __init__(self, model: nn.Module, te_model: nn.Module, name: str, augmentation, n_augmentations=1, output_type='logits', data_key: str = "data", target_key: str = 'target',
                  parse_item_cb: callable or None = None, meta_data: pd.DataFrame or None = None,
                  root: str or None = None, batch_size: int = 1, num_workers: int = 0, shuffle: bool = False,
                  pin_memory: bool = False, collate_fn: callable = default_collate, transform: callable or None = None,
                  sampler: torch.utils.data.sampler.Sampler or None = None, batch_sampler=None,
-                 drop_last: bool = False, timeout: int = 0):
+                 drop_last: bool = False, timeout: int = 0, detach: bool = False):
         super().__init__(meta_data=meta_data, parse_item_cb=parse_item_cb, root=root, batch_size=batch_size,
                          num_workers=num_workers, shuffle=shuffle, pin_memory=pin_memory, collate_fn=collate_fn,
                          transform=transform, sampler=sampler, batch_sampler=batch_sampler, drop_last=drop_last, timeout=timeout)
-        self.__name: str = name
-        self.__te_model: nn.Module = teacher_model
-        self.__st_model: nn.Module = student_model
+        self.__name = name
+        self.__model: nn.Module = model
+        self.__te_model: nn.Module = te_model
         self.__n_augmentations = n_augmentations
         self.__augmentation = augmentation
         self.__data_key = data_key
         self.__target_key = target_key
+        self.__output_type = output_type
+        self.__detach = detach
 
     def __len__(self):
         return super().__len__()
@@ -228,10 +230,6 @@ class AugmentedGroupStudentTeacherSampler(ItemLoader):
             target = sampled_rows[i][self.__target_key]
             batch_size = imgs.shape[0]
             list_logits = []
-
-            with torch.no_grad():
-                imgs_gpu = imgs.to(next(self.__te_model.parameters()).device)
-                te_logits = self.__te_model(imgs_gpu).detach()
 
             list_imgs = []
             for b in range(imgs.shape[0]):
@@ -247,29 +245,36 @@ class AugmentedGroupStudentTeacherSampler(ItemLoader):
                     list_imgs.append(aug_img)
 
             batch_imgs = torch.stack(list_imgs, dim=0)
-            batch_imgs = batch_imgs.to(next(self.__st_model.parameters()).device)
+            batch_imgs = batch_imgs.to(next(self.__model.parameters()).device)
 
-            with torch.no_grad():
-                te_input = imgs.to(next(self.__st_model.parameters()).device)
-                te_logits = self.__te_model(te_input)
+            te_f = self.__te_model.get_features(batch_imgs)
 
-            out = self.__st_model(batch_imgs)
-            logits = out
+            st_f = self.__model.get_features(batch_imgs.requires_grad_(True))
+            # logits = self.__model(batch_imgs)
+            # f = self.__model.get_features(batch_imgs)
+            # logits = self.__model.forward_features(f)
 
             if self.__n_augmentations > 1:
-                logits = logits.view(self.__n_augmentations, batch_size, -1)
+                # logits = logits.view(self.__n_augmentations, batch_size, -1)
+                te_f = te_f.view(self.__n_augmentations, batch_size, -1)
+                st_f = st_f.view(self.__n_augmentations, batch_size, -1)
             elif self.__n_augmentations == 1:
                 pass
             else:
                 raise ValueError('Empty list!')
 
-            samples.append({'name': self.__name, 'st_logits': logits, 'te_logits': logits[0, :, :] , 'data': imgs, 'target': target})
+            te_f = te_f.detach()
+            # if self.__detach:
+                # logits = logits.detach()
+                # f = f.detach()
+
+            samples.append({'name': self.__name, 'st_features': st_f, 'te_features': te_f, 'data': imgs, 'target': target})
         return samples
 
 
 class FeatureMatchingSampler(ItemLoader):
     def __init__(self, model: nn.Module, latent_size: int, data_key: str = "data", meta_data: pd.DataFrame or None = None,
-                 parse_item_cb: callable or None = None,
+                 parse_item_cb: callable or None = None, name='fm',
                  root: str or None = None, batch_size: int = 1, num_workers: int = 0, shuffle: bool = False,
                  pin_memory: bool = False, collate_fn: callable = default_collate, transform: callable or None = None,
                  sampler: torch.utils.data.sampler.Sampler or None = None, batch_sampler=None,
@@ -280,6 +285,7 @@ class FeatureMatchingSampler(ItemLoader):
         self.__model: nn.Module = model
         self.__latent_size: int = latent_size
         self.__data_key = data_key
+        self.__name = name
 
     def sample(self, k=1):
         samples = []
@@ -289,16 +295,17 @@ class FeatureMatchingSampler(ItemLoader):
             features = self.__model.get_features(real_imgs)
             noise = torch.randn(self.batch_size, self.__latent_size)
             noise_on_device = noise.to(next(self.__model.parameters()).device)
-            samples.append({'real_features': features.detach(), 'real_data': real_imgs, 'latent': noise_on_device})
+            samples.append({'name': self.__name, 'real_features': features.detach(), 'real_data': real_imgs, 'latent': noise_on_device})
         return samples
 
 
 class GANFakeSampler(ItemLoader):
-    def __init__(self, g_network, batch_size, latent_size):
-        super().__init__(meta_data=None, parse_item_cb=None)
+    def __init__(self, g_network, batch_size, latent_size, name='ganfake'):
+        super().__init__(meta_data=None, parse_item_cb=None, name=name)
         self.__latent_size = latent_size
         self.batch_size = batch_size
         self.__g_network = g_network
+        self.__name = name
 
     def sample(self, k=1):
         samples = []
@@ -306,7 +313,7 @@ class GANFakeSampler(ItemLoader):
             noise = torch.randn(self.batch_size, self.__latent_size)
             noise_on_device = noise.to(next(self.__g_network.parameters()).device)
             fake: torch.Tensor = self.__g_network(noise_on_device)
-            samples.append({'data': fake.detach(), 'target': torch.zeros(self.batch_size).to(fake.device), 'latent': noise})
+            samples.append({'name': self.__name, 'data': fake.detach(), 'target': torch.zeros(self.batch_size).to(fake.device), 'latent': noise})
 
         return samples
 
@@ -315,14 +322,15 @@ class GANFakeSampler(ItemLoader):
 
 
 class SSGANFakeSampler(ItemLoader):
-    def __init__(self, g_network, batch_size, latent_size, n_classes, use_aux_target=False, same_class_batch=False):
-        super().__init__(meta_data=None, parse_item_cb=None)
+    def __init__(self, g_network, batch_size, latent_size, n_classes, name='ssgan_fake', use_aux_target=False, same_class_batch=False):
+        super().__init__(meta_data=None, parse_item_cb=None, name=name)
         self.__latent_size = latent_size
         self.batch_size = batch_size
         self.__g_network = g_network
         self.__n_classes = n_classes
         self.__use_aux_target = use_aux_target
         self.__sample_class_batch = same_class_batch
+        self.__name = name
 
     def sample(self, k=1):
         samples = []
@@ -343,8 +351,10 @@ class SSGANFakeSampler(ItemLoader):
                 target_val = torch.zeros([self.batch_size, 1], dtype=torch.int64)
                 target_aux = torch.cat((target_cls, target_val), dim=1)
 
-            samples.append({'data': fake.detach(),
+            samples.append({'name': self.__name,
+                            'data': fake.detach(),
                             'target': target,
+                            'onehot': target[:, :-1],
                             'latent': noise,
                             'valid': target[:, -1],
                             'aux_target': target_aux if self.__use_aux_target else None})
@@ -356,12 +366,13 @@ class SSGANFakeSampler(ItemLoader):
 
 
 class GaussianNoiseSampler(ItemLoader):
-    def __init__(self, batch_size, latent_size, device, n_classes):
-        super().__init__(meta_data=None, parse_item_cb=None)
+    def __init__(self, batch_size, latent_size, device, n_classes, name='gaussian_noise'):
+        super().__init__(meta_data=None, parse_item_cb=None, name=name)
         self.latent_size = latent_size
         self.device = device
         self.batch_size = batch_size
         self.__n_classes = n_classes
+        self.__name = name
 
     def sample(self, k=1):
         samples = []
@@ -369,7 +380,7 @@ class GaussianNoiseSampler(ItemLoader):
             noise = torch.randn(self.batch_size, self.latent_size).to(self.device)
             target = torch.zeros([self.batch_size, self.__n_classes + 1]).to(self.device)
             # target[:, -2] = 1.0
-            samples.append({'latent': noise, 'target': target, 'valid': target[:, -1]})
+            samples.append({'name': self.__name, 'latent': noise, 'target': target, 'valid': target[:, -1]})
 
         return samples
 

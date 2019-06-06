@@ -1,4 +1,4 @@
-from collagen.data import ItemLoader, AugmentedGroupSampler, AugmentedGroupStudentTeacherSampler, DataProvider
+from collagen.data import ItemLoader, AugmentedGroupSampler, DataProvider
 
 
 def pimodel_data_provider(model, train_labeled_data, train_unlabeled_data, val_labeled_data, val_unlabeled_data,
@@ -60,8 +60,8 @@ def pimodel_data_provider(model, train_labeled_data, train_unlabeled_data, val_l
 
 
 def mt_data_provider(st_model, te_model, train_labeled_data, train_unlabeled_data, val_labeled_data,
-                     val_unlabeled_data,
-                     transforms, parse_item, bs, num_threads, item_loaders=dict(), output_type='logits', root=""):
+                     val_unlabeled_data, transforms, parse_item, bs, num_threads, item_loaders=dict(),
+                     n_augmentations=1, output_type='logits', root=""):
     """
     Default setting of data provider for Mean-Teacher
 
@@ -71,7 +71,7 @@ def mt_data_provider(st_model, te_model, train_labeled_data, train_unlabeled_dat
     item_loaders["labeled_train_st"] = AugmentedGroupSampler(root=root, name='l_st',
                                                              meta_data=train_labeled_data,
                                                              model=st_model,
-                                                             n_augmentations=1,
+                                                             n_augmentations=n_augmentations,
                                                              augmentation=transforms[2],
                                                              transform=transforms[1],
                                                              parse_item_cb=parse_item,
@@ -81,7 +81,7 @@ def mt_data_provider(st_model, te_model, train_labeled_data, train_unlabeled_dat
     item_loaders["unlabeled_train_st"] = AugmentedGroupSampler(root=root, name='u_st',
                                                                model=st_model,
                                                                meta_data=train_unlabeled_data,
-                                                               n_augmentations=1,
+                                                               n_augmentations=n_augmentations,
                                                                augmentation=transforms[2],
                                                                transform=transforms[1],
                                                                parse_item_cb=parse_item,
@@ -91,7 +91,7 @@ def mt_data_provider(st_model, te_model, train_labeled_data, train_unlabeled_dat
     item_loaders["labeled_train_te"] = AugmentedGroupSampler(root=root, name='l_te',
                                                              meta_data=train_labeled_data,
                                                              model=te_model,
-                                                             n_augmentations=1,
+                                                             n_augmentations=n_augmentations,
                                                              augmentation=transforms[2],
                                                              transform=transforms[1],
                                                              parse_item_cb=parse_item,
@@ -102,7 +102,7 @@ def mt_data_provider(st_model, te_model, train_labeled_data, train_unlabeled_dat
     item_loaders["unlabeled_train_te"] = AugmentedGroupSampler(root=root, name='u_te',
                                                                model=te_model,
                                                                meta_data=train_unlabeled_data,
-                                                               n_augmentations=1,
+                                                               n_augmentations=n_augmentations,
                                                                augmentation=transforms[2],
                                                                transform=transforms[1],
                                                                parse_item_cb=parse_item,
@@ -115,7 +115,7 @@ def mt_data_provider(st_model, te_model, train_labeled_data, train_unlabeled_dat
     item_loaders["labeled_eval_st"] = AugmentedGroupSampler(root=root, name='l_st',
                                                             meta_data=val_labeled_data,
                                                             model=st_model,
-                                                            n_augmentations=1,
+                                                            n_augmentations=n_augmentations,
                                                             augmentation=transforms[2],
                                                             transform=transforms[1],
                                                             parse_item_cb=parse_item,
@@ -125,7 +125,7 @@ def mt_data_provider(st_model, te_model, train_labeled_data, train_unlabeled_dat
     item_loaders["unlabeled_eval_st"] = AugmentedGroupSampler(root=root, name='u_st',
                                                               model=st_model,
                                                               meta_data=val_unlabeled_data,
-                                                              n_augmentations=1,
+                                                              n_augmentations=n_augmentations,
                                                               augmentation=transforms[2],
                                                               transform=transforms[1],
                                                               parse_item_cb=parse_item,
