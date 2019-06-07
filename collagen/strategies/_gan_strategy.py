@@ -110,6 +110,13 @@ class GANStrategy(object):
                                        ProgressbarVisualizer(update_freq=1))
         self.__callbacks += self.__default_st_callbacks
 
+        self._g_minibatch_accumulate_grad = True
+        self._d_minibatch_accumulate_grad = True
+        self._g_batch_accumulate_grad = False
+        self._d_batch_accumulate_grad = False
+        self._g_cast_target = None
+        self._d_cast_target = None
+
 
     def _call_callbacks_by_name(self, cb_func_name, **kwargs):
         for model_name in self.__model_names:
@@ -176,7 +183,10 @@ class GANStrategy(object):
 
                     if "D" in self.__data_key_by_stage[stage]:
                         getattr(self.__trainers["D"], stage)(data_key=self.__data_key_by_stage[stage]["D"],
-                                                             target_key=self.__target_key_by_stage[stage]["D"])
+                                                             target_key=self.__target_key_by_stage[stage]["D"],
+                                                             minibatch_accumulate_grad=self._d_minibatch_accumulate_grad,
+                                                             accumulate_grad = self._d_batch_accumulate_grad,
+                                                             cast_target=self._d_cast_target)
                     self._call_callbacks_by_name(cb_func_name='on_gan_d_batch_end',
                                                    progress_bar=progress_bar,
                                                    epoch=epoch,
@@ -192,7 +202,10 @@ class GANStrategy(object):
 
                     if "G" in self.__data_key_by_stage[stage]:
                         getattr(self.__trainers["G"], stage)(data_key=self.__data_key_by_stage[stage]["G"],
-                                                             target_key=self.__target_key_by_stage[stage]["G"])
+                                                             target_key=self.__target_key_by_stage[stage]["G"],
+                                                             minibatch_accumulate_grad=self._g_minibatch_accumulate_grad,
+                                                             accumulate_grad=self._g_batch_accumulate_grad,
+                                                             cast_target=self._g_cast_target)
                     self._call_callbacks_by_name(cb_func_name='on_gan_d_batch_end',
                                                    progress_bar=progress_bar,
                                                    epoch=epoch,

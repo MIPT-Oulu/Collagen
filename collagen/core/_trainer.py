@@ -88,9 +88,16 @@ class Trainer(object):
     def model(self):
         return self.__module
 
-    def train(self, data_key: Tuple[str] or str = 'img',
-              target_key: Tuple[str] or str = 'target',
-              accumulate_grad=False, cast_target=None):
+    @staticmethod
+    def check_first_minibatch(loader_i, minibatch_i):
+        return loader_i == 0 and minibatch_i == 0
+
+    @staticmethod
+    def check_last_minibatch(n_loaders, loader_i, n_minibatches, minibatch_i):
+        return loader_i >= n_loaders - 1 and minibatch_i >= n_minibatches - 1
+
+    def train(self, data_key: Tuple[str] or str = 'img', target_key: Tuple[str] or str = 'target',
+              minibatch_accumulate_grad: bool = True, accumulate_grad=False, cast_target=None):
         """
         Runs session in train mode as many iterations as given in the train loader.
 
@@ -142,10 +149,15 @@ class Trainer(object):
                         else:
                             raise ValueError('Not found key {} in sampled batch'.format(key_i))
 
-                first_minibatch = ind == 0 and i == 0
+                first_minibatch = self.check_first_minibatch(loader_i=ind, minibatch_i=i)
+                last_minibatch = self.check_last_minibatch(n_loaders=len(self.__train_loader_names), loader_i=ind,
+                                                           n_minibatches=n_iter, minibatch_i=i)
+                no_zero_grad = accumulate_grad or (not first_minibatch and minibatch_accumulate_grad)
+                with_step = last_minibatch or not minibatch_accumulate_grad
                 loss, train_result = self.__session.train_step(input_data,
                                                                target, retain_graph=True,
-                                                               accumulate_grad=accumulate_grad or not first_minibatch, with_step=False,
+                                                               accumulate_grad=no_zero_grad,
+                                                               with_step=with_step,
                                                                return_out=True, callbacks=self.__train_callbacks)
                 self.__train_batches_count += 1
 
@@ -181,11 +193,13 @@ class Trainer(object):
                     else:
                         raise ValueError('Not found key {} in sampled batch'.format(key_i))
 
-            first_minibatch = ind == 0 and i == 0
-            last_minibatch = ind == len(self.__train_loader_names) - 1 and i == n_iter - 1
-            loss, train_result = self.__session.train_step(input_data, target,
-                                                           accumulate_grad=accumulate_grad or not first_minibatch, with_step=last_minibatch,
-                                                           return_out=True,
+            first_minibatch = self.check_first_minibatch(loader_i=ind, minibatch_i=i)
+            last_minibatch = self.check_last_minibatch(n_loaders=len(self.__train_loader_names), loader_i=ind, n_minibatches=n_iter, minibatch_i=i)
+            no_zero_grad = accumulate_grad or (not first_minibatch and minibatch_accumulate_grad)
+            with_step = last_minibatch or not minibatch_accumulate_grad
+            loss, train_result = self.__session.train_step(input_data, target, return_out=True,
+                                                           accumulate_grad=no_zero_grad,
+                                                           with_step=with_step,
                                                            callbacks=self.__train_callbacks)
             self.__train_batches_count += 1
             # TODO: support tuple of target_key, inputs and targets
