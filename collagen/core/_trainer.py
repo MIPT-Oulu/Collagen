@@ -155,7 +155,7 @@ class Trainer(object):
                 no_zero_grad = accumulate_grad or (not first_minibatch and minibatch_accumulate_grad)
                 with_step = last_minibatch or not minibatch_accumulate_grad
                 loss, train_result = self.__session.train_step(input_data,
-                                                               target, retain_graph=True,
+                                                               target, retain_graph=minibatch_accumulate_grad,
                                                                accumulate_grad=no_zero_grad,
                                                                with_step=with_step,
                                                                return_out=True, callbacks=self.__train_callbacks)
@@ -218,7 +218,7 @@ class Trainer(object):
         #     cur_loader_state = self.__data_provider.state_dict()[loader_name]
         #     del cur_loader_state['samples']
 
-    def eval(self, data_key: Tuple[str] or str = 'img',
+    def eval(self, data_key: Tuple[str] or str = 'img', minibatch_accumulate_grad=None, accumulate_grad=None,
              target_key: Tuple[str] or str = 'target', cast_target=None):
         """
         Runs session in `eval` mode as many iterations as given in the validation / test loader.
