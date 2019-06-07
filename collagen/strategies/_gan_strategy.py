@@ -117,16 +117,27 @@ class GANStrategy(object):
         self._g_cast_target = None
         self._d_cast_target = None
 
+    def get_samples(self, stage, loader_name):
+        if stage in self.__num_samples_by_stage and loader_name in self.__num_samples_by_stage[stage]:
+            return self.__num_samples_by_stage[stage][loader_name]
+        else:
+            return None
+
+    def set_samples(self, stage, loader_name, value):
+        if stage in self.__num_samples_by_stage and loader_name in self.__num_samples_by_stage[stage]:
+            self.__num_samples_by_stage[stage][loader_name] = value
+        else:
+            raise ValueError('Not found stage {} and loader name'.format(stage, loadername))
 
     def _call_callbacks_by_name(self, cb_func_name, **kwargs):
         for model_name in self.__model_names:
             for cb in getattr(self.__trainers[model_name], f'get_callbacks_by_stage')(kwargs['stage']):
                 if hasattr(cb, cb_func_name):
-                    getattr(cb, cb_func_name)(strategy=self, **kwargs)
+                    getattr(cb, cb_func_name)(strategy=self, data_provider=self.__data_provider, **kwargs)
 
         for cb in self.__callbacks:
             if hasattr(cb, cb_func_name):
-                getattr(cb, cb_func_name)(strategy=self, **kwargs)
+                getattr(cb, cb_func_name)(strategy=self, data_provider=self.__data_provider, **kwargs)
 
 
     def get_callbacks_by_name(self, name, stage):
