@@ -129,6 +129,68 @@ class ItemLoader(object):
         return samples
 
 
+class MixUpSampler(ItemLoader):
+    def __init__(self, name: str, alpha: callable or float, model: nn.Module or None = None,
+                 data_rearrage: callable or None = None, target_rearrage: callable or None = None,
+                 data_key: str = "data", target_key: str = 'target',
+                 parse_item_cb: callable or None = None, meta_data: pd.DataFrame or None = None,
+                 root: str or None = None, batch_size: int = 1, num_workers: int = 0, shuffle: bool = False,
+                 pin_memory: bool = False, collate_fn: callable = default_collate, transform: callable or None = None,
+                 sampler: torch.utils.data.sampler.Sampler or None = None, batch_sampler=None,
+                 drop_last: bool = False, timeout: int = 0, detach: bool = False):
+        super().__init__(meta_data=meta_data, parse_item_cb=parse_item_cb, root=root, batch_size=batch_size,
+                         num_workers=num_workers, shuffle=shuffle, pin_memory=pin_memory, collate_fn=collate_fn,
+                         transform=transform, sampler=sampler, batch_sampler=batch_sampler, drop_last=drop_last, timeout=timeout)
+
+        self.__model = model
+        self.__name = name
+        self.__data_key = data_key
+        self.__target_key = target_key
+        self.__alpha = alpha
+        self.__data_rearrage = self._default_change_data_ordering if data_rearrage is None else data_rearrage
+        self.__target_rearrage = self._default_change_target_ordering if target_rearrage is None else target_rearrage
+
+    @property
+    def alpha(self):
+        return self.__alpha
+
+    @staticmethod
+    def _default_change_data_ordering(x):
+        return x[::-1, :, :, :]
+
+    @staticmethod
+    def _default_change_target_ordering(y):
+        return y[::-1, :]
+
+    def sample(self, k=1):
+        sampled_rows = super().sample(k)
+        samples = []
+        for i in range(k):
+            imgs1 = sampled_rows[i][self.__data_key]
+            target1 = sampled_rows[i][self.__target_key]
+            imgs2 = self.__data_rearrage(imgs1)
+            target2 = self.__target_rearrage(target1)
+            if isinstance(self.alpha, callable):
+                l = self.alpha()
+            elif isinstance(self.alpha, float):
+                l = self.alpha
+            else:
+                raise ValueError('Not support alpha of {}'.format(type(self.alpha)))
+
+            if not isinstance(self.alpha, float) or l < 0 or l > 1:
+                raise ValueError('Alpha {} is out of range [0,1]'.format(l))
+
+            if self.__model is not None:
+                device = next(self.__model.parameters()).device
+                logits1 = self.__model(imgs1.to(device))
+                logits2 = self.__model(imgs2.to(device))
+
+            mixup_imgs = l*imgs1 + (1 - l)*imgs2
+            mixup_target = l*target1 + (1 - l)*target2
+            samples.append({'name': self.__name, self.__data_key: mixup_imgs, self.__target_key: target,
+                            'logits1': logits1, 'logits2': logits2})
+
+
 class AugmentedGroupSampler(ItemLoader):
     def __init__(self, model: nn.Module, name: str, augmentation, n_augmentations=1, output_type='logits', data_key: str = "data", target_key: str = 'target',
                  parse_item_cb: callable or None = None, meta_data: pd.DataFrame or None = None,
