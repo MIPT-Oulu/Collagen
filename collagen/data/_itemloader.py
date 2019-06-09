@@ -144,6 +144,7 @@ class MixUpSampler(ItemLoader):
 
         self.__model = model
         self.__name = name
+        # self.__n_classes = n_classes
         self.__data_key = data_key
         self.__target_key = target_key
         self.__alpha = alpha
@@ -167,10 +168,12 @@ class MixUpSampler(ItemLoader):
 
     def sample(self, k=1):
         sampled_rows = super().sample(k)
+        device = next(self.__model.parameters()).device
         samples = []
         for i in range(k):
             imgs1 = sampled_rows[i][self.__data_key]
             target1 = sampled_rows[i][self.__target_key]
+
             imgs2 = self.__data_rearrage(imgs1)
             target2 = self.__target_rearrage(target1)
             if callable(self.alpha):
@@ -182,17 +185,25 @@ class MixUpSampler(ItemLoader):
 
             if not isinstance(l, float) or l < 0 or l > 1:
                 raise ValueError('Alpha {} is not float or out of range [0,1]'.format(l))
+            elif l < 0.5:
+                l = 1 - l
 
             if self.__model is not None:
-                device = next(self.__model.parameters()).device
                 logits1 = self.__model(imgs1.to(device))
                 logits2 = self.__model(imgs2.to(device))
 
+            onehot1 = torch.zeros([batch_size, self.__n_classes])
+            onehot2 = torch.zeros([batch_size, self.__n_classes])
+
+            # batch_size = imgs1.shape[0]
+            # onehot1.scatter_(1, target1.type(torch.int64).unsqueeze(-1), 1.0)
+            # onehot2.scatter_(1, target2.type(torch.int64).unsqueeze(-1), 1.0)
+            # mixup_target = l*onehot1 + (1 - l)*onehot2
+
             mixup_imgs = l*imgs1 + (1 - l)*imgs2
-            mixup_target = l*target1 + (1 - l)*target2
             mixup_logits = l*logits1 + (1 - l)*logits2
-            samples.append({'name': self.__name, 'mixup_data': mixup_imgs, 'mixup_target': mixup_target,
-                            'mixup_logits': mixup_logits})
+            samples.append({'name': self.__name, 'mixup_data': mixup_imgs, 'target': target1, 'target_bg': target2,
+                            'alpha': l, 'mixup_logits': mixup_logits})
         return samples
 
 
