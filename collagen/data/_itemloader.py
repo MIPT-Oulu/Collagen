@@ -156,11 +156,14 @@ class MixUpSampler(ItemLoader):
 
     @staticmethod
     def _default_change_data_ordering(x):
-        return x[::-1, :, :, :]
+        return torch.flip(x, dims=[0])
 
     @staticmethod
     def _default_change_target_ordering(y):
-        return y[::-1, :]
+        return torch.flip(y, dims=[0])
+
+    def __len__(self):
+        return super().__len__()
 
     def sample(self, k=1):
         sampled_rows = super().sample(k)
@@ -170,15 +173,15 @@ class MixUpSampler(ItemLoader):
             target1 = sampled_rows[i][self.__target_key]
             imgs2 = self.__data_rearrage(imgs1)
             target2 = self.__target_rearrage(target1)
-            if isinstance(self.alpha, callable):
+            if callable(self.alpha):
                 l = self.alpha()
             elif isinstance(self.alpha, float):
                 l = self.alpha
             else:
                 raise ValueError('Not support alpha of {}'.format(type(self.alpha)))
 
-            if not isinstance(self.alpha, float) or l < 0 or l > 1:
-                raise ValueError('Alpha {} is out of range [0,1]'.format(l))
+            if not isinstance(l, float) or l < 0 or l > 1:
+                raise ValueError('Alpha {} is not float or out of range [0,1]'.format(l))
 
             if self.__model is not None:
                 device = next(self.__model.parameters()).device
@@ -187,8 +190,10 @@ class MixUpSampler(ItemLoader):
 
             mixup_imgs = l*imgs1 + (1 - l)*imgs2
             mixup_target = l*target1 + (1 - l)*target2
-            samples.append({'name': self.__name, self.__data_key: mixup_imgs, self.__target_key: target,
-                            'logits1': logits1, 'logits2': logits2})
+            mixup_logits = l*logits1 + (1 - l)*logits2
+            samples.append({'name': self.__name, 'mixup_data': mixup_imgs, 'mixup_target': mixup_target,
+                            'mixup_logits': mixup_logits})
+        return samples
 
 
 class AugmentedGroupSampler(ItemLoader):
@@ -245,7 +250,6 @@ class AugmentedGroupSampler(ItemLoader):
                 out = self.__model.get_features(batch_imgs)
                 # logits = to_cpu(out, use_numpy=False, required_grad=True)
                 logits = out
-
 
             if self.__n_augmentations > 1:
                 logits = logits.view(self.__n_augmentations, batch_size, -1)
