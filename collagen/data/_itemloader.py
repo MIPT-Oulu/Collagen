@@ -192,8 +192,8 @@ class MixUpSampler(ItemLoader):
                 logits1 = self.__model(imgs1.to(device))
                 logits2 = self.__model(imgs2.to(device))
 
-            onehot1 = torch.zeros([batch_size, self.__n_classes])
-            onehot2 = torch.zeros([batch_size, self.__n_classes])
+            # onehot1 = torch.zeros([batch_size, self.__n_classes])
+            # onehot2 = torch.zeros([batch_size, self.__n_classes])
 
             # batch_size = imgs1.shape[0]
             # onehot1.scatter_(1, target1.type(torch.int64).unsqueeze(-1), 1.0)
