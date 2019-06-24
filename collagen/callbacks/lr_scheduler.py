@@ -74,8 +74,8 @@ class CycleRampUpDownScheduler(LRScheduler):
         self.__cycle_interval = cycle_interval
 
     def on_batch_begin(self, epoch, n_epochs, batch_i, n_batches, *args, **kwargs):
-        if self.__lr_rampdown_epochs <= n_epochs:
-            raise ValueError(f'lr_rampdown_epochs {self.__lr_rampdown_epochs} must larger than num of epochs {n_epochs}')
+        # if self.__lr_rampdown_epochs <= n_epochs:
+        #     raise ValueError(f'lr_rampdown_epochs {self.__lr_rampdown_epochs} must larger than num of epochs {n_epochs}')
         
         epoch = epoch + batch_i / n_batches
         # LR warm-up to handle large minibatch sizes from https://arxiv.org/abs/1706.02677
