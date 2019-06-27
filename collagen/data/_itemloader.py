@@ -271,13 +271,13 @@ class MixUpSampler2(ItemLoader):
 
             mixup_imgs = l * imgs1 + (1 - l) * imgs2
 
-            logits1 = self.__model(imgs1.to(device))
+            logits1 = self.__te_model(imgs1.to(device))
             logits2 = self.__model(imgs2.to(device))
             # mixup_logits = self.__model(mixup_imgs.to(device))
 
             imgs1_cpu = to_cpu(imgs1.permute(0, 2, 3, 1), use_numpy=True)
             imgs1_aug = self.__augmentation(imgs1_cpu)
-            logits1_aug = self.__te_model(imgs1_aug.to(device))
+            logits1_aug = self.__model(imgs1_aug.to(device))
 
             # mixup_imgs_cpu = to_cpu(mixup_imgs.permute(0, 2, 3, 1), use_numpy=True)
             # mixup_aug_imgs = self.__augmentation(mixup_imgs_cpu)
@@ -293,7 +293,7 @@ class MixUpSampler2(ItemLoader):
             logits_mixup = l*logits1 + (1 - l)*logits2
             samples.append({'name': self.__name, 'mixup_data': mixup_imgs,
                             'target': target1, 'target_bg': target2,
-                            'logits': logits1, 'logits_aug': logits1_aug.detach(),
+                            'logits': logits1.detach(), 'logits_aug': logits1_aug,
                             'logits_mixup': logits_mixup, 'alpha': l})
         return samples
 
