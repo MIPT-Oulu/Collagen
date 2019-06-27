@@ -210,7 +210,7 @@ class MixUpSampler(ItemLoader):
 
 
 class MixUpSampler2(ItemLoader):
-    def __init__(self, name: str, alpha: callable or float, model: nn.Module or None = None,
+    def __init__(self, name: str, alpha: callable or float, model: nn.Module or None, te_model: nn.Module or None = None,
                  data_rearrange: callable or None = None, target_rearrage: callable or None = None,
                  data_key: str = "data", target_key: str = 'target', augmentation: callable or None = None,
                  parse_item_cb: callable or None = None, meta_data: pd.DataFrame or None = None, min_lambda: float = 0.7,
@@ -223,6 +223,7 @@ class MixUpSampler2(ItemLoader):
                          transform=transform, sampler=sampler, batch_sampler=batch_sampler, drop_last=drop_last, timeout=timeout)
 
         self.__model = model
+        self.__te_model = self.__model if te_model is None else te_model
         self.__name = name
         # self.__n_classes = n_classes
         self.__data_key = data_key
@@ -276,7 +277,7 @@ class MixUpSampler2(ItemLoader):
 
             imgs1_cpu = to_cpu(imgs1.permute(0, 2, 3, 1), use_numpy=True)
             imgs1_aug = self.__augmentation(imgs1_cpu)
-            logits1_aug = self.__model(imgs1_aug.to(device))
+            logits1_aug = self.__te_model(imgs1_aug.to(device))
 
             # mixup_imgs_cpu = to_cpu(mixup_imgs.permute(0, 2, 3, 1), use_numpy=True)
             # mixup_aug_imgs = self.__augmentation(mixup_imgs_cpu)
@@ -292,7 +293,7 @@ class MixUpSampler2(ItemLoader):
             logits_mixup = l*logits1 + (1 - l)*logits2
             samples.append({'name': self.__name, 'mixup_data': mixup_imgs,
                             'target': target1, 'target_bg': target2,
-                            'logits': logits1, 'logits_aug': logits1_aug,
+                            'logits': logits1, 'logits_aug': logits1_aug.detach(),
                             'logits_mixup': logits_mixup, 'alpha': l})
         return samples
 
