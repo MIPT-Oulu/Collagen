@@ -82,7 +82,7 @@ class Session(object):
         self.__optimizer.add_param_group(self.__module.parameters(group_name))
 
     def train_step(self, batch: torch.Tensor or Tuple[torch.Tensor],
-                   target: torch.Tensor or Tuple[torch.Tensor],
+                   target: torch.Tensor or Tuple[torch.Tensor], retain_graph: bool = False,
                    accumulate_grad: bool = False, return_out=False, with_step: bool = True,
                    callbacks: Tuple[callable] or List[callable] or None = None) -> float:
         """
@@ -113,12 +113,12 @@ class Session(object):
             self.__optimizer.zero_grad()
 
         return self.__batch_step(batch=batch, target=target, with_grad=True,
-                                 with_backward=True, with_step=with_step,
+                                 with_backward=True, with_step=with_step, retain_graph=retain_graph,
                                  return_out=return_out, callbacks=callbacks)
 
     def eval_step(self, batch: torch.Tensor or Tuple[torch.Tensor],
                   target: torch.Tensor or Tuple[torch.Tensor],
-                  return_out=False,
+                  return_out=False, retain_graph:bool = False,
                   callbacks: Tuple[callable] or List[callable] or None = None) -> Tuple[float,
                                                                                         torch.Tensor or tuple] or float:
         """
@@ -142,13 +142,13 @@ class Session(object):
 
         return self.__batch_step(batch, target, with_grad=False,
                                  with_backward=False, with_step=False,
-                                 eval_mode=True,
+                                 eval_mode=True, retain_graph=retain_graph,
                                  return_out=return_out, callbacks=callbacks)
 
     def __batch_step(self, batch: torch.Tensor or Tuple[torch.Tensor],
                      target: torch.Tensor or Tuple[torch.Tensor] or dict,  with_grad: bool = True,
                      with_backward: bool = True, eval_mode: bool = False, with_step: bool = True,
-                     return_out: bool = False,
+                     return_out: bool = False, retain_graph: bool = False,
                      callbacks: Tuple[callable] or List[callable] or None = None) -> Tuple[float, Any] or float:
         """
         Private method, which handles the logic for training and evaluation for 1 mini-batch.
@@ -265,7 +265,7 @@ class Session(object):
                                          output=out)
 
                 loss.backward(gradient=self.__gradient,
-                              retain_graph=self.__retain_graph,
+                              retain_graph=self.__retain_graph or retain_graph,
                               create_graph=self.__create_graph)
 
                 for cb in callbacks:

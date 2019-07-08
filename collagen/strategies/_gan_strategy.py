@@ -1,9 +1,9 @@
 from collagen.core import Trainer, Callback
-from collagen.core.utils import to_tuple
+from collagen.core.utils import wrap_tuple
 from collagen.data import DataProvider
 from collagen.metrics import RunningAverageMeter
-from collagen.callbacks import OnDiscriminatorBatchFreezer, OnGeneratorBatchFreezer
-from collagen.callbacks import ProgressbarVisualizer, OnSamplingFreezer
+from collagen.callbacks import DiscriminatorBatchFreezer, GeneratorBatchFreezer
+from collagen.callbacks import ProgressbarVisualizer, SamplingFreezer
 from typing import Tuple
 import torch
 from tqdm import tqdm
@@ -50,7 +50,7 @@ class GANStrategy(object):
         self.__stage_names = ("train", "eval")
         self.__model_names = ("G", "D")
         self.__n_epochs = n_epochs
-        self.__callbacks = to_tuple(callbacks)
+        self.__callbacks = wrap_tuple(callbacks)
         self.__data_provider = data_provider
 
         self.__data_sampling_config = data_sampling_config
@@ -94,9 +94,9 @@ class GANStrategy(object):
 
         # Default minibatch level callbacks
         self.__default_g_callbacks_train = (RunningAverageMeter(prefix="train/G", name="loss"),
-                                            OnGeneratorBatchFreezer(modules=d_trainer.model))
+                                            GeneratorBatchFreezer(modules=d_trainer.model))
         self.__default_d_callbacks_train = (RunningAverageMeter(prefix="train/D", name="loss"),
-                                            OnDiscriminatorBatchFreezer(modules=g_trainer.model))
+                                            DiscriminatorBatchFreezer(modules=g_trainer.model))
         self.__default_g_callbacks_eval = RunningAverageMeter(prefix="eval/G", name="loss")
         self.__default_d_callbacks_eval = RunningAverageMeter(prefix="eval/D", name="loss")
 
@@ -106,18 +106,38 @@ class GANStrategy(object):
         self.__trainers["D"].add_eval_callbacks(self.__default_d_callbacks_eval)
 
         # Default epoch level callbacks
-        self.__default_st_callbacks = (OnSamplingFreezer(modules=to_tuple(d_trainer.model)+to_tuple(g_trainer.model)),
+        self.__default_st_callbacks = (SamplingFreezer(modules=wrap_tuple(d_trainer.model) + wrap_tuple(g_trainer.model)),
                                        ProgressbarVisualizer(update_freq=1))
         self.__callbacks += self.__default_st_callbacks
 
+        self._g_minibatch_accumulate_grad = True
+        self._d_minibatch_accumulate_grad = True
+        self._g_batch_accumulate_grad = False
+        self._d_batch_accumulate_grad = False
+        self._g_cast_target = None
+        self._d_cast_target = None
+
+    def get_samples(self, stage, loader_name):
+        if stage in self.__num_samples_by_stage and loader_name in self.__num_samples_by_stage[stage]:
+            return self.__num_samples_by_stage[stage][loader_name]
+        else:
+            return None
+
+    def set_samples(self, stage, loader_name, value):
+        if stage in self.__num_samples_by_stage and loader_name in self.__num_samples_by_stage[stage]:
+            self.__num_samples_by_stage[stage][loader_name] = value
+        else:
+            raise ValueError('Not found stage {} and loader name'.format(stage, loadername))
 
     def _call_callbacks_by_name(self, cb_func_name, **kwargs):
         for model_name in self.__model_names:
             for cb in getattr(self.__trainers[model_name], f'get_callbacks_by_stage')(kwargs['stage']):
-                getattr(cb, cb_func_name)(strategy=self, **kwargs)
+                if hasattr(cb, cb_func_name):
+                    getattr(cb, cb_func_name)(strategy=self, data_provider=self.__data_provider, **kwargs)
 
         for cb in self.__callbacks:
-            getattr(cb, cb_func_name)(strategy=self, **kwargs)
+            if hasattr(cb, cb_func_name):
+                getattr(cb, cb_func_name)(strategy=self, data_provider=self.__data_provider, **kwargs)
 
 
     def get_callbacks_by_name(self, name, stage):
@@ -174,7 +194,10 @@ class GANStrategy(object):
 
                     if "D" in self.__data_key_by_stage[stage]:
                         getattr(self.__trainers["D"], stage)(data_key=self.__data_key_by_stage[stage]["D"],
-                                                             target_key=self.__target_key_by_stage[stage]["D"])
+                                                             target_key=self.__target_key_by_stage[stage]["D"],
+                                                             minibatch_accumulate_grad=self._d_minibatch_accumulate_grad,
+                                                             accumulate_grad = self._d_batch_accumulate_grad,
+                                                             cast_target=self._d_cast_target)
                     self._call_callbacks_by_name(cb_func_name='on_gan_d_batch_end',
                                                    progress_bar=progress_bar,
                                                    epoch=epoch,
@@ -190,7 +213,10 @@ class GANStrategy(object):
 
                     if "G" in self.__data_key_by_stage[stage]:
                         getattr(self.__trainers["G"], stage)(data_key=self.__data_key_by_stage[stage]["G"],
-                                                             target_key=self.__target_key_by_stage[stage]["G"])
+                                                             target_key=self.__target_key_by_stage[stage]["G"],
+                                                             minibatch_accumulate_grad=self._g_minibatch_accumulate_grad,
+                                                             accumulate_grad=self._g_batch_accumulate_grad,
+                                                             cast_target=self._g_cast_target)
                     self._call_callbacks_by_name(cb_func_name='on_gan_d_batch_end',
                                                    progress_bar=progress_bar,
                                                    epoch=epoch,

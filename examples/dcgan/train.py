@@ -4,7 +4,8 @@ from torch import optim
 from tensorboardX import SummaryWriter
 
 from collagen.core import Trainer
-from collagen.callbacks import  TensorboardSynthesisVisualizer, GeneratorLoss
+from collagen.losses.gan import GeneratorLoss
+from collagen.callbacks import  TensorboardSynthesisVisualizer
 from collagen.data.data_provider import gan_data_provider
 from collagen.core.utils import auto_detect_device
 from collagen.strategies import GANStrategy

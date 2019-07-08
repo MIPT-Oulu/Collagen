@@ -6,7 +6,7 @@ from tqdm import tqdm
 from collagen.core import Trainer, Session, Module
 from collagen.metrics import RunningAverageMeter
 from collagen.callbacks import ProgressbarVisualizer
-from collagen.core.utils import to_tuple
+from collagen.core.utils import wrap_tuple
 from collagen.core import Callback
 from collagen.data import DataProvider
 
@@ -63,22 +63,22 @@ class Strategy(object):
         self.__n_epochs: int = n_epochs
 
         self.__data_sampling_config = data_sampling_config
-        self.__train_callbacks: Tuple[Callback] = to_tuple(train_callbacks)
-        self.__val_callbacks: Tuple[Callback] = to_tuple(val_callbacks)
-        self.__train_loader_names: Tuple[str] = to_tuple(train_loader_names)
-        self.__val_loader_names: Tuple[str] = to_tuple(val_loader_names)
-        self.__val_callbacks: Tuple[Callback] = to_tuple(val_callbacks)
-        self.__train_callbacks: Tuple[Callback] = to_tuple(train_callbacks)
+        self.__train_callbacks: Tuple[Callback] = wrap_tuple(train_callbacks)
+        self.__val_callbacks: Tuple[Callback] = wrap_tuple(val_callbacks)
+        self.__train_loader_names: Tuple[str] = wrap_tuple(train_loader_names)
+        self.__val_loader_names: Tuple[str] = wrap_tuple(val_loader_names)
+        self.__val_callbacks: Tuple[Callback] = wrap_tuple(val_callbacks)
+        self.__train_callbacks: Tuple[Callback] = wrap_tuple(train_callbacks)
 
         if train_num_samples is None:
             self.__train_num_samples: Tuple[int] = tuple([1] * len(self.__train_loader_names))
         else:
-            self.__train_num_samples: Tuple[int] = to_tuple(train_num_samples)
+            self.__train_num_samples: Tuple[int] = wrap_tuple(train_num_samples)
 
         if val_num_samples is None:
             self.__val_num_samples: Tuple[int] = tuple([1] * len(self.__val_loader_names))
         else:
-            self.__val_num_samples: Tuple[int] = to_tuple(val_num_samples)
+            self.__val_num_samples: Tuple[int] = wrap_tuple(val_num_samples)
 
         if len(self.__train_loader_names) != len(self.__train_num_samples) or \
                 len(self.__val_loader_names) != len(self.__val_num_samples):

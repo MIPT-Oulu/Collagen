@@ -6,15 +6,15 @@ from typing import Tuple
 import numpy as np
 import torch
 from collagen.core import Callback
-from collagen.core.utils import to_tuple
+from collagen.core.utils import wrap_tuple
 
 
 class ModelSaver(Callback):
     def __init__(self, metric_names: Tuple[str] or str, conditions: Tuple[str] or str, model: nn.Module,
                  save_dir: str, prefix: str = "", keep_best_only: bool = True, mode="and"):
         super().__init__(ctype="saver")
-        self.__metric_names = to_tuple(metric_names)
-        self.__conditions = to_tuple(conditions)
+        self.__metric_names = wrap_tuple(metric_names)
+        self.__conditions = wrap_tuple(conditions)
         self.__prefix = prefix if prefix else "model"
         self.__save_dir = save_dir
         self.__keep_best_only = keep_best_only

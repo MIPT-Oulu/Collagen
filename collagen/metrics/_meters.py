@@ -93,7 +93,7 @@ class RunningAverageMeter(Meter):
 
     def current(self):
         if self.__count == 0:
-            return self.__value
+            return None
         return self.__value / self.__count
 
 
@@ -135,9 +135,9 @@ class AccuracyMeter(Meter):
     def current(self):
         if self.__data_count > 0:
             acc = self.__correct_count / self.__data_count
+            return to_cpu(acc, use_numpy=True)
         else:
-            acc = 0.0
-        return to_cpu(acc, use_numpy=True)
+            return None
 
 
 class BalancedAccuracyMeter(Meter):
@@ -181,10 +181,9 @@ class BalancedAccuracyMeter(Meter):
 
     def current(self):
         if len(self.__corrects) > 0:
-            acc = balanced_accuracy_score(y_true=self.__corrects, y_pred=self.__preds)
+            return balanced_accuracy_score(y_true=self.__corrects, y_pred=self.__preds)
         else:
-            acc = 0.0
-        return acc
+            return None
 
 
 class AccuracyThresholdMeter(Meter):
@@ -223,29 +222,32 @@ class AccuracyThresholdMeter(Meter):
     def current(self):
         if self.__data_count > 0:
             acc = self.__correct_count / self.__data_count
+            return to_cpu(acc, use_numpy=True)
         else:
-            acc = 0.0
-        return to_cpu(acc, use_numpy=True)
+            return None
 
 
 class SSAccuracyMeter(Meter):
-    def __init__(self, name: str = "ssl_accuracy", sigmoid: bool = False, prefix=""):
+    def __init__(self, name: str = "ssl_accuracy", sigmoid: bool = False, prefix="",
+                 cond=None, parse_target=None, parse_output=None):
         super().__init__(name=name, prefix=prefix)
         self.__sigmoid: bool = sigmoid
         self.__data_count = 0.0
         self.__correct_count = 0.0
         self.__accuracy = None
+        self.__cond = Meter.default_cond if cond is None else cond
+        self.__parse_target = Meter.default_parse_target if parse_target is None else parse_target
+        self.__parse_output = Meter.default_parse_output if parse_output is None else parse_output
 
     def on_epoch_begin(self, epoch, *args, **kwargs):
         self.__data_count = 0.0
         self.__correct_count = 0.0
 
     def _calc_metric(self, target, output, device=None, **kwargs):
-        if len(target.shape) > 1 and target.shape[1] > 1:
-            n = target.shape[0]
-            target_cls = target[:,:-1].float()
-            output_cls = output[:,:-1].float()
-            target_valid = target[:, -1].float()
+        if self.__cond(target, output):
+            target_cls, target_valid = self.__parse_target(target)
+            output_cls, _ = self.__parse_output(output)
+
             if device is None:
                 device = output.device
                 target_on_device = target_cls.to(device)
@@ -277,13 +279,14 @@ class SSAccuracyMeter(Meter):
     def current(self):
         if self.__data_count > 0:
             acc = self.__correct_count / self.__data_count
+            to_cpu(acc, use_numpy=True)
         else:
-            acc = 0.0
-        return to_cpu(acc, use_numpy=True)
+            return None
 
 
 class SSBalancedAccuracyMeter(Meter):
-    def __init__(self, name: str = "ssl_balanced_accuracy", sigmoid: bool = False, prefix=""):
+    def __init__(self, name: str = "ssl_balanced_accuracy", sigmoid: bool = False, prefix="",
+                 cond=None, parse_target=None, parse_output=None):
         super().__init__(name=name, prefix=prefix)
         self.__sigmoid: bool = sigmoid
         self.__data_count = 0.0
@@ -291,21 +294,22 @@ class SSBalancedAccuracyMeter(Meter):
         self.__accuracy = None
         self.__corrects = []
         self.__preds = []
+        self.__cond = Meter.default_cond if cond is None else cond
+        self.__parse_target = Meter.default_parse_target if parse_target is None else parse_target
+        self.__parse_output = Meter.default_parse_output if parse_output is None else parse_output
 
     def on_epoch_begin(self, epoch, *args, **kwargs):
         self.__preds = []
         self.__corrects = []
 
     def _calc_metric(self, target, output, device=None, **kwargs):
-        if len(target.shape) > 1 and target.shape[1] > 1:
-            if self.__sigmoid:
-                output = output[:, -1].sigmoid()
-            target = to_cpu(target, use_numpy=True)
-            output = to_cpu(output, use_numpy=True)
-            n = target.shape[0]
-            target_cls = target[:,:-1]
-            output_cls = output[:,:-1]
-            target_valid = target[:, -1]
+        if self.__cond(target, output):
+            target_cls, target_valid = self.__parse_target(target)
+            output_cls, _ = self.__parse_output(output)
+
+            target_cls = to_cpu(target_cls, use_numpy=True)
+            target_valid = to_cpu(target_valid, use_numpy=True)
+            output_cls = to_cpu(output_cls, use_numpy=True)
 
             mask = target_valid == 1
 
@@ -326,59 +330,50 @@ class SSBalancedAccuracyMeter(Meter):
 
     def current(self):
         if len(self.__corrects) > 0:
-            acc = balanced_accuracy_score(y_true=self.__corrects, y_pred=self.__preds)
+            return balanced_accuracy_score(y_true=self.__corrects, y_pred=self.__preds)
         else:
-            acc = 0.0
-        return acc
+            return None
 
 
 class SSValidityMeter(Meter):
-    def __init__(self, name: str = "ssl_validity", threshold: float = 0.5, sigmoid: bool = False, prefix=""):
+    def __init__(self, name: str = "ssl_validity", threshold: float = 0.5, sigmoid: bool = False, prefix="",
+                 cond=None, parse_target=None, parse_output=None):
         super().__init__(name=name, prefix=prefix)
         self.__sigmoid: bool = sigmoid
         self.__threshold = threshold
         self.__data_count = 0.0
         self.__correct_count = 0.0
         self.__accuracy = None
+        self.__cond = Meter.default_cond
+        self.__parse_target = Meter.default_parse_target if parse_target is None else parse_target
+        self.__parse_output = Meter.default_parse_output if parse_output is None else parse_output
 
     def on_epoch_begin(self, epoch, *args, **kwargs):
         self.__data_count = 0.0
         self.__correct_count = 0.0
 
     def on_minibatch_end(self, target, output, device=None, **kwargs):
-        if len(target.shape) > 1 and target.shape[1] > 1:
-            target_valid = target[:,-1]
-        elif len(target.shape) == 1:
-            target_valid = target
-        else:
-            raise ValueError("Not support target shape like {}".format(target.shape))
+        if self.__cond(target, output):
+            target_valid = self.__parse_target(target)
+            output_valid = self.__parse_output(output)
 
-        if len(output.shape) > 1 and output.shape[1] > 1:
-            output_valid = output[:,-1]
-        elif len(output.shape) == 1:
-            output_valid = output
-        else:
-            raise ValueError("Not support output shape like {}".format(output.shape))
+            n = target_valid.shape[0]
 
-        n = target.shape[0]
+            if device is None:
+                device = output.device
+                target_on_device = target_valid.to(device)
+                output_on_device = output_valid
+            else:
+                target_on_device = target_valid.to(device)
+                output_on_device = output_valid.to(device)
 
-        if device is None:
-            device = output.device
-            target_on_device = target_valid.to(device)
-            output_on_device = output_valid
-        else:
-            target_on_device = target_valid.to(device)
-            output_on_device = output_valid.to(device)
+            if self.__sigmoid:
+                output_on_device = output_on_device.sigmoid()
 
-        if self.__sigmoid:
-            output_on_device = output_on_device.sigmoid()
-
-        valid = ((output_on_device > self.__threshold) == target_on_device.byte()).float()
-        fp = valid.sum()
-        self.__correct_count += fp
-        self.__data_count += n
-        acc = self.__correct_count/self.__data_count
-        acc1 = acc
+            valid = ((output_on_device > self.__threshold) == target_on_device.byte()).float()
+            fp = valid.sum()
+            self.__correct_count += fp
+            self.__data_count += n
 
     def on_epoch_end(self, epoch, n_epochs, *args, **kwargs):
         self.__accuracy = self.current()
@@ -386,9 +381,9 @@ class SSValidityMeter(Meter):
     def current(self):
         if self.__data_count > 0:
             acc = self.__correct_count / self.__data_count
+            return to_cpu(acc, use_numpy=True)
         else:
-            acc = 0.0
-        return to_cpu(acc, use_numpy=True)
+            return None
 
 
 class KappaMeter(Meter):
@@ -403,11 +398,6 @@ class KappaMeter(Meter):
         self.__parse_target = Meter.default_parse_target if parse_target is None else parse_target
         self.__parse_output = Meter.default_parse_output if parse_output is None else parse_output
         self.__cond = Meter.default_cond if cond is None else cond
-        # if parse_classes is None:
-        #     self.__parse_classes = self._default_parse_classes
-        # else:
-        #     self.__parse_classes = parse_classes
-
 
     def on_epoch_begin(self, epoch, **kwargs):
         self.__predicts = []
@@ -429,5 +419,7 @@ class KappaMeter(Meter):
         if len(self.__corrects) != len(self.__predicts):
             raise ValueError("Predicts and corrects must match, but got {} vs {}".format(len(self.__corrects),
                                                                                          len(self.__predicts)))
-        kappa_score = cohen_kappa_score(self.__corrects, self.__predicts, weights=self.__weight_type)
-        return kappa_score
+        elif len(self.__corrects) == 0:
+            return None
+        else:
+            return cohen_kappa_score(self.__corrects, self.__predicts, weights=self.__weight_type)

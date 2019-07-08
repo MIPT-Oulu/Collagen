@@ -11,16 +11,16 @@ import solt.transforms as slt
 
 
 def cond_accuracy_meter(target, output):
-    return target['name'] == 'l'
+    return target['name'].startswith('l')
 
-def parse_target_accuracy_meter(target):
-    if target['name'] == 'l':
+def parse_target(target):
+    if target['name'].startswith('l'):
         return target['target']
     else:
         return None
 
 def parse_class(output):
-    if isinstance(output, dict) and output['name'] == 'l':
+    if isinstance(output, dict) and output['name'].startswith('l'):
         output = output['target']
     elif isinstance(output, Tensor):
         pass
@@ -49,17 +49,9 @@ class SSConfusionMatrixVisualizer(ConfusionMatrixVisualizer):
             target_cls = self.__parse_class(target)
             pred_cls = self.__parse_class(output)
             if target_cls is not None and pred_cls is not None:
+                # decoded_pred_cls = pred_cls.argmax(dim=-1)
                 self._corrects += [self._labels[i] for i in to_cpu(target_cls, use_numpy=True).tolist()]
                 self._predicts += [self._labels[i] for i in to_cpu(pred_cls, use_numpy=True).tolist()]
-
-def cond_accuracy_meter(target, output):
-    return target['name'] == 'l'
-
-def parse_target_accuracy_meter(target):
-    if target['name'] == 'l':
-        return target['target']
-    else:
-        return None
 
 
 def wrap2solt(inp):
@@ -138,10 +130,17 @@ def parse_item(root, entry, trf, data_key, target_key):
 
 def init_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--n_epochs', type=int, default=1000, help='Number of epochs')
+    parser.add_argument('--n_epochs', type=int, default=500, help='Number of epochs')
     parser.add_argument('--dataset', type=str, default="cifar10", help='Dataset name')
     parser.add_argument('--bs', type=int, default=32, help='Batch size')
-    parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate (Discriminator)')
+    parser.add_argument('--lr', type=float, default=1e-1, help='Max learning rate')
+    parser.add_argument('--initial_lr', default=0.0, type=float, help='Initial learning rate when using linear rampup')
+    parser.add_argument('--lr_rampup', default=20, type=int, help='Length of learning rate rampup in the beginning')
+    parser.add_argument('--lr_rampdown_epochs', default=80, type=int, help='Length of learning rate cosine rampdown (>= length of training)')
+    parser.add_argument('--start_cycle_epoch', default=80, type=int, help='Epoch to start cycle')
+    parser.add_argument('--cycle_rampdown_epochs', default=0, type=int, help='Length of epoch cycle to ramp down')
+    parser.add_argument('--cycle_interval', default=20, type=int, help='Length of epoch for a cosine annealing cycle')
+
     parser.add_argument('--wd', type=float, default=1e-4, help='Weight decay')
     parser.add_argument('--beta1', type=float, default=0.5, help='Weight decay')
     parser.add_argument('--n_features', type=int, default=128, help='Number of features')
@@ -153,8 +152,7 @@ def init_args():
     parser.add_argument('--log_dir', type=str, default=None, help='Log directory')
     parser.add_argument('--grid_shape', type=tuple, default=(24, 24), help='Shape of grid of generated images')
     parser.add_argument('--ngpu', type=int, default=1, help='Num of GPUs')
-    parser.add_argument('--n_training_batches', type=int, default=-1,
-                        help='Num of training batches, if -1, auto computed')
+    parser.add_argument('--n_training_batches', type=int, default=-1, help='Num of training batches, if -1, auto computed')
     args = parser.parse_args()
 
     torch.manual_seed(args.seed)
