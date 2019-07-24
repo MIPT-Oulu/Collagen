@@ -39,7 +39,9 @@ class BatchLRLogging(Logging):
         self.__optims = wrap_tuple(optimizers)
         self.__names = wrap_tuple(names)
         if len(self.__optims) != len(self.__names):
-            raise ValueError('The num of optimizers and names must match, but found {} and {}'.format(len(self.__optims), len(self.__names)))
+            raise ValueError(
+                'The num of optimizers and names must match, but found {} and {}'.format(len(self.__optims),
+                                                                                         len(self.__names)))
 
         self.__single = len(self.__names) == 1
 
@@ -54,6 +56,7 @@ class BatchLRLogging(Logging):
                 lrs[name] = optim.param_groups[0]['lr']
             self.__summary_writer.add_scalars(self.__tag, lrs, global_step)
 
+
 class EpochLRLogging(Logging):
     def __init__(self, writer, optimizers, names, log_dir: str = None, tag: str = ''):
         super().__init__()
@@ -63,7 +66,9 @@ class EpochLRLogging(Logging):
         self.__optims = wrap_tuple(optimizers)
         self.__names = wrap_tuple(names)
         if len(self.__optims) != len(self.__names):
-            raise ValueError('The num of optimizers and names must match, but found {} and {}'.format(len(self.__optims), len(self.__names)))
+            raise ValueError(
+                'The num of optimizers and names must match, but found {} and {}'.format(len(self.__optims),
+                                                                                         len(self.__names)))
 
         self.__single = len(self.__names) == 1
 

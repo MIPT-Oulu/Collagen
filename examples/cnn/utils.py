@@ -1,18 +1,14 @@
 import argparse
-import torch
-import numpy as np
 
-import pandas as pd
-import torchvision.datasets as datasets
+import solt.core as slc
+import solt.data as sld
+import solt.transforms as slt
+import torch
 import torch.nn.functional as F
 from torch import nn
 
-import solt.data as sld
-import solt.core as slc
-import solt.transforms as slt
-
-from collagen.data.utils import ApplyTransform, Normalize, Compose
 from collagen.core import Module
+from collagen.data.utils import ApplyTransform, Normalize, Compose
 
 
 def init_args():
@@ -79,11 +75,11 @@ def init_mnist_transforms(n_channels=1):
 class SimpleConvNet(Module):
     def __init__(self, bw, drop=0.5, n_cls=10, n_channels=1):
         super(SimpleConvNet, self).__init__()
-        self.n_filters_last = bw*2
+        self.n_filters_last = bw * 2
 
         self.conv1 = self.make_layer(n_channels, bw)
-        self.conv2 = self.make_layer(bw, bw*2)
-        self.conv3 = self.make_layer(bw*2, self.n_filters_last)
+        self.conv2 = self.make_layer(bw, bw * 2)
+        self.conv3 = self.make_layer(bw * 2, self.n_filters_last)
 
         self.classifier = nn.Sequential(nn.Dropout(drop),
                                         nn.Linear(self.n_filters_last, n_cls))
@@ -110,4 +106,3 @@ class SimpleConvNet(Module):
 
     def get_features_by_name(self, name):
         pass
-

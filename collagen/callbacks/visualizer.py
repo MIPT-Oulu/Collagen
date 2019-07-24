@@ -1,11 +1,13 @@
-import tqdm
-import torch
+from typing import Tuple
+
 import numpy as np
+import torch
+import tqdm
 from torch import Tensor
 from torch.tensor import OrderedDict
-from typing import Tuple
-from collagen.core import Callback
 from torchvision.utils import make_grid
+
+from collagen.core import Callback
 from collagen.core.utils import to_cpu
 from collagen.metrics import plot_confusion_matrix
 
@@ -47,7 +49,6 @@ class ConfusionMatrixVisualizer(Callback):
     def _default_parse_class(y):
         return y
 
-
     @property
     def targets(self):
         return self._corrects
@@ -79,9 +80,12 @@ class ConfusionMatrixVisualizer(Callback):
 
     def on_epoch_end(self, *args, **kwargs):
         if len(self._corrects) != len(self._predicts):
-            raise ValueError('Num of predictions and groundtruths must match, but found {} and {}'.format(len(self._predicts), len(self._corrects)))
+            raise ValueError(
+                'Num of predictions and groundtruths must match, but found {} and {}'.format(len(self._predicts),
+                                                                                             len(self._corrects)))
         elif len(self._corrects) > 0:
-            fig = plot_confusion_matrix(np.array(self._corrects), np.array(self._predicts), labels=self._labels, normalize=self._normalize)
+            fig = plot_confusion_matrix(np.array(self._corrects), np.array(self._predicts), labels=self._labels,
+                                        normalize=self._normalize)
             self._writer.add_figure(self._tag, fig, global_step=self.__epoch)
 
 
@@ -162,8 +166,7 @@ class TensorboardSynthesisVisualizer(Callback):
 
     @staticmethod
     def _default_transform(x):
-        return (x+1.0)/2.0
-
+        return (x + 1.0) / 2.0
 
     @staticmethod
     def _default_tranform_unbind_imgs(separate_imgs):
@@ -180,8 +183,8 @@ class TensorboardSynthesisVisualizer(Callback):
                     if len(img.shape) == 3 and img.shape[0] != 1 and img.shape[0] != 3:
                         if self.__split_channel:
                             if img.shape[0] % 3 == 0:
-                                n_split = int(img.shape[0]/3)
-                                separate_imgs = [img[3*k:3*(k+1), :, :] for k in range(n_split)]
+                                n_split = int(img.shape[0] / 3)
+                                separate_imgs = [img[3 * k:3 * (k + 1), :, :] for k in range(n_split)]
                                 concate_img = self.__unbind_imgs_transform(separate_imgs)
                                 images.append(concate_img)
                             else:
@@ -189,7 +192,9 @@ class TensorboardSynthesisVisualizer(Callback):
                                 concate_img = self.__unbind_imgs_transform(separate_imgs)
                                 images.append(torch.unsqueeze(concate_img, 0))
                         else:
-                            raise ValueError("Channels of image ({}) must be either 1 or 3, but found {}".format(img.shape, img.shape[0]))
+                            raise ValueError(
+                                "Channels of image ({}) must be either 1 or 3, but found {}".format(img.shape,
+                                                                                                    img.shape[0]))
                     else:
                         images.append(img)
             else:

@@ -1,20 +1,20 @@
-import torch
-import numpy as np
-import yaml
-
-from collagen.data import ItemLoader, DataProvider
-from collagen.data import FoldSplit
-from collagen.core.utils import auto_detect_device
-from collagen.strategies import Strategy
-from collagen.metrics import RunningAverageMeter, AccuracyMeter
-from collagen.callbacks import ProgressbarVisualizer
-from collagen.data.utils import get_mnist, get_cifar10
-from collagen.savers import ModelSaver
 import random
-from collagen.logging import MeterLogging
+
+import numpy as np
+import torch
+import yaml
 from tensorboardX import SummaryWriter
-from examples.cnn.utils import init_mnist_transforms, init_args
+
+from collagen.core.utils import auto_detect_device
+from collagen.data import FoldSplit
+from collagen.data import ItemLoader, DataProvider
+from collagen.data.utils import get_mnist, get_cifar10
+from collagen.logging import MeterLogging
+from collagen.metrics import RunningAverageMeter, AccuracyMeter
+from collagen.savers import ModelSaver
+from collagen.strategies import Strategy
 from examples.cnn.utils import SimpleConvNet
+from examples.cnn.utils import init_mnist_transforms, init_args
 
 device = auto_detect_device()
 
@@ -39,7 +39,6 @@ if __name__ == "__main__":
         n_channels = 1
     else:
         raise ValueError('Not support dataset {}'.format(args.dataset))
-
 
     criterion = torch.nn.CrossEntropyLoss()
 

@@ -1,7 +1,8 @@
-import torch.nn as nn
-from typing import Tuple, Dict
 from abc import abstractmethod
+from typing import Tuple, Dict
+
 import torch
+import torch.nn as nn
 
 
 class Module(nn.Module):
@@ -11,6 +12,7 @@ class Module(nn.Module):
     This extension allows to group the layers and have an easy access to them via group names.
 
     """
+
     def __init__(self, input_shape=None, output_shape=None):
         super(Module, self).__init__()
         self.__param_groups = dict()
@@ -64,7 +66,7 @@ class Module(nn.Module):
         else:
             if name is None:
                 if isinstance(group, str):
-                    group = (group, )
+                    group = (group,)
                 for group_name in group:
                     yield {'params': self.__param_groups[group_name],
                            'name': None,
@@ -74,7 +76,7 @@ class Module(nn.Module):
                     raise ValueError
 
                 if isinstance(name, str):
-                    name = (name, )
+                    name = (name,)
 
                 for module_name in name:
                     yield {'params': self.__param_groups[group][module_name], 'name': module_name, 'group_name': group}

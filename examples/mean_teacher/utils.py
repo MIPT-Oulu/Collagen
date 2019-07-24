@@ -1,23 +1,27 @@
 import argparse
+
+import numpy as np
+import solt.core as slc
+import solt.data as sld
+import solt.transforms as slt
 import torch
 from torch import Tensor
-import numpy as np
-import solt.data as sld
+
+from collagen.callbacks import ConfusionMatrixVisualizer
 from collagen.core.utils import to_cpu
 from collagen.data.utils import ApplyTransform, Normalize, Compose
-from collagen.callbacks import ConfusionMatrixVisualizer
-import solt.core as slc
-import solt.transforms as slt
 
 
 def cond_accuracy_meter(target, output):
     return target['name'].startswith('l')
+
 
 def parse_target(target):
     if target['name'].startswith('l'):
         return target['target']
     else:
         return None
+
 
 def parse_class(output):
     if isinstance(output, dict) and output['name'].startswith('l'):
@@ -37,6 +41,7 @@ def parse_class(output):
         raise ValueError("Only support dims 1 or 2, but got {}".format(len(output.shape)))
     output_cpu = output_cpu.astype(int)
     return output_cpu
+
 
 class SSConfusionMatrixVisualizer(ConfusionMatrixVisualizer):
     def __init__(self, cond, parse_class, writer, labels: list or None = None, tag="confusion_matrix", normalize=False):
@@ -66,7 +71,7 @@ def wrap2solt(inp):
 def unpack_solt(dc: sld.DataContainer):
     img, target = dc.data
     img, target = torch.from_numpy(img).permute(2, 0, 1).float(), target
-    return img/255.0, np.float32(target)
+    return img / 255.0, np.float32(target)
 
 
 def init_transforms(nc=1):
@@ -138,7 +143,8 @@ def init_args():
     parser.add_argument('--lr', type=float, default=1e-1, help='Max learning rate')
     parser.add_argument('--initial_lr', default=0.0, type=float, help='Initial learning rate when using linear rampup')
     parser.add_argument('--lr_rampup', default=20, type=int, help='Length of learning rate rampup in the beginning')
-    parser.add_argument('--lr_rampdown_epochs', default=350, type=int, help='Length of learning rate cosine rampdown (>= length of training)')
+    parser.add_argument('--lr_rampdown_epochs', default=350, type=int,
+                        help='Length of learning rate cosine rampdown (>= length of training)')
     parser.add_argument('--start_cycle_epoch', default=300, type=int, help='Epoch to start cycle')
     parser.add_argument('--cycle_rampdown_epochs', default=0, type=int, help='Length of epoch cycle to ramp down')
     parser.add_argument('--cycle_interval', default=20, type=int, help='Length of epoch for a cosine annealing cycle')
@@ -155,14 +161,11 @@ def init_args():
     parser.add_argument('--log_dir', type=str, default=None, help='Log directory')
     parser.add_argument('--grid_shape', type=tuple, default=(24, 24), help='Shape of grid of generated images')
     parser.add_argument('--ngpu', type=int, default=1, help='Num of GPUs')
-    parser.add_argument('--n_training_batches', type=int, default=-1, help='Num of training batches, if -1, auto computed')
+    parser.add_argument('--n_training_batches', type=int, default=-1,
+                        help='Num of training batches, if -1, auto computed')
     args = parser.parse_args()
 
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
 
     return args
-
-
-
-

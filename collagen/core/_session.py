@@ -1,7 +1,9 @@
-import torch
-import numpy as np
-from torch import Tensor
 from typing import Tuple, Any, List
+
+import numpy as np
+import torch
+from torch import Tensor
+
 from collagen.core import Module
 
 
@@ -21,6 +23,7 @@ class Session(object):
         Loss used in the session
 
     """
+
     def __init__(self, module: Module, optimizer: torch.optim.Optimizer,
                  loss: torch.nn.Module):
 
@@ -118,7 +121,7 @@ class Session(object):
 
     def eval_step(self, batch: torch.Tensor or Tuple[torch.Tensor],
                   target: torch.Tensor or Tuple[torch.Tensor],
-                  return_out=False, retain_graph:bool = False,
+                  return_out=False, retain_graph: bool = False,
                   callbacks: Tuple[callable] or List[callable] or None = None) -> Tuple[float,
                                                                                         torch.Tensor or tuple] or float:
         """
@@ -146,7 +149,7 @@ class Session(object):
                                  return_out=return_out, callbacks=callbacks)
 
     def __batch_step(self, batch: torch.Tensor or Tuple[torch.Tensor],
-                     target: torch.Tensor or Tuple[torch.Tensor] or dict,  with_grad: bool = True,
+                     target: torch.Tensor or Tuple[torch.Tensor] or dict, with_grad: bool = True,
                      with_backward: bool = True, eval_mode: bool = False, with_step: bool = True,
                      return_out: bool = False, retain_graph: bool = False,
                      callbacks: Tuple[callable] or List[callable] or None = None) -> Tuple[float, Any] or float:
@@ -292,24 +295,14 @@ class Session(object):
 
                     for cb in callbacks:
                         cb.on_optimizer_step_end(module=self.__module,
-                                                   loss=loss,
-                                                   input=batch_on_device,
-                                                   target=target_on_device,
-                                                   output=out,
-                                                   optimizer=self.__optimizer,
-                                                   criterion=self.__loss)
+                                                 loss=loss,
+                                                 input=batch_on_device,
+                                                 target=target_on_device,
+                                                 output=out,
+                                                 optimizer=self.__optimizer,
+                                                 criterion=self.__loss)
 
             if not return_out:
                 return loss.item()
             else:
                 return loss.item(), out
-
-
-
-
-
-
-
-
-
-

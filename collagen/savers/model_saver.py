@@ -1,10 +1,12 @@
-import torch.nn as nn
-from os.path import exists, join, isfile
 from datetime import datetime
 from os import mkdir, remove
+from os.path import exists, join, isfile
 from typing import Tuple
+
 import numpy as np
 import torch
+import torch.nn as nn
+
 from collagen.core import Callback
 from collagen.core.utils import wrap_tuple
 
@@ -23,7 +25,8 @@ class ModelSaver(Callback):
 
         if self.__mode == "avg" and len(self.__conditions) > 1:
             if len(set(self.__conditions)) > 1:
-                raise ValueError("All modes must be the same in {} mode, but got".format(self.__mode, self.__conditions))
+                raise ValueError(
+                    "All modes must be the same in {} mode, but got".format(self.__mode, self.__conditions))
 
         if not exists(self.__save_dir):
             print("Not found directory {} to save modelzoo. Create the directory.".format(self.__save_dir))
@@ -60,7 +63,8 @@ class ModelSaver(Callback):
     def __check_combined_cond(self, metrics):
         is_improved = False
         comb_metric = np.mean(np.array([metrics[metric_name] for metric_name in metrics]))
-        best_metric = np.mean(np.array([self.__best_metrics[metric_name]["value"] for metric_name in self.__best_metrics]))
+        best_metric = np.mean(
+            np.array([self.__best_metrics[metric_name]["value"] for metric_name in self.__best_metrics]))
         cond = self.__best_metrics[next(iter(self.__best_metrics))]["cond"]
         if cond == "min" and comb_metric < best_metric:
             is_improved = True

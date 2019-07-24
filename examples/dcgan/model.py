@@ -1,6 +1,8 @@
 from collections import OrderedDict
-from torch import nn
+
 import torch
+from torch import nn
+
 from collagen.core import Module
 
 

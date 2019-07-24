@@ -1,6 +1,6 @@
-from torchvision import datasets
 import numpy as np
 import pandas as pd
+from torchvision import datasets
 
 
 def get_mnist(data_folder='.', train=True):
@@ -9,9 +9,11 @@ def get_mnist(data_folder='.', train=True):
     meta_data = pd.DataFrame(list_rows)
     return meta_data, list(range(10))
 
+
 def get_cifar10(data_folder='.', train=True):
     _db = datasets.CIFAR10(data_folder, train=train, transform=None, download=True)
-    list_rows = [{"data": _db.train_data[i,:, :, :], "target": _db.train_labels[i]} for i in range(len(_db.train_labels))]
+    list_rows = [{"data": _db.train_data[i, :, :, :], "target": _db.train_labels[i]} for i in
+                 range(len(_db.train_labels))]
     meta_data = pd.DataFrame(list_rows)
     classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
     return meta_data, classes

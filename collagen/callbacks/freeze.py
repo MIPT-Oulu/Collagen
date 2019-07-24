@@ -1,4 +1,5 @@
 from typing import Tuple
+
 from collagen.core import Callback, Module
 from collagen.core.utils import wrap_tuple, freeze_modules
 

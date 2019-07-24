@@ -1,6 +1,6 @@
 from collagen.core import Module
-from collagen.modelzoo.segmentation import constants
 from collagen.modelzoo.segmentation import backbones
+from collagen.modelzoo.segmentation import constants
 from collagen.modelzoo.segmentation import decoders
 
 
@@ -47,4 +47,3 @@ class EncoderDecoder(Module):
 
     def get_features_by_name(self, name: str):
         pass
-

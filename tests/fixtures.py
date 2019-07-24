@@ -1,10 +1,9 @@
-import pytest
-import pandas as pd 
 import numpy as np
-import torch 
-from collagen.core import Module
-from torch import nn
+import pandas as pd
+import pytest
+import torch
 import torch.nn.functional as F
+from torch import nn
 
 
 def gen_5_class_random_data_frame(size):
@@ -79,6 +78,7 @@ def ones_image_parser():
         img, target = transforms(img, target)
 
         return {'img': img, 'target': target, 'fname': entry.fname}
+
     return parser
 
 
@@ -86,6 +86,7 @@ def ones_image_parser():
 def img_target_transformer():
     def empty_transform(img, target):
         return torch.from_numpy(img.astype(np.float32)).unsqueeze(0), target
+
     return empty_transform
 
 
@@ -96,12 +97,14 @@ def classification_minibatch_two_class(request):
                                          request.param[2], request.param[3],
                                          request.param[4])
 
+
 @pytest.fixture(scope='function', params=((2, 3, 7, 7, 3), (3, 3, 9, 9, 3),
                                           (2, 3, 8, 8, 5), (3, 3, 4, 4, 5)))
 def classification_minibatch_multi_class(request):
     return gen_multi_class_img_minibatch(request.param[0], request.param[1],
                                          request.param[2], request.param[3],
                                          request.param[4])
+
 
 @pytest.fixture(scope='function', params=((2, 3, 7, 7, 3, 2), (3, 3, 9, 9, 3, 3),
                                           (2, 3, 8, 8, 5, 2), (3, 3, 4, 4, 5, 3)))
@@ -134,4 +137,3 @@ def dumb_net():
 def tensor_224():
     t = torch.FloatTensor(1, 3, 224, 224).fill_(-0.00001)
     return t
-

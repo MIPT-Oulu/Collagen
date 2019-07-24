@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from sklearn.metrics import balanced_accuracy_score
 from sklearn.metrics import cohen_kappa_score
-from torch import Tensor
+
 from collagen.core import Callback
 from collagen.core.utils import to_cpu
 
@@ -62,7 +62,8 @@ class Meter(Callback):
 
     @property
     def desc(self):
-        return self.__prefix + ("/" if self.__prefix else "") + self.name if self.__desc_name is None else self.__desc_name
+        return self.__prefix + (
+            "/" if self.__prefix else "") + self.name if self.__desc_name is None else self.__desc_name
 
     def __str__(self):
         return self.desc
@@ -141,7 +142,8 @@ class AccuracyMeter(Meter):
 
 
 class BalancedAccuracyMeter(Meter):
-    def __init__(self, name: str = "balanced_categorical_accuracy", prefix="", parse_target=None, parse_output=None, cond=None):
+    def __init__(self, name: str = "balanced_categorical_accuracy", prefix="", parse_target=None, parse_output=None,
+                 cond=None):
         super().__init__(name=name, prefix=prefix)
         self.__data_count = 0.0
         self.__correct_count = 0.0
@@ -265,7 +267,7 @@ class SSAccuracyMeter(Meter):
             discrete_target_on_device = target_on_device.argmax(dim=-1).view(n)
 
             cls = (discrete_output_on_device.byte() == discrete_target_on_device.byte()).float()
-            fp = (target_valid_on_device*cls).sum()
+            fp = (target_valid_on_device * cls).sum()
             total = target_valid_on_device.sum().float()
             self.__correct_count += fp
             self.__data_count += total
@@ -388,7 +390,7 @@ class SSValidityMeter(Meter):
 
 class KappaMeter(Meter):
     def __init__(self, name: str = "kappa", prefix="", weight_type="quadratic",
-                 parse_target = None, parse_output = None, cond = None):
+                 parse_target=None, parse_output=None, cond=None):
         super().__init__(name=name, prefix=prefix)
         self.__predicts = []
         self.__corrects = []

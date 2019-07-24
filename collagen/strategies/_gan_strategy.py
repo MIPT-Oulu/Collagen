@@ -1,12 +1,14 @@
+from typing import Tuple
+
+import torch
+from tqdm import tqdm
+
+from collagen.callbacks import DiscriminatorBatchFreezer, GeneratorBatchFreezer
+from collagen.callbacks import ProgressbarVisualizer, SamplingFreezer
 from collagen.core import Trainer, Callback
 from collagen.core.utils import wrap_tuple
 from collagen.data import DataProvider
 from collagen.metrics import RunningAverageMeter
-from collagen.callbacks import DiscriminatorBatchFreezer, GeneratorBatchFreezer
-from collagen.callbacks import ProgressbarVisualizer, SamplingFreezer
-from typing import Tuple
-import torch
-from tqdm import tqdm
 
 
 class GANStrategy(object):
@@ -25,7 +27,7 @@ class GANStrategy(object):
                  n_epochs: int or None = 100,
                  callbacks: Tuple[Callback] or Callback = None,
                  device: str or None = "cuda",
-                 n_training_batches: int or None=None):
+                 n_training_batches: int or None = None):
         """Implements a part of the training GAN loop by passing the available batches through the model.
 
         Parameters
@@ -106,8 +108,9 @@ class GANStrategy(object):
         self.__trainers["D"].add_eval_callbacks(self.__default_d_callbacks_eval)
 
         # Default epoch level callbacks
-        self.__default_st_callbacks = (SamplingFreezer(modules=wrap_tuple(d_trainer.model) + wrap_tuple(g_trainer.model)),
-                                       ProgressbarVisualizer(update_freq=1))
+        self.__default_st_callbacks = (
+        SamplingFreezer(modules=wrap_tuple(d_trainer.model) + wrap_tuple(g_trainer.model)),
+        ProgressbarVisualizer(update_freq=1))
         self.__callbacks += self.__default_st_callbacks
 
         self._g_minibatch_accumulate_grad = True
@@ -139,14 +142,14 @@ class GANStrategy(object):
             if hasattr(cb, cb_func_name):
                 getattr(cb, cb_func_name)(strategy=self, data_provider=self.__data_provider, **kwargs)
 
-
     def get_callbacks_by_name(self, name, stage):
         if name == "D":
             return self.__trainers[name].get_callbacks_by_stage(stage)
         elif name == "G":
             return self.__trainers[name].get_callbacks_by_stage(stage)
         elif name == "minibatch":
-            return self.__trainers["D"].get_callbacks_by_stage(stage) + self.__trainers["G"].get_callbacks_by_stage(stage)
+            return self.__trainers["D"].get_callbacks_by_stage(stage) + self.__trainers["G"].get_callbacks_by_stage(
+                stage)
         elif name == "batch":
             return self.__callbacks
         elif name == "all":
@@ -158,58 +161,58 @@ class GANStrategy(object):
         for epoch in range(self.__n_epochs):
             for stage in self.__stage_names:
                 self._call_callbacks_by_name(cb_func_name='on_epoch_begin', epoch=epoch, stage=stage,
-                                               n_epochs=self.__n_epochs)
+                                             n_epochs=self.__n_epochs)
 
                 progress_bar = tqdm(range(self.__num_batches_by_stage[stage]), total=self.__num_batches_by_stage[stage],
                                     desc=f'Epoch [{epoch}][{stage}]::')
                 for batch_i in progress_bar:
                     self._call_callbacks_by_name(cb_func_name='on_sample_begin',
-                                                   progress_bar=progress_bar,
-                                                   epoch=epoch,
-                                                   n_epochs=self.__n_epochs,
-                                                   stage=stage,
-                                                   batch_i=batch_i)
+                                                 progress_bar=progress_bar,
+                                                 epoch=epoch,
+                                                 n_epochs=self.__n_epochs,
+                                                 stage=stage,
+                                                 batch_i=batch_i)
 
                     self.__data_provider.sample(**self.__num_samples_by_stage[stage])
                     self._call_callbacks_by_name(cb_func_name='on_sample_end',
-                                                   progress_bar=progress_bar,
-                                                   epoch=epoch,
-                                                   n_epochs=self.__n_epochs,
-                                                   stage=stage,
-                                                   batch_i=batch_i)
+                                                 progress_bar=progress_bar,
+                                                 epoch=epoch,
+                                                 n_epochs=self.__n_epochs,
+                                                 stage=stage,
+                                                 batch_i=batch_i)
 
                     self._call_callbacks_by_name(cb_func_name='on_batch_begin',
-                                                   progress_bar=progress_bar,
-                                                   epoch=epoch,
-                                                   n_epochs=self.__n_epochs,
-                                                   stage=stage,
-                                                   batch_i=batch_i)
+                                                 progress_bar=progress_bar,
+                                                 epoch=epoch,
+                                                 n_epochs=self.__n_epochs,
+                                                 stage=stage,
+                                                 batch_i=batch_i)
 
                     self._call_callbacks_by_name(cb_func_name='on_gan_d_batch_begin',
-                                                   progress_bar=progress_bar,
-                                                   epoch=epoch,
-                                                   n_epochs=self.__n_epochs,
-                                                   stage=stage,
-                                                   batch_i=batch_i)
+                                                 progress_bar=progress_bar,
+                                                 epoch=epoch,
+                                                 n_epochs=self.__n_epochs,
+                                                 stage=stage,
+                                                 batch_i=batch_i)
 
                     if "D" in self.__data_key_by_stage[stage]:
                         getattr(self.__trainers["D"], stage)(data_key=self.__data_key_by_stage[stage]["D"],
                                                              target_key=self.__target_key_by_stage[stage]["D"],
                                                              minibatch_accumulate_grad=self._d_minibatch_accumulate_grad,
-                                                             accumulate_grad = self._d_batch_accumulate_grad,
+                                                             accumulate_grad=self._d_batch_accumulate_grad,
                                                              cast_target=self._d_cast_target)
                     self._call_callbacks_by_name(cb_func_name='on_gan_d_batch_end',
-                                                   progress_bar=progress_bar,
-                                                   epoch=epoch,
-                                                   n_epochs=self.__n_epochs,
-                                                   stage=stage,
-                                                   batch_i=batch_i)
+                                                 progress_bar=progress_bar,
+                                                 epoch=epoch,
+                                                 n_epochs=self.__n_epochs,
+                                                 stage=stage,
+                                                 batch_i=batch_i)
                     self._call_callbacks_by_name(cb_func_name='on_gan_g_batch_begin',
-                                                   progress_bar=progress_bar,
-                                                   epoch=epoch,
-                                                   n_epochs=self.__n_epochs,
-                                                   stage=stage,
-                                                   batch_i=batch_i)
+                                                 progress_bar=progress_bar,
+                                                 epoch=epoch,
+                                                 n_epochs=self.__n_epochs,
+                                                 stage=stage,
+                                                 batch_i=batch_i)
 
                     if "G" in self.__data_key_by_stage[stage]:
                         getattr(self.__trainers["G"], stage)(data_key=self.__data_key_by_stage[stage]["G"],
@@ -218,19 +221,18 @@ class GANStrategy(object):
                                                              accumulate_grad=self._g_batch_accumulate_grad,
                                                              cast_target=self._g_cast_target)
                     self._call_callbacks_by_name(cb_func_name='on_gan_d_batch_end',
-                                                   progress_bar=progress_bar,
-                                                   epoch=epoch,
-                                                   n_epochs=self.__n_epochs,
-                                                   stage=stage,
-                                                   batch_i=batch_i)
+                                                 progress_bar=progress_bar,
+                                                 epoch=epoch,
+                                                 n_epochs=self.__n_epochs,
+                                                 stage=stage,
+                                                 batch_i=batch_i)
 
                     self._call_callbacks_by_name(cb_func_name='on_batch_end',
-                                                   progress_bar=progress_bar,
-                                                   epoch=epoch,
-                                                   n_epochs=self.__n_epochs,
-                                                   stage=stage,
-                                                   batch_i=batch_i)
-
+                                                 progress_bar=progress_bar,
+                                                 epoch=epoch,
+                                                 n_epochs=self.__n_epochs,
+                                                 stage=stage,
+                                                 batch_i=batch_i)
 
                 self._call_callbacks_by_name(cb_func_name='on_epoch_end', epoch=epoch, n_epochs=self.__n_epochs,
-                                               stage=stage)
+                                             stage=stage)

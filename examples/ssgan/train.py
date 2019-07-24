@@ -1,20 +1,19 @@
-from torch.nn import BCELoss, CrossEntropyLoss
-from torch import optim, Tensor
-from tensorboardX import SummaryWriter
 import yaml
+from tensorboardX import SummaryWriter
+from torch import optim, Tensor
+from torch.nn import BCELoss, CrossEntropyLoss
 
+from collagen.callbacks import ConfusionMatrixVisualizer
+from collagen.callbacks import TensorboardSynthesisVisualizer, ClipGradCallback
 from collagen.core import Module, Trainer
 from collagen.core.utils import auto_detect_device, to_cpu
-from collagen.callbacks import TensorboardSynthesisVisualizer, ClipGradCallback
-from collagen.callbacks import ConfusionMatrixVisualizer
 from collagen.data import DataProvider, ItemLoader, SSGANFakeSampler, SSFoldSplit
-from collagen.strategies import GANStrategy
-from collagen.metrics import SSAccuracyMeter, SSValidityMeter
 from collagen.data.utils import get_mnist
 from collagen.logging import MeterLogging
-
-from examples.ssgan.utils import init_args, parse_item_mnist_ssgan, init_mnist_transforms
+from collagen.metrics import SSAccuracyMeter, SSValidityMeter
+from collagen.strategies import GANStrategy
 from examples.ssgan.utils import Discriminator, Generator
+from examples.ssgan.utils import init_args, parse_item_mnist_ssgan, init_mnist_transforms
 
 device = auto_detect_device()
 

@@ -1,22 +1,21 @@
-from torch.nn import MSELoss, CrossEntropyLoss
-from torch import optim, Tensor
 import torch
-from tensorboardX import SummaryWriter
 import yaml
+from tensorboardX import SummaryWriter
+from torch import optim, Tensor
+from torch.nn import CrossEntropyLoss
 from torch.nn import functional as F
 
 from collagen.core import Module
 from collagen.core.utils import auto_detect_device
 from collagen.data import SSFoldSplit
 from collagen.data.data_provider import pimodel_data_provider
-from collagen.strategies import Strategy
-from collagen.metrics import RunningAverageMeter, AccuracyMeter, KappaMeter
 from collagen.data.utils import get_mnist, get_cifar10
 from collagen.logging import MeterLogging
-
-from examples.pi_model.utils import init_args, parse_item, init_transforms, parse_target_accuracy_meter
-from examples.pi_model.utils import SSConfusionMatrixVisualizer, cond_accuracy_meter, parse_class
+from collagen.metrics import RunningAverageMeter, AccuracyMeter, KappaMeter
+from collagen.strategies import Strategy
 from examples.pi_model.networks import Model01
+from examples.pi_model.utils import SSConfusionMatrixVisualizer, cond_accuracy_meter, parse_class
+from examples.pi_model.utils import init_args, parse_item, init_transforms, parse_target_accuracy_meter
 
 device = auto_detect_device()
 
@@ -65,7 +64,6 @@ class PiModelLoss(Module):
         n_classes = input_logits.size()[1]
         return F.mse_loss(input_softmax, target_softmax, reduction='sum') / n_classes
 
-
     def forward(self, pred: Tensor, target: Tensor):
         n_minibatch_size = pred.shape[0]
         if target['name'] == 'u':
@@ -73,7 +71,7 @@ class PiModelLoss(Module):
 
             loss_cons = self.__loss_cons(aug_logit, pred)
 
-            self.__losses['loss_cons'] = self.__alpha * loss_cons / (self.__n_minibatches*n_minibatch_size)
+            self.__losses['loss_cons'] = self.__alpha * loss_cons / (self.__n_minibatches * n_minibatch_size)
             self.__losses['loss_cls'] = None
             self.__losses['loss'] = self.__losses['loss_cons']
             _loss = self.__losses['loss']
@@ -84,8 +82,8 @@ class PiModelLoss(Module):
 
             loss_cls = self.__loss_cls(pred, target_cls)
             loss_cons = self.__loss_cons(aug_logit, pred)
-            self.__losses['loss_cons'] = self.__alpha*loss_cons / (self.__n_minibatches*n_minibatch_size)
-            self.__losses['loss_cls'] = loss_cls / (self.__n_minibatches*n_minibatch_size)
+            self.__losses['loss_cons'] = self.__alpha * loss_cons / (self.__n_minibatches * n_minibatch_size)
+            self.__losses['loss_cls'] = loss_cls / (self.__n_minibatches * n_minibatch_size)
             self.__losses['loss'] = self.__losses['loss_cls'] + self.__losses['loss_cons']
             _loss = self.__losses['loss']
         else:
@@ -130,9 +128,11 @@ if __name__ == "__main__":
     train_labeled_data, val_labeled_data, train_unlabeled_data, val_unlabeled_data = next(splitter)
     t_tr_l = train_labeled_data['target']
     t_va_l = val_labeled_data['target']
-    data_provider = pimodel_data_provider(model=model, train_labeled_data=train_labeled_data, train_unlabeled_data=train_unlabeled_data,
+    data_provider = pimodel_data_provider(model=model, train_labeled_data=train_labeled_data,
+                                          train_unlabeled_data=train_unlabeled_data,
                                           val_labeled_data=val_labeled_data, val_unlabeled_data=val_unlabeled_data,
-                                          transforms=init_transforms(nc=n_channels), parse_item=parse_item, bs=args.bs, num_threads=args.num_threads)
+                                          transforms=init_transforms(nc=n_channels), parse_item=parse_item, bs=args.bs,
+                                          num_threads=args.num_threads)
 
     summary_writer = SummaryWriter(log_dir=log_dir, comment=comment)
     # Callbacks
@@ -140,7 +140,7 @@ if __name__ == "__main__":
                        RunningAverageMeter(prefix='train', name='loss_cons'),
                        MeterLogging(writer=summary_writer),
                        AccuracyMeter(prefix="train", name="acc", parse_target=parse_target_accuracy_meter,
-                                             cond=cond_accuracy_meter),
+                                     cond=cond_accuracy_meter),
                        KappaMeter(prefix='train', name='kappa', parse_target=parse_class, parse_output=parse_class,
                                   cond=cond_accuracy_meter),
                        SSConfusionMatrixVisualizer(writer=summary_writer, cond=cond_accuracy_meter,
@@ -148,15 +148,15 @@ if __name__ == "__main__":
                                                    labels=[str(i) for i in range(10)], tag="train/confusion_matrix")
                        )
 
-
     callbacks_eval = (RunningAverageMeter(prefix='eval', name='loss_cls'),
                       RunningAverageMeter(prefix='eval', name='loss_cons'),
                       AccuracyMeter(prefix="eval", name="acc", parse_target=parse_target_accuracy_meter,
-                                            cond=cond_accuracy_meter),
+                                    cond=cond_accuracy_meter),
                       MeterLogging(writer=summary_writer),
                       KappaMeter(prefix='eval', name='kappa', parse_target=parse_class, parse_output=parse_class,
                                  cond=cond_accuracy_meter),
-                      SSConfusionMatrixVisualizer(writer=summary_writer, cond=cond_accuracy_meter, parse_class=parse_class,
+                      SSConfusionMatrixVisualizer(writer=summary_writer, cond=cond_accuracy_meter,
+                                                  parse_class=parse_class,
                                                   labels=[str(i) for i in range(10)], tag="eval/confusion_matrix"))
 
     st_callbacks = MeterLogging(writer=summary_writer)

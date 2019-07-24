@@ -1,5 +1,7 @@
 from typing import Tuple
+
 from torch.nn import Module
+
 from collagen.core import Module, Callback
 from collagen.core.utils import wrap_tuple, freeze_modules
 
@@ -43,6 +45,7 @@ class M2BatchFreezer(DualModelCallback):
 
     def on_m2_batch_end(self, *args, **kwargs):
         freeze_modules(self.__modules, invert=True)
+
 
 class UpdateEMA(Callback):
     def __init__(self, st_model, te_model, decay=0.97):

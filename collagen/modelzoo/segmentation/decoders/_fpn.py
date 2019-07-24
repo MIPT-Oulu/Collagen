@@ -1,8 +1,9 @@
 import torch
-from torch import nn
 import torch.nn.functional as F
-from collagen.modelzoo.modules import ConvBlock
+from torch import nn
+
 from collagen.core import Module
+from collagen.modelzoo.modules import ConvBlock
 
 
 class FPNBlock(Module):
@@ -10,6 +11,7 @@ class FPNBlock(Module):
     Extended implementation from https://github.com/qubvel/segmentation_models.pytorch
 
     """
+
     def __init__(self, pyramid_channels, skip_channels, dropout=None):
         super(FPNBlock, self).__init__(None, None)
         self.skip_conv = nn.Conv2d(skip_channels, pyramid_channels, kernel_size=1)
@@ -35,6 +37,7 @@ class SegmentationBlock(Module):
     Extended implementation from https://github.com/qubvel/segmentation_models.pytorch
 
     """
+
     def __init__(self, in_channels, out_channels, n_upsamples=0, normalization='BN'):
         super(SegmentationBlock, self).__init__(None, None)
 
@@ -71,6 +74,7 @@ class FPNDecoder(Module):
     Extended implementation from https://github.com/qubvel/segmentation_models.pytorch
 
     """
+
     def __init__(
             self,
             encoder_channels,

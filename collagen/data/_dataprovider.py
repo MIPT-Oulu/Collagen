@@ -17,10 +17,10 @@ class DataProvider(object):
         for itemloader_name in self.__loaders:
             itemloader_len = len(self.__loaders[itemloader_name])
             self.__state_dict[itemloader_name] = {"total": itemloader_len,
-                                          "samples": None,
-                                          "num_sampled": 0,
-                                          "num_left": itemloader_len,
-                                          "num_loops": 0}
+                                                  "samples": None,
+                                                  "num_sampled": 0,
+                                                  "num_left": itemloader_len,
+                                                  "num_loops": 0}
 
     def sample(self, **kwargs):
         """ Samples :attr:__loaders with specified number of data
@@ -51,7 +51,7 @@ class DataProvider(object):
 
         return list_samples
 
-    def __sample(self, itemloader_name : str, k : int):
+    def __sample(self, itemloader_name: str, k: int):
         """Gets `k` samples from the itemloader specified by `itemloader_name`.
 
         Parameters
@@ -72,7 +72,8 @@ class DataProvider(object):
         self.__state_dict[itemloader_name]["samples"] = samples
 
         # Update state_dict
-        if self.__state_dict[itemloader_name]["num_sampled"] + num_samples > self.__state_dict[itemloader_name]["total"]:
+        if self.__state_dict[itemloader_name]["num_sampled"] + num_samples > self.__state_dict[itemloader_name][
+            "total"]:
             self.__state_dict[itemloader_name]["num_loops"] += 1
             self.__state_dict[itemloader_name]["num_sampled"] = num_samples
             self.__state_dict[itemloader_name]["num_left"] = self.__state_dict[itemloader_name]["total"] - num_samples

@@ -1,22 +1,20 @@
 import yaml
-from torch.nn import BCELoss
-from torch import optim
 from tensorboardX import SummaryWriter
+from torch import optim
+from torch.nn import BCELoss
 
+from collagen.callbacks import TensorboardSynthesisVisualizer
 from collagen.core import Trainer
-from collagen.losses.gan import GeneratorLoss
-from collagen.callbacks import  TensorboardSynthesisVisualizer
-from collagen.data.data_provider import gan_data_provider
 from collagen.core.utils import auto_detect_device
-from collagen.strategies import GANStrategy
+from collagen.data.data_provider import gan_data_provider
 from collagen.data.utils import get_mnist
 from collagen.logging import MeterLogging
-
-from examples.dcgan.utils import init_args, parse_item_mnist_gan, init_mnist_transforms
+from collagen.losses.gan import GeneratorLoss
+from collagen.strategies import GANStrategy
 from examples.dcgan.model import Discriminator, Generator
+from examples.dcgan.utils import init_args, parse_item_mnist_gan, init_mnist_transforms
 
 device = auto_detect_device()
-
 
 if __name__ == "__main__":
     # Setup configs

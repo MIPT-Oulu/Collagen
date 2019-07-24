@@ -1,23 +1,27 @@
 import argparse
+
+import numpy as np
+import solt.core as slc
+import solt.data as sld
+import solt.transforms as slt
 import torch
 from torch import Tensor
-import numpy as np
-import solt.data as sld
+
+from collagen.callbacks import ConfusionMatrixVisualizer
 from collagen.core.utils import to_cpu
 from collagen.data.utils import ApplyTransform, Normalize, Compose
-from collagen.callbacks import ConfusionMatrixVisualizer
-import solt.core as slc
-import solt.transforms as slt
 
 
 def cond_accuracy_meter(target, output):
     return target['name'] == 'l'
+
 
 def parse_target_accuracy_meter(target):
     if target['name'] == 'l':
         return target['target']
     else:
         return None
+
 
 def parse_class(output):
     if isinstance(output, dict) and output['name'] == 'l':
@@ -38,6 +42,7 @@ def parse_class(output):
     output_cpu = output_cpu.astype(int)
     return output_cpu
 
+
 class SSConfusionMatrixVisualizer(ConfusionMatrixVisualizer):
     def __init__(self, cond, parse_class, writer, labels: list or None = None, tag="confusion_matrix", normalize=False):
         super().__init__(writer=writer, labels=labels, tag=tag, normalize=normalize)
@@ -52,8 +57,10 @@ class SSConfusionMatrixVisualizer(ConfusionMatrixVisualizer):
                 self._corrects += [self._labels[i] for i in to_cpu(target_cls, use_numpy=True).tolist()]
                 self._predicts += [self._labels[i] for i in to_cpu(pred_cls, use_numpy=True).tolist()]
 
+
 def cond_accuracy_meter(target, output):
     return target['name'] == 'l'
+
 
 def parse_target_accuracy_meter(target):
     if target['name'] == 'l':
@@ -74,7 +81,7 @@ def wrap2solt(inp):
 def unpack_solt(dc: sld.DataContainer):
     img, target = dc.data
     img, target = torch.from_numpy(img).permute(2, 0, 1).float(), target
-    return img/255.0, np.float32(target)
+    return img / 255.0, np.float32(target)
 
 
 def init_transforms(nc=1):
@@ -161,7 +168,3 @@ def init_args():
     np.random.seed(args.seed)
 
     return args
-
-
-
-

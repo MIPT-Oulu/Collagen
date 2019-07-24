@@ -1,9 +1,9 @@
-import torch
-from collagen.modelzoo.segmentation.backbones import ResNetBackbone
-from collagen.modelzoo.segmentation import EncoderDecoder
-from collagen.modelzoo.segmentation.decoders import FPNDecoder
 import pytest
-from .fixtures import tensor_224
+import torch
+
+from collagen.modelzoo.segmentation import EncoderDecoder
+from collagen.modelzoo.segmentation.backbones import ResNetBackbone
+from collagen.modelzoo.segmentation.decoders import FPNDecoder
 
 
 @pytest.mark.parametrize('backbone,conf', [('resnet18', 512), ('resnet34', 512), ('resnet50', 2048)])

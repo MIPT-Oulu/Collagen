@@ -2,12 +2,11 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
-import gc
-from torch.utils.data.sampler import SequentialSampler
 from torch.utils.data.dataloader import default_collate
+from torch.utils.data.sampler import SequentialSampler
 
-from ._dataset import DataFrameDataset
 from collagen.core.utils import to_cpu
+from ._dataset import DataFrameDataset
 
 
 class ItemLoader(object):
@@ -57,7 +56,7 @@ class ItemLoader(object):
                  num_workers: int = 0, shuffle: bool = False, pin_memory: bool = False,
                  collate_fn: callable = default_collate, transform: callable or None = None,
                  sampler: torch.utils.data.sampler.Sampler or None = None,
-                 batch_sampler=None, drop_last: bool = False, timeout: int = 0, name:str = "loader"):
+                 batch_sampler=None, drop_last: bool = False, timeout: int = 0, name: str = "loader"):
         if root is None:
             root = ''
 
@@ -136,11 +135,13 @@ class MixUpSampler(ItemLoader):
                  parse_item_cb: callable or None = None, meta_data: pd.DataFrame or None = None,
                  root: str or None = None, batch_size: int = 1, num_workers: int = 0, shuffle: bool = False,
                  pin_memory: bool = False, collate_fn: callable = default_collate, transform: callable or None = None,
-                 sampler: torch.utils.data.sampler.Sampler or None = None, batch_sampler=None, compute_logits_mixup:bool = True,
+                 sampler: torch.utils.data.sampler.Sampler or None = None, batch_sampler=None,
+                 compute_logits_mixup: bool = True,
                  drop_last: bool = False, timeout: int = 0, detach: bool = False):
         super().__init__(meta_data=meta_data, parse_item_cb=parse_item_cb, root=root, batch_size=batch_size,
                          num_workers=num_workers, shuffle=shuffle, pin_memory=pin_memory, collate_fn=collate_fn,
-                         transform=transform, sampler=sampler, batch_sampler=batch_sampler, drop_last=drop_last, timeout=timeout)
+                         transform=transform, sampler=sampler, batch_sampler=batch_sampler, drop_last=drop_last,
+                         timeout=timeout)
 
         self.__model = model
         self.__name = name
@@ -210,17 +211,19 @@ class MixUpSampler(ItemLoader):
 
 
 class MixUpSampler2(ItemLoader):
-    def __init__(self, name: str, alpha: callable or float, model: nn.Module or None, 
+    def __init__(self, name: str, alpha: callable or float, model: nn.Module or None,
                  data_rearrange: callable or None = None, target_rearrage: callable or None = None,
                  data_key: str = "data", target_key: str = 'target', augmentation: callable or None = None,
-                 parse_item_cb: callable or None = None, meta_data: pd.DataFrame or None = None, min_lambda: float = 0.7,
+                 parse_item_cb: callable or None = None, meta_data: pd.DataFrame or None = None,
+                 min_lambda: float = 0.7,
                  root: str or None = None, batch_size: int = 1, num_workers: int = 0, shuffle: bool = False,
                  pin_memory: bool = False, collate_fn: callable = default_collate, transform: callable or None = None,
                  sampler: torch.utils.data.sampler.Sampler or None = None, batch_sampler=None,
                  drop_last: bool = False, timeout: int = 0, detach: bool = False):
         super().__init__(meta_data=meta_data, parse_item_cb=parse_item_cb, root=root, batch_size=batch_size,
                          num_workers=num_workers, shuffle=shuffle, pin_memory=pin_memory, collate_fn=collate_fn,
-                         transform=transform, sampler=sampler, batch_sampler=batch_sampler, drop_last=drop_last, timeout=timeout)
+                         transform=transform, sampler=sampler, batch_sampler=batch_sampler, drop_last=drop_last,
+                         timeout=timeout)
 
         self.__model = model
         self.__name = name
@@ -289,7 +292,7 @@ class MixUpSampler2(ItemLoader):
             # onehot2.scatter_(1, target2.type(torch.int64).unsqueeze(-1), 1.0)
             # mixup_target = l*onehot1 + (1 - l)*onehot2
 
-            logits_mixup = l*logits1 + (1 - l)*logits2
+            logits_mixup = l * logits1 + (1 - l) * logits2
             samples.append({'name': self.__name, 'mixup_data': mixup_imgs,
                             'target': target1, 'target_bg': target2,
                             'logits': logits1, 'logits_aug': logits1_aug,
@@ -298,7 +301,8 @@ class MixUpSampler2(ItemLoader):
 
 
 class AugmentedGroupSampler(ItemLoader):
-    def __init__(self, model: nn.Module, name: str, augmentation, n_augmentations=1, output_type='logits', data_key: str = "data", target_key: str = 'target',
+    def __init__(self, model: nn.Module, name: str, augmentation, n_augmentations=1, output_type='logits',
+                 data_key: str = "data", target_key: str = 'target',
                  parse_item_cb: callable or None = None, meta_data: pd.DataFrame or None = None,
                  root: str or None = None, batch_size: int = 1, num_workers: int = 0, shuffle: bool = False,
                  pin_memory: bool = False, collate_fn: callable = default_collate, transform: callable or None = None,
@@ -306,7 +310,8 @@ class AugmentedGroupSampler(ItemLoader):
                  drop_last: bool = False, timeout: int = 0, detach: bool = False):
         super().__init__(meta_data=meta_data, parse_item_cb=parse_item_cb, root=root, batch_size=batch_size,
                          num_workers=num_workers, shuffle=shuffle, pin_memory=pin_memory, collate_fn=collate_fn,
-                         transform=transform, sampler=sampler, batch_sampler=batch_sampler, drop_last=drop_last, timeout=timeout)
+                         transform=transform, sampler=sampler, batch_sampler=batch_sampler, drop_last=drop_last,
+                         timeout=timeout)
         self.__name = name
         self.__model: nn.Module = model
         self.__n_augmentations = n_augmentations
@@ -362,12 +367,13 @@ class AugmentedGroupSampler(ItemLoader):
             if self.__detach:
                 logits = logits.detach()
 
-            samples.append({'name': self.__name, 'logits': logits , 'data': imgs, 'target': target})
+            samples.append({'name': self.__name, 'logits': logits, 'data': imgs, 'target': target})
         return samples
 
 
 class AugmentedGroupSampler2(ItemLoader):
-    def __init__(self, model: nn.Module, te_model: nn.Module, name: str, augmentation, n_augmentations=1, output_type='logits', data_key: str = "data", target_key: str = 'target',
+    def __init__(self, model: nn.Module, te_model: nn.Module, name: str, augmentation, n_augmentations=1,
+                 output_type='logits', data_key: str = "data", target_key: str = 'target',
                  parse_item_cb: callable or None = None, meta_data: pd.DataFrame or None = None,
                  root: str or None = None, batch_size: int = 1, num_workers: int = 0, shuffle: bool = False,
                  pin_memory: bool = False, collate_fn: callable = default_collate, transform: callable or None = None,
@@ -375,7 +381,8 @@ class AugmentedGroupSampler2(ItemLoader):
                  drop_last: bool = False, timeout: int = 0, detach: bool = False):
         super().__init__(meta_data=meta_data, parse_item_cb=parse_item_cb, root=root, batch_size=batch_size,
                          num_workers=num_workers, shuffle=shuffle, pin_memory=pin_memory, collate_fn=collate_fn,
-                         transform=transform, sampler=sampler, batch_sampler=batch_sampler, drop_last=drop_last, timeout=timeout)
+                         transform=transform, sampler=sampler, batch_sampler=batch_sampler, drop_last=drop_last,
+                         timeout=timeout)
         self.__name = name
         self.__model: nn.Module = model
         self.__te_model: nn.Module = te_model
@@ -432,12 +439,14 @@ class AugmentedGroupSampler2(ItemLoader):
 
             te_f = te_f.detach()
 
-            samples.append({'name': self.__name, 'st_features': st_f, 'te_features': te_f, 'data': imgs, 'target': target})
+            samples.append(
+                {'name': self.__name, 'st_features': st_f, 'te_features': te_f, 'data': imgs, 'target': target})
         return samples
 
 
 class FeatureMatchingSampler(ItemLoader):
-    def __init__(self, model: nn.Module, latent_size: int, data_key: str = "data", meta_data: pd.DataFrame or None = None,
+    def __init__(self, model: nn.Module, latent_size: int, data_key: str = "data",
+                 meta_data: pd.DataFrame or None = None,
                  parse_item_cb: callable or None = None, name='fm',
                  root: str or None = None, batch_size: int = 1, num_workers: int = 0, shuffle: bool = False,
                  pin_memory: bool = False, collate_fn: callable = default_collate, transform: callable or None = None,
@@ -445,7 +454,8 @@ class FeatureMatchingSampler(ItemLoader):
                  drop_last: bool = False, timeout: int = 0):
         super().__init__(meta_data=meta_data, parse_item_cb=parse_item_cb, root=root, batch_size=batch_size,
                          num_workers=num_workers, shuffle=shuffle, pin_memory=pin_memory, collate_fn=collate_fn,
-                         transform=transform, sampler=sampler, batch_sampler=batch_sampler, drop_last=drop_last, timeout=timeout)
+                         transform=transform, sampler=sampler, batch_sampler=batch_sampler, drop_last=drop_last,
+                         timeout=timeout)
         self.__model: nn.Module = model
         self.__latent_size: int = latent_size
         self.__data_key = data_key
@@ -459,7 +469,8 @@ class FeatureMatchingSampler(ItemLoader):
             features = self.__model.get_features(real_imgs)
             noise = torch.randn(self.batch_size, self.__latent_size)
             noise_on_device = noise.to(next(self.__model.parameters()).device)
-            samples.append({'name': self.__name, 'real_features': features.detach(), 'real_data': real_imgs, 'latent': noise_on_device})
+            samples.append({'name': self.__name, 'real_features': features.detach(), 'real_data': real_imgs,
+                            'latent': noise_on_device})
         return samples
 
 
@@ -477,7 +488,9 @@ class GANFakeSampler(ItemLoader):
             noise = torch.randn(self.batch_size, self.__latent_size)
             noise_on_device = noise.to(next(self.__g_network.parameters()).device)
             fake: torch.Tensor = self.__g_network(noise_on_device)
-            samples.append({'name': self.__name, 'data': fake.detach(), 'target': torch.zeros(self.batch_size).to(fake.device), 'latent': noise})
+            samples.append(
+                {'name': self.__name, 'data': fake.detach(), 'target': torch.zeros(self.batch_size).to(fake.device),
+                 'latent': noise})
 
         return samples
 
@@ -486,7 +499,8 @@ class GANFakeSampler(ItemLoader):
 
 
 class SSGANFakeSampler(ItemLoader):
-    def __init__(self, g_network, batch_size, latent_size, n_classes, name='ssgan_fake', use_aux_target=False, same_class_batch=False):
+    def __init__(self, g_network, batch_size, latent_size, n_classes, name='ssgan_fake', use_aux_target=False,
+                 same_class_batch=False):
         super().__init__(meta_data=None, parse_item_cb=None, name=name)
         self.__latent_size = latent_size
         self.batch_size = batch_size
@@ -509,7 +523,7 @@ class SSGANFakeSampler(ItemLoader):
 
             if self.__use_aux_target:
                 if self.__sample_class_batch:
-                    target_cls = torch.ones([self.batch_size, 1], dtype=torch.int64)*(i%self.__n_classes)
+                    target_cls = torch.ones([self.batch_size, 1], dtype=torch.int64) * (i % self.__n_classes)
                 else:
                     target_cls = torch.randint(self.__n_classes, size=(self.batch_size, 1))
                 target_val = torch.zeros([self.batch_size, 1], dtype=torch.int64)

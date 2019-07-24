@@ -1,12 +1,13 @@
+from typing import Tuple
+
+import torch
+from tqdm import tqdm
+
+from collagen.callbacks import ProgressbarVisualizer, SamplingFreezer
 from collagen.core import Trainer, Callback
 from collagen.core.utils import wrap_tuple
 from collagen.data import DataProvider
 from collagen.metrics import RunningAverageMeter
-from collagen.callbacks import DiscriminatorBatchFreezer, GeneratorBatchFreezer
-from collagen.callbacks import ProgressbarVisualizer, SamplingFreezer
-from typing import Tuple
-import torch
-from tqdm import tqdm
 
 
 class DualModelStrategy(object):
@@ -106,8 +107,8 @@ class DualModelStrategy(object):
 
         # Default epoch level callbacks
         self.__default_st_callbacks = (
-        SamplingFreezer(modules=wrap_tuple(m1_trainer.model) + wrap_tuple(m0_trainer.model)),
-        ProgressbarVisualizer(update_freq=1))
+            SamplingFreezer(modules=wrap_tuple(m1_trainer.model) + wrap_tuple(m0_trainer.model)),
+            ProgressbarVisualizer(update_freq=1))
         self.__callbacks += self.__default_st_callbacks
 
     def _call_callbacks_by_name(self, cb_func_name, **kwargs):

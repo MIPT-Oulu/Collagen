@@ -2,12 +2,13 @@ try:
     from torch.optim import Optimizer
 except ImportError:
     from torch.optim.optimizer import Optimizer
-from ..data import DataProvider
-from ._session import Session
 from typing import Tuple
-from collagen.core.utils import wrap_tuple
+
 from collagen.core import Module
 from collagen.core._callback import Callback
+from collagen.core.utils import wrap_tuple
+from ._session import Session
+from ..data import DataProvider
 from ..data.utils import cast_tensor
 
 
@@ -197,7 +198,8 @@ class Trainer(object):
                         raise ValueError('Not found key {} in sampled batch'.format(key_i))
 
             first_minibatch = self.check_first_minibatch(loader_i=ind, minibatch_i=i)
-            last_minibatch = self.check_last_minibatch(n_loaders=len(self.__train_loader_names), loader_i=ind, n_minibatches=n_iter, minibatch_i=i)
+            last_minibatch = self.check_last_minibatch(n_loaders=len(self.__train_loader_names), loader_i=ind,
+                                                       n_minibatches=n_iter, minibatch_i=i)
             no_zero_grad = accumulate_grad or (not first_minibatch and minibatch_accumulate_grad)
             with_step = last_minibatch or not minibatch_accumulate_grad
             loss, train_result = self.__session.train_step(input_data, target, return_out=True,

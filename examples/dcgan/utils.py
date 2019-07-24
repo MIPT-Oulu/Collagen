@@ -1,10 +1,12 @@
 import argparse
-import torch
+import random
+
 import numpy as np
 import solt.data as sld
-from collagen.data.utils import ApplyTransform, Normalize, Compose
 import solt.transforms as slt
-import random
+import torch
+
+from collagen.data.utils import ApplyTransform, Normalize, Compose
 
 
 def wrap2solt(inp):
@@ -15,7 +17,7 @@ def wrap2solt(inp):
 def unpack_solt(dc: sld.DataContainer):
     img, target = dc.data
     img, target = torch.from_numpy(img).permute(2, 0, 1).float(), target
-    return img/255.0, np.float32(target)
+    return img / 255.0, np.float32(target)
 
 
 def init_mnist_transforms():

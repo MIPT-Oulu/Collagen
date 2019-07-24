@@ -1,6 +1,7 @@
 from torch import optim
+
+from collagen.callbacks.lrscheduler.utils import ramps
 from collagen.core import Callback
-from collagen.lrscheduler.utils import ramps
 
 
 class LRScheduler(Callback):
@@ -44,7 +45,8 @@ class SingleRampUpDownScheduler(LRScheduler):
 
     def on_batch_begin(self, epoch, batch_i, n_batches, n_epochs, *args, **kwargs):
         if self.__lr_rampdown_epochs <= n_epochs:
-            raise ValueError(f'lr_rampdown_epochs {self.__lr_rampdown_epochs} must larger than num of epochs {n_epochs}')
+            raise ValueError(
+                f'lr_rampdown_epochs {self.__lr_rampdown_epochs} must larger than num of epochs {n_epochs}')
         epoch = epoch + batch_i / n_batches
 
         # LR warm-up to handle large minibatch sizes from https://arxiv.org/abs/1706.02677
@@ -60,7 +62,8 @@ class SingleRampUpDownScheduler(LRScheduler):
 
 class CycleRampUpDownScheduler(LRScheduler):
     def __init__(self, optimizer, initial_lr, lr_rampup, lr, lr_rampdown_epochs, start_cycle_epoch,
-                 cycle_rampdown_epochs, cycle_interval, constant_lr_epoch = 10, constant_lr = None, name='cycle_rampupdown_lrs'):
+                 cycle_rampdown_epochs, cycle_interval, constant_lr_epoch=10, constant_lr=None,
+                 name='cycle_rampupdown_lrs'):
         super().__init__(name=name)
         self.__optim = optimizer
         self.__initial_lr = initial_lr
@@ -76,7 +79,7 @@ class CycleRampUpDownScheduler(LRScheduler):
     def on_batch_begin(self, epoch, n_epochs, batch_i, n_batches, *args, **kwargs):
         # if self.__lr_rampdown_epochs <= n_epochs:
         #     raise ValueError(f'lr_rampdown_epochs {self.__lr_rampdown_epochs} must larger than num of epochs {n_epochs}')
-        
+
         epoch = epoch + batch_i / n_batches
         # LR warm-up to handle large minibatch sizes from https://arxiv.org/abs/1706.02677
         lr = ramps.linear_rampup(epoch, self.__lr_rampup) * (self.__lr - self.__initial_lr) + self.__initial_lr
@@ -93,7 +96,8 @@ class CycleRampUpDownScheduler(LRScheduler):
                 else:
                     lr_rampdown_epochs = self.__lr_rampdown_epochs if self.__cycle_rampdown_epochs == 0 else self.__cycle_rampdown_epochs
                     lr *= ramps.cosine_rampdown(
-                        (lr_rampdown_epochs - (self.__lr_rampdown_epochs - self.__start_cycle_epoch) - self.__cycle_interval) +
+                        (lr_rampdown_epochs - (
+                                    self.__lr_rampdown_epochs - self.__start_cycle_epoch) - self.__cycle_interval) +
                         ((epoch - self.__start_cycle_epoch) % self.__cycle_interval), lr_rampdown_epochs)
 
         for param_group in self.__optim.param_groups:

@@ -1,5 +1,6 @@
-import torch
 from typing import Tuple
+
+import torch
 
 
 def to_cpu(x: torch.Tensor or torch.cuda.FloatTensor, required_grad=False, use_numpy=True):

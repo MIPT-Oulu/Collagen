@@ -1,7 +1,8 @@
-from torch import nn
 import pretrainedmodels
-from collagen.core import Module
 import torch.nn.functional as F
+from torch import nn
+
+from collagen.core import Module
 
 
 class ResNetBackbone(Module):
@@ -9,6 +10,7 @@ class ResNetBackbone(Module):
     Extended implementation from https://github.com/qubvel/segmentation_models.pytorch
 
     """
+
     def __init__(self, backbone_name='resnet50', dropout=None):
         super(ResNetBackbone, self).__init__()
         self.backbone_name = backbone_name
@@ -27,7 +29,7 @@ class ResNetBackbone(Module):
 
         self.dropout = dropout
 
-        self.shape_dict = {'resnet18':  (512, 256, 128, 64, 64),
+        self.shape_dict = {'resnet18': (512, 256, 128, 64, 64),
                            'resnet34': (512, 256, 128, 64, 64),
                            'resnet50': (2048, 1024, 512, 256, 64)}
 

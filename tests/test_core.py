@@ -2,13 +2,6 @@ import torch
 from torch import nn
 from torch import optim
 
-import itertools
-
-import pytest
-from .fixtures import classification_minibatch_multi_class, classification_minibatches_seq_multiclass
-from .fixtures import classification_minibatch_two_class, classification_minibatches_seq_two_class
-from .fixtures import dumb_net
-
 from collagen.core import Session
 
 
@@ -46,7 +39,4 @@ def test_session_train_eval(dumb_net, classification_minibatches_seq_two_class):
         val_losses.append(val_loss)
 
     assert loss < 1e-1
-    assert min(val_losses)*4 < val_losses[0]
-
-
-
+    assert min(val_losses) * 4 < val_losses[0]

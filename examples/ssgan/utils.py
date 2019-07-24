@@ -1,13 +1,15 @@
 import argparse
-from collagen.core import Module
+
+import numpy as np
+import solt.core as slc
+import solt.data as sld
+import solt.transforms as slt
+import torch
 from torch import nn
 from torch.tensor import OrderedDict
-import torch
-import numpy as np
-import solt.data as sld
+
+from collagen.core import Module
 from collagen.data.utils import ApplyTransform, Normalize, Compose
-import solt.core as slc
-import solt.transforms as slt
 
 
 def wrap2solt(inp):
@@ -18,7 +20,7 @@ def wrap2solt(inp):
 def unpack_solt(dc: sld.DataContainer):
     img, target = dc.data
     img, target = torch.from_numpy(img).permute(2, 0, 1).float(), target
-    return img/255.0, np.float32(target)
+    return img / 255.0, np.float32(target)
 
 
 def init_mnist_transforms():
@@ -161,7 +163,7 @@ class Generator(nn.Module):
 
 def parse_item_mnist_ssgan(root, entry, trf, data_key, target_key):
     img, target = trf((entry[data_key], entry[target_key]))
-    ext_y = np.zeros(10+2, dtype=np.float32)
+    ext_y = np.zeros(10 + 2, dtype=np.float32)
     ext_y[-1] = 1.0
     ext_y[int(round(target))] = 1.0
     return {data_key: img, target_key: ext_y, 'class': target, 'valid': ext_y[-1]}
@@ -193,7 +195,3 @@ def init_args():
     np.random.seed(args.seed)
 
     return args
-
-
-
-

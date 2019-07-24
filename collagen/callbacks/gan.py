@@ -1,6 +1,7 @@
 from typing import Tuple
+
 from torch.nn import Module
-from torch import Tensor
+
 from collagen.core import Module, Callback
 from collagen.core.utils import wrap_tuple, freeze_modules
 
