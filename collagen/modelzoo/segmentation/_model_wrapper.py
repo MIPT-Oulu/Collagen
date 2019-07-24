@@ -28,6 +28,7 @@ class EncoderDecoder(Module):
                                                   bayesian_dropout=bayesian_dropout)
 
         self.decoder = decoder
+        self.decoder.initialize()
 
     def forward(self, x):
         features = self.backbone(x)
