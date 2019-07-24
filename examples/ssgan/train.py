@@ -9,8 +9,8 @@ from collagen.core import Module, Trainer
 from collagen.core.utils import auto_detect_device, to_cpu
 from collagen.data import DataProvider, ItemLoader, SSGANFakeSampler, SSFoldSplit
 from collagen.data.utils import get_mnist
-from collagen.logging import MeterLogging
-from collagen.metrics import SSAccuracyMeter, SSValidityMeter
+from collagen.callbacks.logging import MeterLogging
+from collagen.callbacks.metrics import SSAccuracyMeter, SSValidityMeter
 from collagen.strategies import GANStrategy
 from examples.ssgan.utils import Discriminator, Generator
 from examples.ssgan.utils import init_args, parse_item_mnist_ssgan, init_mnist_transforms

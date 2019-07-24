@@ -1,9 +1,6 @@
 import itertools
-
-import pytest
-
 from collagen.data import ItemLoader
-
+from .fixtures import *
 
 @pytest.mark.parametrize('batch_size, n_samples', itertools.product([32, 11, 3], [1, 3, 6]))
 def test_loader_samples_batches(batch_size, n_samples, metadata_fname_target_5_classes,

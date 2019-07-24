@@ -10,7 +10,7 @@ from collagen.core import Callback
 from collagen.core import Trainer, Session, Module
 from collagen.core.utils import wrap_tuple
 from collagen.data import DataProvider
-from collagen.metrics import RunningAverageMeter
+from collagen.callbacks.metrics import RunningAverageMeter
 
 
 class Strategy(object):

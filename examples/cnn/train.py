@@ -9,8 +9,8 @@ from collagen.core.utils import auto_detect_device
 from collagen.data import FoldSplit
 from collagen.data import ItemLoader, DataProvider
 from collagen.data.utils import get_mnist, get_cifar10
-from collagen.logging import MeterLogging
-from collagen.metrics import RunningAverageMeter, AccuracyMeter
+from collagen.callbacks.logging import MeterLogging
+from collagen.callbacks.metrics import RunningAverageMeter, AccuracyMeter
 from collagen.savers import ModelSaver
 from collagen.strategies import Strategy
 from examples.cnn.utils import SimpleConvNet

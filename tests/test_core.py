@@ -1,8 +1,9 @@
-import torch
-from torch import nn
+
 from torch import optim
 
 from collagen.core import Session
+
+from .fixtures import *
 
 
 def test_session_single_batch_step_simple(dumb_net, classification_minibatch_two_class):

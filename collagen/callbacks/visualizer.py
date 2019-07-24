@@ -9,7 +9,7 @@ from torchvision.utils import make_grid
 
 from collagen.core import Callback
 from collagen.core.utils import to_cpu
-from collagen.metrics import plot_confusion_matrix
+from collagen.callbacks.metrics import plot_confusion_matrix
 
 
 class ConfusionMatrixVisualizer(Callback):

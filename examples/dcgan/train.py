@@ -8,7 +8,7 @@ from collagen.core import Trainer
 from collagen.core.utils import auto_detect_device
 from collagen.data.data_provider import gan_data_provider
 from collagen.data.utils import get_mnist
-from collagen.logging import MeterLogging
+from collagen.callbacks.logging import MeterLogging
 from collagen.losses.gan import GeneratorLoss
 from collagen.strategies import GANStrategy
 from examples.dcgan.model import Discriminator, Generator

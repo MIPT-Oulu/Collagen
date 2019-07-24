@@ -1,9 +1,8 @@
-import pytest
-import torch
-
 from collagen.modelzoo.segmentation import EncoderDecoder
 from collagen.modelzoo.segmentation.backbones import ResNetBackbone
 from collagen.modelzoo.segmentation.decoders import FPNDecoder
+
+from .fixtures import *
 
 
 @pytest.mark.parametrize('backbone,conf', [('resnet18', 512), ('resnet34', 512), ('resnet50', 2048)])

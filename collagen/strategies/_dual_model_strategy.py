@@ -7,7 +7,7 @@ from collagen.callbacks import ProgressbarVisualizer, SamplingFreezer
 from collagen.core import Trainer, Callback
 from collagen.core.utils import wrap_tuple
 from collagen.data import DataProvider
-from collagen.metrics import RunningAverageMeter
+from collagen.callbacks.metrics import RunningAverageMeter
 
 
 class DualModelStrategy(object):

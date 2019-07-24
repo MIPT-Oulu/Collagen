@@ -11,9 +11,9 @@ from collagen.core.utils import auto_detect_device
 from collagen.data import SSFoldSplit
 from collagen.data.data_provider import mt_data_provider
 from collagen.data.utils import get_cifar10, get_mnist
-from collagen.logging import MeterLogging, EpochLRLogging
+from collagen.callbacks.logging import MeterLogging, EpochLRLogging
 from collagen.losses.ssl import MTLoss
-from collagen.metrics import RunningAverageMeter, AccuracyMeter, KappaMeter
+from collagen.callbacks.metrics import RunningAverageMeter, AccuracyMeter, KappaMeter
 from collagen.strategies import DualModelStrategy
 from examples.mean_teacher.networks import Model01
 from examples.mean_teacher.utils import SSConfusionMatrixVisualizer, cond_accuracy_meter
