@@ -132,5 +132,6 @@ def dumb_net():
 
 @pytest.fixture(scope='function')
 def tensor_224():
-    return torch.FloatTensor(1, 3, 224, 224)
+    t = torch.FloatTensor(1, 3, 224, 224).fill_(-0.00001)
+    return t
 

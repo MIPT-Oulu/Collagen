@@ -11,7 +11,7 @@ class EncoderDecoder(Module):
         if isinstance(backbone, str):
             if backbone in constants.allowed_encoders:
                 if 'resnet' in backbone:
-                    backbone = backbones.ResNetBackbone(backbone)
+                    backbone = backbones.ResNetBackbone(backbone, dropout=bayesian_dropout)
                 else:
                     ValueError('Cannot find the implementation of the backbone!')
             else:

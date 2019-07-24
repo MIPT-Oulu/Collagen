@@ -17,7 +17,7 @@ class FPNBlock(Module):
         self.dropout_on = False
 
     def switch_dropout(self):
-        self.dropout_on = not self.dropout
+        self.dropout_on = not self.dropout_on
 
     def forward(self, x):
         x, skip = x
@@ -132,7 +132,7 @@ class FPNDecoder(Module):
         x = self.assembly(torch.cat((s5, s4, s3, s2), 1))
 
         if self.spatial_dropout is not None:
-            x = F.dropout2d(x, self.spatial_dropout)
+            x = F.dropout2d(x, self.spatial_dropout, training=self.training)
 
         x = self.final_conv(x)
 
