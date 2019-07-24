@@ -32,7 +32,7 @@ class DualModelStrategy(object):
         Parameters
         ----------
         data_provider: DataProvider
-            Provides batches of data to D and G models
+            Provides batches of data to D and G modelzoo
         data_sampling_config: dict
             Configuration of the itemloader names and the corresponding numbers of samples
         m1_trainer: Trainer

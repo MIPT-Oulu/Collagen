@@ -1,9 +1,10 @@
-import torch
+import torch.nn as nn
 from typing import Tuple, Dict
 from abc import abstractmethod
+import torch
 
 
-class Module(torch.nn.Module):
+class Module(nn.Module):
     """
     Generic building block, which assumes to have trainable parameters within it.
 
@@ -111,3 +112,11 @@ class Module(torch.nn.Module):
     @abstractmethod
     def get_features_by_name(self, name: str):
         raise NotImplementedError
+
+    def initialize(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)

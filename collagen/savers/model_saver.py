@@ -26,7 +26,7 @@ class ModelSaver(Callback):
                 raise ValueError("All modes must be the same in {} mode, but got".format(self.__mode, self.__conditions))
 
         if not exists(self.__save_dir):
-            print("Not found directory {} to save models. Create the directory.".format(self.__save_dir))
+            print("Not found directory {} to save modelzoo. Create the directory.".format(self.__save_dir))
             mkdir(self.__save_dir)
 
         if len(self.__metric_names) != len(self.__conditions):

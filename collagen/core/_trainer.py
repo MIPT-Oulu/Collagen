@@ -1,4 +1,7 @@
-from torch.optim import Optimizer
+try:
+    from torch.optim import Optimizer
+except ImportError:
+    from torch.optim.optimizer import Optimizer
 from ..data import DataProvider
 from ._session import Session
 from typing import Tuple
@@ -106,10 +109,10 @@ class Trainer(object):
         Parameters
         ----------
         data_key : Tuple[str] or str
-            Key of the dictionary, which corresponds to the data. Sometimes (e.g. in Siamese models),
+            Key of the dictionary, which corresponds to the data. Sometimes (e.g. in Siamese modelzoo),
             we need two items thus we might need multiple keys.
         target_key : Tuple[str] or str
-            Key of the dictionary, which corresponds to the target. In case of models with e.g. multiple
+            Key of the dictionary, which corresponds to the target. In case of modelzoo with e.g. multiple
             heads and heterogeneous outputs, it could be useful to use multiple keys.
         accumulate_grad : bool
             Whether to accumulate gradient.
@@ -229,10 +232,10 @@ class Trainer(object):
         Parameters
         ----------
         data_key : Tuple[str] or str
-            Key of the dictionary, which corresponds to the data. Sometimes (e.g. in Siamese models),
+            Key of the dictionary, which corresponds to the data. Sometimes (e.g. in Siamese modelzoo),
             we need two items thus we might need multiple keys.
         target_key : Tuple[str] or str
-            Key of the dictionary, which corresponds to the target. In case of models with e.g. multiple
+            Key of the dictionary, which corresponds to the target. In case of modelzoo with e.g. multiple
             heads and heterogeneous outputs, it could be useful to use multiple keys.
         cast_target : None or str
             Performs type casting for target
