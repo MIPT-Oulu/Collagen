@@ -20,7 +20,7 @@ class UpdateSWA(Callback):
         return self.__student_model
 
     def on_epoch_begin(self, epoch, *args, **kwargs):
-        if ((epoch >= self.__start_cycle_epoch)) and ((epoch - self.__start_cycle_epoch) % self.__cycle_interval) == 0:
+        if (epoch >= self.__start_cycle_epoch) and ((epoch - self.__start_cycle_epoch) % self.__cycle_interval) == 0:
             self.__num_params += 1
             inv = 1. / float(self.__num_params)
             for swa_p, src_p in zip(self.swa_model.parameters(), self.student_model.parameters()):
