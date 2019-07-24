@@ -130,3 +130,7 @@ def dumb_net():
     return DumbNet
 
 
+@pytest.fixture(scope='function')
+def tensor_224():
+    return torch.FloatTensor(1, 3, 224, 224)
+

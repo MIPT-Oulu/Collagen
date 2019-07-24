@@ -6,7 +6,9 @@
 from setuptools import setup, find_packages
 
 
-requirements = ('numpy', 'opencv-python', 'solt', 'torch', 'tqdm', 'scikit-learn', 'pandas')
+requirements = ('numpy', 'opencv-python', 'solt',
+                'torch', 'tqdm', 'scikit-learn',
+                'pandas', 'pretrainedmodels')
 
 setup_requirements = ()
 
