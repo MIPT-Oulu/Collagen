@@ -44,7 +44,7 @@ def unpack_solt(dc: sld.DataContainer):
     return img, target
 
 
-def init_mnist_transforms(n_channels=1):
+def init_mnist_cifar_transforms(n_channels=1, stage='train'):
     if n_channels == 1:
         norm_mean_std = Normalize((0.1307,), (0.3081,))
     elif n_channels == 3:
@@ -62,6 +62,9 @@ def init_mnist_transforms(n_channels=1):
         ApplyTransform(norm_mean_std)
     ])
 
+    if stage == 'train':
+        return train_trf
+
     test_trf = Compose([
         wrap2solt,
         slt.PadTransform(pad_to=32),
@@ -69,7 +72,7 @@ def init_mnist_transforms(n_channels=1):
         ApplyTransform(norm_mean_std)
     ])
 
-    return train_trf, test_trf
+    return test_trf
 
 
 class SimpleConvNet(Module):

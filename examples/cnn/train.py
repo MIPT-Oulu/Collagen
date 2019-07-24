@@ -8,13 +8,13 @@ from tensorboardX import SummaryWriter
 from collagen.core.utils import auto_detect_device
 from collagen.data import FoldSplit
 from collagen.data import ItemLoader, DataProvider
-from collagen.data.utils import get_mnist, get_cifar10
+from collagen.data.utils.datasets import get_mnist, get_cifar10
 from collagen.callbacks.logging import MeterLogging
 from collagen.callbacks.metrics import RunningAverageMeter, AccuracyMeter
 from collagen.savers import ModelSaver
 from collagen.strategies import Strategy
 from examples.cnn.utils import SimpleConvNet
-from examples.cnn.utils import init_mnist_transforms, init_args
+from examples.cnn.utils import init_mnist_cifar_transforms, init_args
 
 device = auto_detect_device()
 
@@ -61,7 +61,7 @@ if __name__ == "__main__":
 
         for stage, df in zip(['train', 'eval'], [df_train, df_val]):
             item_loaders[f'mnist_{stage}'] = ItemLoader(meta_data=df,
-                                                        transform=init_mnist_transforms()[0],
+                                                        transform=init_mnist_cifar_transforms(n_channels, stage),
                                                         parse_item_cb=parse_item_mnist,
                                                         batch_size=args.bs, num_workers=args.num_threads,
                                                         shuffle=True if stage == "train" else False)

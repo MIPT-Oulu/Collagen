@@ -12,8 +12,8 @@ def get_mnist(data_folder='.', train=True):
 
 def get_cifar10(data_folder='.', train=True):
     _db = datasets.CIFAR10(data_folder, train=train, transform=None, download=True)
-    list_rows = [{"data": _db.train_data[i, :, :, :], "target": _db.train_labels[i]} for i in
-                 range(len(_db.train_labels))]
+    list_rows = [{"data": _db.data[i, :, :, :], "target": _db.targets[i]} for i in
+                 range(len(_db.targets))]
     meta_data = pd.DataFrame(list_rows)
     classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
     return meta_data, classes
