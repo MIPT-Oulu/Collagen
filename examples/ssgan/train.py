@@ -8,7 +8,7 @@ from collagen.callbacks import TensorboardSynthesisVisualizer, ClipGradCallback
 from collagen.core import Module, Trainer
 from collagen.core.utils import auto_detect_device, to_cpu
 from collagen.data import DataProvider, ItemLoader, SSGANFakeSampler, SSFoldSplit
-from collagen.data.utils import get_mnist
+from collagen.data.utils.datasets import get_mnist
 from collagen.callbacks.logging import MeterLogging
 from collagen.callbacks.metrics import SSAccuracyMeter, SSValidityMeter
 from collagen.strategies import GANStrategy
