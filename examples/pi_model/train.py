@@ -11,7 +11,7 @@ from collagen.data import SSFoldSplit
 from collagen.data.data_provider import pimodel_data_provider
 from collagen.data.utils.datasets import get_mnist, get_cifar10
 from collagen.callbacks.logging import MeterLogging
-from collagen.callbacks.metrics import RunningAverageMeter, AccuracyMeter, KappaMeter
+from collagen.callbacks.metrics import RunningAverageMeter, AccuracyMeter
 from collagen.strategies import Strategy
 from examples.pi_model.networks import Model01
 from examples.pi_model.utils import SSConfusionMatrixVisualizer, cond_accuracy_meter, parse_class
@@ -97,6 +97,12 @@ class PiModelLoss(Module):
         else:
             return None
 
+    def get_features(self):
+        pass
+
+    def get_features_by_name(self, name: str):
+        pass
+
 
 if __name__ == "__main__":
     args = init_args()
@@ -113,14 +119,14 @@ if __name__ == "__main__":
         train_ds, classes = get_mnist(data_folder=args.save_data, train=True)
         n_channels = 1
     else:
-        raise ValueError('Not support dataset {}'.format(args.dataset))
+        raise ValueError('Not supported dataset {}'.format(args.dataset))
 
     n_folds = 5
     splitter = SSFoldSplit(train_ds, n_ss_folds=3, n_folds=n_folds, target_col="target", random_state=args.seed,
                            labeled_train_size_per_class=400, unlabeled_train_size_per_class=2000,
                            equal_target=True, equal_unlabeled_target=True, shuffle=True, unlabeled_target_col='target')
 
-    # Initializing Discriminator
+    # Initializing Discriminator-like net (similar to dcgan example)
     model = Model01(nc=n_channels, ndf=args.n_features, drop_rate=0.5).to(device)
     optim = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.wd, betas=(args.beta1, 0.999))
     crit = PiModelLoss(alpha=10.0).to(device)
@@ -141,8 +147,6 @@ if __name__ == "__main__":
                        MeterLogging(writer=summary_writer),
                        AccuracyMeter(prefix="train", name="acc", parse_target=parse_target_accuracy_meter,
                                      cond=cond_accuracy_meter),
-                       KappaMeter(prefix='train', name='kappa', parse_target=parse_class, parse_output=parse_class,
-                                  cond=cond_accuracy_meter),
                        SSConfusionMatrixVisualizer(writer=summary_writer, cond=cond_accuracy_meter,
                                                    parse_class=parse_class,
                                                    labels=[str(i) for i in range(10)], tag="train/confusion_matrix")
@@ -153,8 +157,6 @@ if __name__ == "__main__":
                       AccuracyMeter(prefix="eval", name="acc", parse_target=parse_target_accuracy_meter,
                                     cond=cond_accuracy_meter),
                       MeterLogging(writer=summary_writer),
-                      KappaMeter(prefix='eval', name='kappa', parse_target=parse_class, parse_output=parse_class,
-                                 cond=cond_accuracy_meter),
                       SSConfusionMatrixVisualizer(writer=summary_writer, cond=cond_accuracy_meter,
                                                   parse_class=parse_class,
                                                   labels=[str(i) for i in range(10)], tag="eval/confusion_matrix"))
