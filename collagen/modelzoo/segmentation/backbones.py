@@ -45,18 +45,23 @@ class ResNetBackbone(Module):
     def forward(self, x):
         x0 = self.layer0(x)
         x1 = self.layer1(x0)
-
-        x2 = self.layer2(x1)
         if self.dropout is not None:
-            x2 = F.dropout(x2, self.dropout, training=self.dropout_on)
+            x1_d = F.dropout(x1, self.dropout, training=self.dropout_on)
+            x2 = self.layer2(x1_d)
+        else:
+            x2 = self.layer2(x1)
 
-        x3 = self.layer3(x2)
         if self.dropout is not None:
-            x3 = F.dropout(x3, self.dropout, training=self.dropout_on)
+            x2_d = F.dropout(x2, self.dropout, training=self.dropout_on)
+            x3 = self.layer3(x2_d)
+        else:
+            x3 = self.layer3(x2)
 
-        x4 = self.layer4(x3)
         if self.dropout is not None:
-            x4 = F.dropout(x4, self.dropout, training=self.dropout_on)
+            x3_d = F.dropout(x3, self.dropout, training=self.dropout_on)
+            x4 = self.layer4(x3_d)
+        else:
+            x4 = self.layer4(x3)
 
         return x0, x1, x2, x3, x4
 
