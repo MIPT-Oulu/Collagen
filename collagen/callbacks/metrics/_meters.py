@@ -460,7 +460,7 @@ class ConfusionMeter(Meter):
     def on_minibatch_end(self, target, output, **kwargs):
         if self.__cond(target, output):
             target_cpu = to_cpu(target, use_numpy=True)
-            output_cpu = to_cpu(output, use_numpy=True)
+            output_cpu = to_cpu(output, use_numpy=True).argmax(-1)
 
             if target_cpu is not None and output_cpu is not None and target_cpu.shape == output_cpu.shape:
                 self._compute_confusion_matrix(target_cpu, output_cpu)

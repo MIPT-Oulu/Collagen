@@ -8,6 +8,7 @@ from sklearn.metrics import confusion_matrix
 
 from ._meters import KappaMeter, SSBalancedAccuracyMeter, BalancedAccuracyMeter
 from ._meters import Meter, RunningAverageMeter, AccuracyMeter, AccuracyThresholdMeter, SSAccuracyMeter, SSValidityMeter
+from ._meters import ConfusionMeter
 
 
 def plot_confusion_matrix(correct_labels, predict_labels, labels, normalize=True):
