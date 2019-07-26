@@ -4,7 +4,7 @@ from torch import optim
 
 from collagen.callbacks.dualmodel import UpdateEMA
 from collagen.callbacks.lrscheduler._lrscheduler import SingleRampUpDownScheduler
-from collagen.callbacks.visualizer import ProgressbarVisualizer
+from collagen.callbacks.visualization import ProgressbarVisualizer
 from collagen.core import Callback
 from collagen.core import Trainer
 from collagen.core.utils import auto_detect_device

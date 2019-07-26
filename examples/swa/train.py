@@ -2,15 +2,15 @@ import yaml
 from tensorboardX import SummaryWriter
 from torch import optim
 
-from collagen.callbacks.lrscheduler._lrscheduler import CycleRampUpDownScheduler
+from collagen.callbacks.lrscheduler import CycleRampUpDownScheduler
 from collagen.callbacks.swa import UpdateSWA
-from collagen.callbacks.visualizer import ProgressbarVisualizer
+from collagen.callbacks.visualization import ProgressbarVisualizer
 from collagen.core import Callback
 from collagen.core import Trainer
 from collagen.core.utils import auto_detect_device
 from collagen.data import SSFoldSplit
 from collagen.data.data_provider import mt_data_provider
-from collagen.data.utils import get_cifar10, get_mnist
+from collagen.data.utils.datasets import get_cifar10, get_mnist
 from collagen.callbacks.logging import MeterLogging, EpochLRLogging
 from collagen.losses.ssl import MTLoss
 from collagen.callbacks.metrics import RunningAverageMeter, AccuracyMeter, KappaMeter

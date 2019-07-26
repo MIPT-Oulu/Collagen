@@ -3,7 +3,9 @@ from typing import Tuple
 import torch
 from tqdm import tqdm
 
-from collagen.callbacks import ProgressbarVisualizer, SamplingFreezer
+from collagen.callbacks.visualization import ProgressbarVisualizer
+from collagen.callbacks import SamplingFreezer
+
 from collagen.core import Trainer, Callback
 from collagen.core.utils import wrap_tuple
 from collagen.data import DataProvider

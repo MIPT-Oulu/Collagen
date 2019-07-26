@@ -2,10 +2,14 @@ from typing import Tuple
 
 import torch
 import torch.nn as nn
-from torch.optim import Optimizer
+try:
+    from torch.optim import Optimizer
+except ImportError:
+    from torch.optim.optimizer import Optimizer
+
 from tqdm import tqdm
 
-from collagen.callbacks import ProgressbarVisualizer
+from collagen.callbacks.visualization import ProgressbarVisualizer
 from collagen.core import Callback
 from collagen.core import Trainer, Session, Module
 from collagen.core.utils import wrap_tuple

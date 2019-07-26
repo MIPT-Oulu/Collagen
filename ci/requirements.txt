@@ -13,3 +13,4 @@ sphinx-rtd-theme==0.4.1
 dill==0.2.9
 torch
 torchvision
+matplotlib

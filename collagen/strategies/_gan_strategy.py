@@ -3,8 +3,8 @@ from typing import Tuple
 import torch
 from tqdm import tqdm
 
-from collagen.callbacks import DiscriminatorBatchFreezer, GeneratorBatchFreezer
-from collagen.callbacks import ProgressbarVisualizer, SamplingFreezer
+from collagen.callbacks import DiscriminatorBatchFreezer, GeneratorBatchFreezer, SamplingFreezer
+from collagen.callbacks.visualization import ProgressbarVisualizer
 from collagen.core import Trainer, Callback
 from collagen.core.utils import wrap_tuple
 from collagen.data import DataProvider

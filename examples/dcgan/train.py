@@ -3,7 +3,7 @@ from tensorboardX import SummaryWriter
 from torch import optim
 from torch.nn import BCELoss
 
-from collagen.callbacks import TensorboardSynthesisVisualizer
+from collagen.callbacks.visualization import TensorboardSynthesisVisualizer
 from collagen.core import Trainer
 from collagen.core.utils import auto_detect_device
 from collagen.data.data_provider import gan_data_provider
