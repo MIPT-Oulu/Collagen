@@ -191,7 +191,7 @@ class BalancedAccuracyMeter(Meter):
 class AccuracyThresholdMeter(Meter):
     def __init__(self, name: str = "binary_accuracy", threshold: float = 0.5, sigmoid: bool = False, prefix=""):
         super().__init__(name=name, prefix=prefix)
-        self.__threshold: int = threshold
+        self.__threshold: float = threshold
         self.__sigmoid: bool = sigmoid
         self.__data_count = 0.0
         self.__correct_count = 0.0
@@ -425,3 +425,45 @@ class KappaMeter(Meter):
             return None
         else:
             return cohen_kappa_score(self.__corrects, self.__predicts, weights=self.__weight_type)
+
+
+class ConfusionMeter(Meter):
+    def __init__(self, n_classes, name='confusion_matrix', prefix="", parse_target=None, parse_output=None, cond=None):
+        super().__init__(name=name, prefix=prefix)
+        self._n_classes = n_classes
+        self._confusion_matrix = np.zeros((n_classes, n_classes), dtype=np.uint64)
+
+        self.__parse_target = Meter.default_parse_target if parse_target is None else parse_target
+        self.__parse_output = Meter.default_parse_output if parse_output is None else parse_output
+        self.__cond = Meter.default_cond if cond is None else cond
+
+    def on_epoch_begin(self, *args, **kwargs):
+        self._confusion_matrix = np.zeros((self._n_classes, self._n_classes), dtype=np.uint64)
+
+    def _compute_confusion_matrix(self, targets, predictions):
+        """
+        https://github.com/ternaus/robot-surgery-segmentation/blob/master/validation.py
+        """
+
+        replace_indices = np.vstack((
+            targets.flatten(),
+            predictions.flatten())
+        ).T
+
+        confusion_matrix, _ = np.histogramdd(
+            replace_indices,
+            bins=(self._n_classes, self._n_classes),
+            range=[(0, self._n_classes), (0, self._n_classes)]
+        )
+        self._confusion_matrix += confusion_matrix.astype(np.uint64)
+
+    def on_minibatch_end(self, target, output, **kwargs):
+        if self.__cond(target, output):
+            target_cpu = to_cpu(target, use_numpy=True)
+            output_cpu = to_cpu(output, use_numpy=True)
+
+            if target_cpu is not None and output_cpu is not None and target_cpu.shape == output_cpu.shape:
+                self._compute_confusion_matrix(target_cpu, output_cpu)
+
+    def current(self):
+        return self._confusion_matrix
