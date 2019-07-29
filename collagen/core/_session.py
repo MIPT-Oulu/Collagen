@@ -41,6 +41,9 @@ class Session(object):
     def loss(self, new_loss: torch.nn.Module):
         self.__loss: torch.nn.Module = new_loss
 
+    def _check_single_element_tuple(self, x):
+        return isinstance(x, tuple) and len(x) == 1
+
     def optimizer_params(self, param_name):
         """Returns the value of optimizer parameter for every group of trainable parameters.
         """
@@ -193,9 +196,9 @@ class Session(object):
                 raise ValueError
 
         with torch.set_grad_enabled(with_grad):
-            if isinstance(batch, tuple) and len(batch) == 1:
+            if self._check_single_element_tuple(batch):
                 batch = batch[0]
-            if isinstance(target, tuple) and len(target) == 1:
+            if self._check_single_element_tuple(target):
                 target = target[0]
 
             # Transfer input and target into proper device
