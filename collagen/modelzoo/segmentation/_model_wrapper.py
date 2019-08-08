@@ -17,7 +17,7 @@ class EncoderDecoder(Module):
             else:
                 raise ValueError('This backbone name is not in the list of allowed backbones!')
 
-        self.backbone = backbone
+        
         if isinstance(decoder, str):
             if decoder in constants.allowed_decoders:
                 if decoder == 'FPN':
@@ -27,8 +27,10 @@ class EncoderDecoder(Module):
                                                   normalization=decoder_normalization,
                                                   bayesian_dropout=bayesian_dropout)
 
+        decoder.initialize()
+
+        self.backbone = backbone
         self.decoder = decoder
-        self.decoder.initialize()
 
     def forward(self, x):
         features = self.backbone(x)
