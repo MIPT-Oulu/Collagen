@@ -428,14 +428,24 @@ class KappaMeter(Meter):
 
 
 class ConfusionMeter(Meter):
-    def __init__(self, n_classes, name='confusion_matrix', prefix="", parse_target=None, parse_output=None, cond=None):
-        super().__init__(name=name, prefix=prefix)
+    def __init__(self, n_classes, name='confusion_matrix', prefix="",
+                 parse_target=None, parse_output=None, cond=None, class_dim=-1):
+
+        super(ConfusionMeter, self).__init__(name=name, prefix=prefix)
         self._n_classes = n_classes
         self._confusion_matrix = np.zeros((n_classes, n_classes), dtype=np.uint64)
 
         self.__parse_target = Meter.default_parse_target if parse_target is None else parse_target
         self.__parse_output = Meter.default_parse_output if parse_output is None else parse_output
         self.__cond = Meter.default_cond if cond is None else cond
+        self._blocked = False
+        self.class_dim = class_dim
+
+    def switch_blocker(self):
+        self._blocked = not self._blocked
+
+    def is_blocked(self):
+        return self._blocked
 
     def on_epoch_begin(self, *args, **kwargs):
         self._confusion_matrix = np.zeros((self._n_classes, self._n_classes), dtype=np.uint64)
@@ -458,12 +468,99 @@ class ConfusionMeter(Meter):
         self._confusion_matrix += confusion_matrix.astype(np.uint64)
 
     def on_minibatch_end(self, target, output, **kwargs):
+        target = self.__parse_target(target)
+        output = self.__parse_output(output)
+
         if self.__cond(target, output):
             target_cpu = to_cpu(target, use_numpy=True)
-            output_cpu = to_cpu(output, use_numpy=True).argmax(-1)
+            output_cpu = to_cpu(output, use_numpy=True).argmax(self.class_dim)
 
             if target_cpu is not None and output_cpu is not None and target_cpu.shape == output_cpu.shape:
                 self._compute_confusion_matrix(target_cpu, output_cpu)
 
     def current(self):
         return self._confusion_matrix
+
+
+class JaccardDiceMeter(Meter):
+    def __init__(self, n_classes=2, prefix="", name='jaccard', parse_output=None, class_names=None,
+                 parse_target=None, cond=None, confusion_matrix=None):
+        super(JaccardDiceMeter, self).__init__(name=name, prefix=prefix, desc_name=None)
+        assert name in ['jaccard', 'dice']
+
+        if confusion_matrix is not None:
+            # For efficiency, we can share the confusion meter among multiple meters
+            self.confusion_matrix = confusion_matrix
+            assert confusion_matrix.current().shape[0] == n_classes
+        else:
+            self.confusion_matrix = ConfusionMeter(n_classes=n_classes,
+                                                   prefix="", parse_target=parse_target,
+                                                   parse_output=parse_output, cond=cond, class_dim=1)
+
+        self.updating_cm = True
+        if class_names is None:
+            self.class_names = list(range(n_classes))
+        else:
+            assert len(class_names) == n_classes
+            self.class_names = class_names
+
+    def on_minibatch_start(self,**kwargs):
+        # Mechanism of blocking will allow to share 1 confusion matrix among several meters
+        # For example, IoU and Dice. with different thresholds.
+        if not self.confusion_matrix.is_blocked():
+            self.updating_cm = True
+            self.confusion_matrix.switch_blocker()
+        else:
+            self.updating_cm = False
+
+    def on_minibatch_end(self, target, output, **kwargs):
+
+        self.confusion_matrix.on_minibatch_end(target, output)
+
+    def current(self):
+        if self.name == 'jaccrad':
+            coeffs = self._compute_jaccard(self.confusion_matrix.current())
+        else:
+            coeffs = self._compute_dice(self.confusion_matrix.current())
+
+        return {cls:res for cls, res in zip(self.class_names, coeffs)}
+
+    @staticmethod
+    def _compute_jaccard(confusion_matrix):
+        """
+        https://github.com/ternaus/robot-surgery-segmentation/blob/master/validation.py
+        """
+        confusion_matrix = confusion_matrix.astype(float)
+        ious = []
+        for index in range(confusion_matrix.shape[0]):
+            true_positives = confusion_matrix[index, index]
+            false_positives = confusion_matrix[:, index].sum() - true_positives
+            false_negatives = confusion_matrix[index, :].sum() - true_positives
+            denom = true_positives + false_positives + false_negatives
+            if denom == 0:
+                iou = 0
+            else:
+                iou = float(true_positives) / denom
+            ious.append(iou)
+        return ious
+
+    @staticmethod
+    def _compute_dice(confusion_matrix):
+        """
+        https://github.com/ternaus/robot-surgery-segmentation/blob/master/validation.py
+        """
+        confusion_matrix = confusion_matrix.astype(float)
+        dices = []
+        for index in range(confusion_matrix.shape[0]):
+            true_positives = confusion_matrix[index, index]
+            false_positives = confusion_matrix[:, index].sum() - true_positives
+            false_negatives = confusion_matrix[index, :].sum() - true_positives
+            denom = 2 * true_positives + false_positives + false_negatives
+            if denom == 0:
+                dice = 0
+            else:
+                dice = 2 * float(true_positives) / denom
+            dices.append(dice)
+        return dices
+
+

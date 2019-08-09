@@ -165,7 +165,11 @@ class ProgressbarVisualizer(Callback):
             for cb in strategy.get_callbacks_by_name("minibatch", stage=stage):
                 if cb.ctype == "meter" and cb.current() is not None:
                     list_metrics_desc.append(str(cb))
-                    postfix_progress[cb.desc] = f'{cb.current():.03f}'
+                    cb_cur = cb.current()
+                    if not isinstance(cb_cur, dict):
+                        postfix_progress[cb.desc] = f'{cb_cur:.03f}'
+                    else:
+                        postfix_progress[cb.desc] = '|'.join([f'{cls}:{cb_cur[cls]:.03f}' for cls in cb_cur])
 
             progress_bar.set_postfix(ordered_dict=postfix_progress, refresh=True)
 
