@@ -7,7 +7,7 @@ import solt.transforms as slt
 import torch
 from torch import Tensor
 
-from collagen.callbacks import ConfusionMatrixVisualizer
+from collagen.callbacks.visualization import ConfusionMatrixVisualizer
 from collagen.core.utils import to_cpu
 from collagen.data.utils import ApplyTransform, Normalize, Compose
 
