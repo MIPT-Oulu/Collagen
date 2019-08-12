@@ -49,6 +49,8 @@ def init_mnist_cifar_transforms(n_channels=1, stage='train'):
         norm_mean_std = Normalize((0.1307,), (0.3081,))
     elif n_channels == 3:
         norm_mean_std = Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+    else:
+        raise NotImplementedError('The number of channels is not accepted.')
     train_trf = Compose([
         wrap2solt,
         slc.Stream([

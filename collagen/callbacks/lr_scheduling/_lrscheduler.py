@@ -1,6 +1,6 @@
 from torch import optim
 
-from collagen.callbacks.lrscheduler.utils import ramps
+from collagen.callbacks.lr_scheduling.utils import ramps
 from collagen.core import Callback
 
 

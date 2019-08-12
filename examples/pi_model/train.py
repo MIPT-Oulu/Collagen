@@ -10,8 +10,8 @@ from collagen.core.utils import auto_detect_device
 from collagen.data import SSFoldSplit
 from collagen.data.data_provider import pimodel_data_provider
 from collagen.data.utils.datasets import get_mnist, get_cifar10
-from collagen.callbacks.logging import ScalarMeterLogger
-from collagen.callbacks.metrics import RunningAverageMeter, AccuracyMeter
+from collagen.callbacks.logging.loggers import ScalarMeterLogger
+from collagen.callbacks.meters import RunningAverageMeter, AccuracyMeter
 from collagen.strategies import Strategy
 from examples.pi_model.networks import Model01
 from examples.pi_model.utils import SSConfusionMatrixVisualizer, cond_accuracy_meter, parse_class

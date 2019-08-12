@@ -9,12 +9,14 @@ except ImportError:
 
 from tqdm import tqdm
 
-from collagen.callbacks.logging._logging import ProgressbarLogger
 from collagen.core import Callback
 from collagen.core import Trainer, Session, Module
 from collagen.core.utils import wrap_tuple
+
 from collagen.data import DataProvider
-from collagen.callbacks.metrics import RunningAverageMeter
+
+from collagen.callbacks.meters import RunningAverageMeter
+from collagen.callbacks.logging.loggers import ProgressbarLogger
 
 
 class Strategy(object):

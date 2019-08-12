@@ -3,12 +3,14 @@ from typing import Tuple
 import torch
 from tqdm import tqdm
 
-from collagen.callbacks import DiscriminatorBatchFreezer, GeneratorBatchFreezer, SamplingFreezer
-from collagen.callbacks.logging._logging import ProgressbarLogger
+from collagen.callbacks.train.gan import DiscriminatorBatchFreezer, GeneratorBatchFreezer
+from collagen.callbacks.train.freeze import SamplingFreezer
+from collagen.callbacks.logging.loggers import ProgressbarLogger
+
 from collagen.core import Trainer, Callback
 from collagen.core.utils import wrap_tuple
 from collagen.data import DataProvider
-from collagen.callbacks.metrics import RunningAverageMeter
+from collagen.callbacks.meters import RunningAverageMeter
 
 
 class GANStrategy(object):
