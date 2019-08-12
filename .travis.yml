@@ -18,7 +18,7 @@ before_install:
   - sh ci/conda_setup.sh
   - bash $HOME/miniconda.sh -b -p $HOME/miniconda
   - export OPATH="$PATH" && export PATH="$HOME/miniconda/bin:$PATH"
-  - conda update -n base -c defaults conda
+  - conda update -y -n base -c defaults conda
 install:
   - conda create -q -y -n collagen_test_env python=$TRAVIS_PYTHON_VERSION
   - source activate collagen_test_env
