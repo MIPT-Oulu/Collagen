@@ -5,6 +5,8 @@ __pycache__/
 .idea/
 # C extensions
 *.so
+collagen/.DS_Store
+collagen/callbacks/.DS_Store	
 
 examples/minist_classification/data/
 .pytest_cache/
