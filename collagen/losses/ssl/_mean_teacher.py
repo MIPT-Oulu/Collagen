@@ -3,7 +3,7 @@ import torch.nn as nn
 from torch.nn import CrossEntropyLoss
 from torch.nn import functional as F
 
-from collagen.callbacks.lrscheduler.utils.ramps import sigmoid_rampup
+from collagen.callbacks.lr_scheduling.utils.ramps import sigmoid_rampup
 
 
 class MTLoss(nn.Module):
