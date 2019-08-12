@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 from .fixtures import classification_problem_output
-from collagen.callbacks.metrics import ConfusionMeter
+from collagen.callbacks.meters import ConfusionMeter
 from sklearn.metrics import confusion_matrix
 
 
