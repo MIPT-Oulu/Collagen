@@ -23,7 +23,7 @@ install:
   - conda create -q -y -n collagen_test_env python=$TRAVIS_PYTHON_VERSION
   - conda install -y -n collagen_test_env pandoc
   - source activate collagen_test_env
-  - conda install -c anaconda coverage=4.5.1
+  - conda install -c anaconda coverage=4.5.1 -y
   - pip install -r ci/requirements.txt
   - pip install .
 
