@@ -4,7 +4,7 @@ from torch.utils.data.dataloader import default_collate
 import pandas as pd
 import numpy as np
 
-from collagen.data import ItemLoader
+from collagen.data import ItemLoader, DataProvider
 from collagen.core.utils import to_cpu
 
 
@@ -41,33 +41,62 @@ class MixMatchSampler(object):
         self._target_key = target_key
         self._output_type = output_type
         self._detach = detach
-        self._len = max(len(self._label_sampler, self._unlabel_sampler))
+        self._len = max(len(self._label_sampler), len(self._unlabel_sampler))
 
     def __len__(self):
         return self._len
 
     def _crop_if_needed(self, df1, df2):
-        min_len = min(len(df1), len(df2))
-        df1 = df1[:min_len]
-        df2 = df2[:min_len]
+        assert len(df1) == len(df2)
+        for i in range(len(df1)):
+            if len(df1[i]['data']) != len(df2[i]['data']):
+                min_len = min(len(df1[i]['data']), len(df2[i]['data']))
+                df1[i][self._data_key] = df1[i][:min_len][self._data_key]
+                df2[i][self._data_key] = df2[i][:min_len][self._data_key]
+                df1[i][self._target_key] = df1[i][:min_len][self._target_key]
+                df2[i][self._target_key] = df2[i][:min_len][self._target_key]
         return df1, df2
 
     def sharpen(self, x, T=0.5):
         assert len(x.shape) == 2
 
-        _x = torch.pow(x, T)
+        _x = torch.pow(x, 1 / T)
         s = torch.sum(_x, dim=-1, keepdim=True)
         _x = _x / s
         return _x
+
+    def _create_union_data(self, r1, r2):
+        assert len(r1) == len(r2)
+        r = []
+
+        for i in range(len(r1)):
+            union_rows = dict()
+            union_rows[self._data_key] = torch.cat([r1[i][self._data_key], r2[i][self._data_key]], dim=0)
+            union_rows[self._target_key] = torch.cat([r1[i][self._target_key], r2[i][self._target_key]], dim=0)
+            union_rows['name'] = r1[i]['name']
+            r.append(union_rows)
+        return r
+
+    def _mixup(self, x1, y1, x2, y2, alpha=0.75):
+        l = np.random.beta(alpha, alpha)
+        l = max(l, 1 - l)
+        x = l * x1 + (1 - l) * x2
+        y = l * y1 + (1 - l) * y2
+        return x, y
 
     def sample(self, k=1):
         samples = []
         labeled_sampled_rows = self._label_sampler.sample(k)
         unlabeled_sampled_rows = self._unlabel_sampler.sample(k)
 
-        labeled_sampled_rows, unlabeled_sampled_rows = self._crop_if_needed(labeled_sampled_rows, unlabeled_sampled_rows)
+        labeled_sampled_rows, unlabeled_sampled_rows = self._crop_if_needed(labeled_sampled_rows,
+                                                                            unlabeled_sampled_rows)
 
         for i in range(k):
+            # Unlabeled data
+            unlabeled_sampled_rows[i][self._data_key] = unlabeled_sampled_rows[i][self._data_key].to(
+                next(self._model.parameters()).device)
+
             u_imgs = unlabeled_sampled_rows[i][self._data_key]
 
             list_imgs = []
@@ -87,12 +116,8 @@ class MixMatchSampler(object):
             batch_imgs = batch_imgs.to(next(self._model.parameters()).device)
             if self._output_type == 'logits':
                 out = self._model(batch_imgs)
-                # logits = to_cpu(out, use_numpy=False, required_grad=True)
-                logits = out
             elif self._output_type == 'features':
                 out = self._model.get_features(batch_imgs)
-                # logits = to_cpu(out, use_numpy=False, required_grad=True)
-                logits = out
 
             preds = out.view(u_imgs.shape[0], -1, out.shape[-1])
             mean_preds = torch.mean(preds, dim=1)
@@ -100,16 +125,45 @@ class MixMatchSampler(object):
 
             unlabeled_sampled_rows[i][self._target_key] = guessing_labels
 
-        union_rows = labeled_sampled_rows + unlabeled_sampled_rows
+            # Labeled data
+            labeled_sampled_rows[i][self._data_key] = labeled_sampled_rows[i][self._data_key].to(
+                next(self._model.parameters()).device)
+            target_l = labeled_sampled_rows[i][self._target_key]
+            onehot_l = torch.zeros(guessing_labels.shape)
+            onehot_l.scatter_(1, target_l.type(torch.int64).unsqueeze(-1), 1.0)
+            labeled_sampled_rows[i][self._target_key] = onehot_l.to(next(self._model.parameters()).device)
 
-        rand_idx = np.random.permutation(len(union_rows))
+        union_rows = self._create_union_data(labeled_sampled_rows, unlabeled_sampled_rows)
 
         for i in range(k):
-            u_imgs = unlabeled_sampled_rows[i][self._data_key]
+            ridx = np.random.permutation(union_rows[i][self._data_key].shape[0])
+            u = unlabeled_sampled_rows[i]
+            x = labeled_sampled_rows[i]
 
+            x_mix, target_mix = self._mixup(x[self._data_key], x[self._target_key],
+                                            union_rows[i][self._data_key][ridx[i]], union_rows[i][self._target_key][ridx[i]])
+            u_mix, pred_mix = self._mixup(u[self._data_key], u[self._target_key], union_rows[i][self._data_key][ridx[k + i]],
+                                          union_rows[i][self._target_key][ridx[k + i]])
 
-            if self._detach:
-                logits = logits.detach()
-
-            samples.append({'name': self._name, 'logits': logits, 'data': imgs, 'target': target})
+            samples.append({'name': self._name, 'x_mix': x_mix, 'target_mix_x': target_mix, 'u_mix': u_mix,
+                            'target_mix_u': pred_mix})
         return samples
+
+
+def mixmatch_data_provider(model, augmentation, labeled_meta_data, unlabeled_meta_data, val_labeled_data,
+                           n_augmentations, parse_item, bs, transforms, root="", num_threads=4):
+    itemloader_dict = {}
+    itemloader_dict['all_train'] = MixMatchSampler(model=model, name="train_mixmatch", augmentation=augmentation,
+                                                   labeled_meta_data=labeled_meta_data,
+                                                   unlabeled_meta_data=unlabeled_meta_data,
+                                                   n_augmentations=n_augmentations,
+                                                   data_key='data', target_key='target', parse_item_cb=parse_item,
+                                                   batch_size=bs, transform=transforms[0],
+                                                   num_workers=num_threads, shuffle=True)
+
+    itemloader_dict['labeled_eval'] = ItemLoader(root=root, meta_data=val_labeled_data, name='l_eval',
+                                                 transform=transforms[1],
+                                                 parse_item_cb=parse_item,
+                                                 batch_size=bs, num_workers=num_threads,
+                                                 shuffle=False)
+    return DataProvider(itemloader_dict)

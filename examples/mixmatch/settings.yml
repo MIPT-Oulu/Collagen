@@ -1,20 +1,15 @@
 train:
   data_provider:
-    unlabeled_train:
-      cate: AugmentedGroupSampler
+    all_train:
+      cate: MixMatchSampler
       num_samples: 1
-      data_key: "data"
+      data_key:
+        - "x_mix"
+        - "u_mix"
       target_key:
         - "name"
-        - "logits"
-    labeled_train:
-      cate: ItemLoader
-      num_samples: 1
-      data_key: "data"
-      target_key:
-        - "target"
-        - "logits"
-        - "name"
+        - "target_mix_x"
+        - "target_mix_u"
 
 eval:
   data_provider:
@@ -26,11 +21,3 @@ eval:
         - "target"
         - "logits"
         - "name"
-
-    unlabeled_eval:
-      cate: AugmentedGroupSampler
-      num_samples: 1
-      data_key: "data"
-      target_key:
-        - "name"
-        - "logits"
