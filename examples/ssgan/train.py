@@ -155,9 +155,9 @@ if __name__ == "__main__":
                                                     tag="eval/confusion_matrix"))
 
     st_callbacks = (ScalarMeterLogger(writer=summary_writer),
-                    TensorboardSynthesisVisualizer(generator_sampler=item_loaders['fake_unlabeled_gen'],
-                                                   writer=summary_writer,
-                                                   grid_shape=args.grid_shape))
+                    ImageSamplingVisualizer(generator_sampler=item_loaders['fake_unlabeled_gen'],
+                                            writer=summary_writer,
+                                            grid_shape=args.grid_shape))
 
     with open("settings.yml", "r") as f:
         sampling_config = yaml.load(f)
