@@ -10,7 +10,7 @@ from collagen.core.utils import auto_detect_device
 from collagen.data import SSFoldSplit
 from collagen.data.data_provider import pimodel_data_provider
 from collagen.data.utils.datasets import get_mnist, get_cifar10
-from collagen.callbacks.logging import MeterLogging
+from collagen.callbacks.logging import ScalarMeterLogger
 from collagen.callbacks.metrics import RunningAverageMeter, AccuracyMeter
 from collagen.strategies import Strategy
 from examples.pi_model.networks import Model01
@@ -144,7 +144,7 @@ if __name__ == "__main__":
     # Callbacks
     callbacks_train = (RunningAverageMeter(prefix='train', name='loss_cls'),
                        RunningAverageMeter(prefix='train', name='loss_cons'),
-                       MeterLogging(writer=summary_writer),
+                       ScalarMeterLogger(writer=summary_writer),
                        AccuracyMeter(prefix="train", name="acc", parse_target=parse_target_accuracy_meter,
                                      cond=cond_accuracy_meter),
                        SSConfusionMatrixVisualizer(writer=summary_writer, cond=cond_accuracy_meter,
@@ -156,12 +156,12 @@ if __name__ == "__main__":
                       RunningAverageMeter(prefix='eval', name='loss_cons'),
                       AccuracyMeter(prefix="eval", name="acc", parse_target=parse_target_accuracy_meter,
                                     cond=cond_accuracy_meter),
-                      MeterLogging(writer=summary_writer),
+                      ScalarMeterLogger(writer=summary_writer),
                       SSConfusionMatrixVisualizer(writer=summary_writer, cond=cond_accuracy_meter,
                                                   parse_class=parse_class,
                                                   labels=[str(i) for i in range(10)], tag="eval/confusion_matrix"))
 
-    st_callbacks = MeterLogging(writer=summary_writer)
+    st_callbacks = ScalarMeterLogger(writer=summary_writer)
 
     with open("settings.yml", "r") as f:
         sampling_config = yaml.load(f)

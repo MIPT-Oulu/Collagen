@@ -9,7 +9,7 @@ from collagen.core.utils import auto_detect_device
 from collagen.data import FoldSplit
 from collagen.data import ItemLoader, DataProvider
 from collagen.data.utils.datasets import get_mnist, get_cifar10
-from collagen.callbacks.logging import MeterLogging
+from collagen.callbacks.logging import ScalarMeterLogger
 from collagen.callbacks.metrics import RunningAverageMeter, AccuracyMeter
 from collagen.savers import ModelSaver
 from collagen.strategies import Strategy
@@ -75,7 +75,7 @@ if __name__ == "__main__":
 
         val_cbs = (RunningAverageMeter(prefix="eval", name="loss"),
                    AccuracyMeter(prefix="eval", name="acc"),
-                   MeterLogging(writer=summary_writer),
+                   ScalarMeterLogger(writer=summary_writer),
                    ModelSaver(metric_names='eval/loss', save_dir=args.snapshots, conditions='min', model=model))
 
         strategy = Strategy(data_provider=data_provider,

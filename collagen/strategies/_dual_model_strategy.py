@@ -3,7 +3,7 @@ from typing import Tuple
 import torch
 from tqdm import tqdm
 
-from collagen.callbacks.visualization import ProgressbarVisualizer
+from collagen.callbacks.logging._logging import ProgressbarLogger
 from collagen.callbacks import SamplingFreezer
 
 from collagen.core import Trainer, Callback
@@ -110,7 +110,7 @@ class DualModelStrategy(object):
         # Default epoch level callbacks
         self.__default_st_callbacks = (
             SamplingFreezer(modules=wrap_tuple(m1_trainer.model) + wrap_tuple(m0_trainer.model)),
-            ProgressbarVisualizer(update_freq=1))
+            ProgressbarLogger(update_freq=1))
         self.__callbacks += self.__default_st_callbacks
 
     def _call_callbacks_by_name(self, cb_func_name, **kwargs):

@@ -9,7 +9,7 @@ except ImportError:
 
 from tqdm import tqdm
 
-from collagen.callbacks.visualization import ProgressbarVisualizer
+from collagen.callbacks.logging._logging import ProgressbarLogger
 from collagen.core import Callback
 from collagen.core import Trainer, Session, Module
 from collagen.core.utils import wrap_tuple
@@ -132,9 +132,9 @@ class Strategy(object):
         self.__loss.to(self.__device)
 
         self.__default_callbacks_train = (RunningAverageMeter(prefix='train', name='loss'),
-                                          ProgressbarVisualizer(update_freq=1))
+                                          ProgressbarLogger(update_freq=1, name='pbar/train'))
         self.__default_callbacks_eval = (RunningAverageMeter(prefix='eval', name='loss'),
-                                         ProgressbarVisualizer(update_freq=1),)
+                                         ProgressbarLogger(update_freq=1, name='pbar/eval'),)
 
         self.__train_callbacks = self._auto_add_default_callbacks(self.__default_callbacks_train,
                                                                   self.__train_callbacks)
@@ -153,7 +153,8 @@ class Strategy(object):
                                  train_callbacks=self.__train_callbacks,
                                  val_callbacks=self.__val_callbacks)
 
-    def _auto_add_default_callbacks(self, d_cbs, cbs):
+    @staticmethod
+    def _auto_add_default_callbacks(d_cbs, cbs):
         added_train_cbs = []
         for d_cb in d_cbs:
             exist = False

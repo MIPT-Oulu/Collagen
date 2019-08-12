@@ -1,4 +1,5 @@
-from collagen.data import ItemLoader, GANFakeSampler, GaussianNoiseSampler, DataProvider
+from collagen.data.samplers import ItemLoader, GANFakeSampler, GaussianNoiseSampler
+from collagen.data import DataProvider
 
 
 def gan_data_provider(g_network, item_loaders, train_ds, classes,

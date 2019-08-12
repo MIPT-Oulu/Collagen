@@ -9,7 +9,7 @@ from collagen.core import Module, Trainer
 from collagen.core.utils import auto_detect_device, to_cpu
 from collagen.data import DataProvider, ItemLoader, SSGANFakeSampler, SSFoldSplit
 from collagen.data.utils.datasets import get_mnist
-from collagen.callbacks.logging import MeterLogging
+from collagen.callbacks.logging import ScalarMeterLogger
 from collagen.callbacks.metrics import SSAccuracyMeter, SSValidityMeter
 from collagen.strategies import GANStrategy
 from examples.ssgan.utils import Discriminator, Generator
@@ -152,7 +152,7 @@ if __name__ == "__main__":
                                                     labels=[str(i) for i in range(10)],
                                                     tag="eval/confusion_matrix"))
 
-    st_callbacks = (MeterLogging(writer=summary_writer),
+    st_callbacks = (ScalarMeterLogger(writer=summary_writer),
                     TensorboardSynthesisVisualizer(generator_sampler=item_loaders['fake_unlabeled_gen'],
                                                    writer=summary_writer,
                                                    grid_shape=args.grid_shape))

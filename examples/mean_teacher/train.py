@@ -4,14 +4,14 @@ from torch import optim
 
 from collagen.callbacks.dualmodel import UpdateEMA
 from collagen.callbacks.lrscheduler._lrscheduler import SingleRampUpDownScheduler
-from collagen.callbacks.visualization import ProgressbarVisualizer
+from collagen.callbacks.logging._logging import ProgressbarLogger
 from collagen.core import Callback
 from collagen.core import Trainer
 from collagen.core.utils import auto_detect_device
 from collagen.data import SSFoldSplit
 from collagen.data.data_provider import mt_data_provider
 from collagen.data.utils.datasets import get_cifar10, get_mnist
-from collagen.callbacks.logging import MeterLogging, EpochLRLogging
+from collagen.callbacks.logging import ScalarMeterLogger, EpochLRLogging
 from collagen.losses.ssl import MTLoss
 from collagen.callbacks.metrics import RunningAverageMeter, AccuracyMeter, KappaMeter
 from collagen.strategies import DualModelStrategy
@@ -82,7 +82,7 @@ if __name__ == "__main__":
                                      parse_item=parse_item, bs=args.bs, num_threads=args.num_threads,
                                      output_type='logits')
     # Setting up the callbacks
-    stra_cbs = (MeterLogging(writer=summary_writer), ProgressbarVisualizer())
+    stra_cbs = (ScalarMeterLogger(writer=summary_writer), ProgressbarLogger())
 
     # Trainers
     st_train_cbs = (

@@ -4,7 +4,7 @@ import torch
 from tqdm import tqdm
 
 from collagen.callbacks import DiscriminatorBatchFreezer, GeneratorBatchFreezer, SamplingFreezer
-from collagen.callbacks.visualization import ProgressbarVisualizer
+from collagen.callbacks.logging._logging import ProgressbarLogger
 from collagen.core import Trainer, Callback
 from collagen.core.utils import wrap_tuple
 from collagen.data import DataProvider
@@ -109,8 +109,8 @@ class GANStrategy(object):
 
         # Default epoch level callbacks
         self.__default_st_callbacks = (
-        SamplingFreezer(modules=wrap_tuple(d_trainer.model) + wrap_tuple(g_trainer.model)),
-        ProgressbarVisualizer(update_freq=1))
+            SamplingFreezer(modules=wrap_tuple(d_trainer.model) + wrap_tuple(g_trainer.model)),
+            ProgressbarLogger(update_freq=1))
         self.__callbacks += self.__default_st_callbacks
 
         self._g_minibatch_accumulate_grad = True

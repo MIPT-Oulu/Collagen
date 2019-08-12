@@ -9,50 +9,11 @@ from sklearn.metrics import confusion_matrix
 from typing import Tuple
 
 import torch
-import tqdm
 from torch import Tensor
-from torch.tensor import OrderedDict
 from torchvision.utils import make_grid
 
 from collagen.core import Callback
 from collagen.core.utils import to_cpu
-
-
-def plot_confusion_matrix(correct_labels, predict_labels, labels, normalize=True):
-    cm = confusion_matrix(correct_labels, predict_labels, labels=labels)
-    if normalize:
-        cm = cm.astype('float') * 100.0 / cm.sum(axis=1)[:, np.newaxis]
-        cm = np.nan_to_num(cm, copy=True)
-        cm = np.round(cm).astype('int')
-
-    np.set_printoptions(precision=2)
-
-    fig = figure.Figure(figsize=(5, 5), dpi=230, facecolor='w', edgecolor='k')
-    ax = fig.add_subplot(1, 1, 1)
-    im = ax.imshow(cm, cmap='Oranges')
-
-    classes = [re.sub(r'([a-z](?=[A-Z])|[A-Z](?=[A-Z][a-z]))', r'\1 ', x) for x in labels]
-    classes = ['\n'.join(wrap(l, 40)) for l in classes]
-
-    tick_marks = np.arange(len(classes))
-
-    ax.set_xlabel('Predicted', fontsize=16)
-    ax.set_xticks(tick_marks)
-    c = ax.set_xticklabels(classes, fontsize=16, rotation=-90, ha='center')
-    ax.xaxis.set_label_position('bottom')
-    ax.xaxis.tick_bottom()
-
-    ax.set_ylabel('True Label', fontsize=16)
-    ax.set_yticks(tick_marks)
-    ax.set_yticklabels(classes, fontsize=16, va='center')
-    ax.yaxis.set_label_position('left')
-    ax.yaxis.tick_left()
-
-    for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
-        ax.text(j, i, format(cm[i, j], 'd') if cm[i, j] != 0 else '.', horizontalalignment="center", fontsize=16,
-                verticalalignment='center', color="black")
-    fig.set_tight_layout(True)
-    return fig
 
 
 class ConfusionMatrixVisualizer(Callback):
@@ -121,62 +82,58 @@ class ConfusionMatrixVisualizer(Callback):
                 self._corrects += [self._labels[i] for i in to_cpu(target_cls, use_numpy=True).tolist()]
                 self._predicts += [self._labels[i] for i in to_cpu(pred_cls, use_numpy=True).tolist()]
 
+    @staticmethod
+    def plot_confusion_matrix(correct_labels, predict_labels, labels, normalize=True):
+        cm = confusion_matrix(correct_labels, predict_labels, labels=labels)
+        if normalize:
+            cm = cm.astype('float') * 100.0 / cm.sum(axis=1)[:, np.newaxis]
+            cm = np.nan_to_num(cm, copy=True)
+            cm = np.round(cm).astype('int')
+
+        np.set_printoptions(precision=2)
+
+        fig = figure.Figure(figsize=(5, 5), dpi=230, facecolor='w', edgecolor='k')
+        ax = fig.add_subplot(1, 1, 1)
+        im = ax.imshow(cm, cmap='Oranges')
+
+        classes = [re.sub(r'([a-z](?=[A-Z])|[A-Z](?=[A-Z][a-z]))', r'\1 ', x) for x in labels]
+        classes = ['\n'.join(wrap(l, 40)) for l in classes]
+
+        tick_marks = np.arange(len(classes))
+
+        ax.set_xlabel('Predicted', fontsize=16)
+        ax.set_xticks(tick_marks)
+        c = ax.set_xticklabels(classes, fontsize=16, rotation=-90, ha='center')
+        ax.xaxis.set_label_position('bottom')
+        ax.xaxis.tick_bottom()
+
+        ax.set_ylabel('True Label', fontsize=16)
+        ax.set_yticks(tick_marks)
+        ax.set_yticklabels(classes, fontsize=16, va='center')
+        ax.yaxis.set_label_position('left')
+        ax.yaxis.tick_left()
+
+        for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
+            ax.text(j, i, format(cm[i, j], 'd') if cm[i, j] != 0 else '.', horizontalalignment="center", fontsize=16,
+                    verticalalignment='center', color="black")
+        fig.set_tight_layout(True)
+        return fig
+
     def on_epoch_end(self, *args, **kwargs):
         if len(self._corrects) != len(self._predicts):
             raise ValueError(
                 'Num of predictions and groundtruths must match, but found {} and {}'.format(len(self._predicts),
                                                                                              len(self._corrects)))
         elif len(self._corrects) > 0:
-            fig = plot_confusion_matrix(np.array(self._corrects), np.array(self._predicts), labels=self._labels,
-                                        normalize=self._normalize)
+            fig = self.plot_confusion_matrix(np.array(self._corrects), np.array(self._predicts),
+                                             labels=self._labels,
+                                             normalize=self._normalize)
             self._writer.add_figure(self._tag, fig, global_step=self.__epoch)
 
 
-class ProgressbarVisualizer(Callback):
-    def __init__(self, update_freq=1, name='progressbar'):
-        """Visualizes progressbar after a specific number of batches
-
-        Parameters
-        ----------
-        update_freq: int
-            The number of batches to update progressbar (default: 1)
-        """
-        super().__init__(ctype="visualizer")
-        self.__count = 0
-        self.__update_freq = update_freq
-        self.__name = name
-        if not isinstance(self.__update_freq, int) or self.__update_freq < 1:
-            raise ValueError(
-                "`update_freq` must be `int` and greater than 0, but found {} {}".format(type(self.__update_freq),
-                                                                                         self.__update_freq))
-
-    @property
-    def name(self):
-        return self.__name
-
-    def _check_freq(self):
-        return self.__count % self.__update_freq == 0
-
-    def on_batch_end(self, strategy, epoch: int, progress_bar: tqdm, stage: str or None, **kwargs):
-        self.__count += 1
-        if self._check_freq():
-            list_metrics_desc = []
-            postfix_progress = OrderedDict()
-            for cb in strategy.get_callbacks_by_name("minibatch", stage=stage):
-                if cb.ctype == "meter" and cb.current() is not None:
-                    list_metrics_desc.append(str(cb))
-                    cb_cur = cb.current()
-                    if not isinstance(cb_cur, dict):
-                        postfix_progress[cb.desc] = f'{cb_cur:.03f}'
-                    else:
-                        postfix_progress[cb.desc] = '|'.join([f'{cls}:{cb_cur[cls]:.03f}' for cls in cb_cur])
-
-            progress_bar.set_postfix(ordered_dict=postfix_progress, refresh=True)
-
-
-class TensorboardSynthesisVisualizer(Callback):
+class ImageSamplingVisualizer(Callback):
     def __init__(self, writer, generator_sampler, key_name: str = "data", tag: str = "Generated",
-                 grid_shape: Tuple[int] = (10, 10), split_channel=True, transform=None, unbind_imgs_transform=None):
+                 grid_shape: Tuple[int, int] or int = (10, 10), split_channel=True, transform=None, unbind_imgs_transform=None):
         """Visualizes synthesized images in TensorboardX
 
         Parameters
@@ -209,14 +166,14 @@ class TensorboardSynthesisVisualizer(Callback):
         self.__num_images = grid_shape[0] * grid_shape[1]
         self.__num_batches = self.__num_images // self.__generator_sampler.batch_size + 1
         self.__tag = tag
-        self.__unbind_imgs_transform = self._default_tranform_unbind_imgs if unbind_imgs_transform is None else unbind_imgs_transform
+        self.__unbind_imgs_transform = self._default_transform_unbind_imgs if unbind_imgs_transform is None else unbind_imgs_transform
 
     @staticmethod
     def _default_transform(x):
         return (x + 1.0) / 2.0
 
     @staticmethod
-    def _default_tranform_unbind_imgs(separate_imgs):
+    def _default_transform_unbind_imgs(separate_imgs):
         concate_img = torch.cat(separate_imgs, dim=-1)
         return concate_img
 
@@ -232,12 +189,12 @@ class TensorboardSynthesisVisualizer(Callback):
                             if img.shape[0] % 3 == 0:
                                 n_split = int(img.shape[0] / 3)
                                 separate_imgs = [img[3 * k:3 * (k + 1), :, :] for k in range(n_split)]
-                                concate_img = self.__unbind_imgs_transform(separate_imgs)
-                                images.append(concate_img)
+                                concat_img = self.__unbind_imgs_transform(separate_imgs)
+                                images.append(concat_img)
                             else:
                                 separate_imgs = torch.unbind(img, dim=0)
-                                concate_img = self.__unbind_imgs_transform(separate_imgs)
-                                images.append(torch.unsqueeze(concate_img, 0))
+                                concat_img = self.__unbind_imgs_transform(separate_imgs)
+                                images.append(torch.unsqueeze(concat_img, 0))
                         else:
                             raise ValueError(
                                 "Channels of image ({}) must be either 1 or 3, but found {}".format(img.shape,
