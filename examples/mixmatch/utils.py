@@ -11,30 +11,59 @@ import solt.transforms as slt
 
 
 def cond_accuracy_meter(target, output):
-    return target['name'] == 'l'
+    return True
 
-def parse_target_accuracy_meter(target):
-    if target['name'] == 'l':
+def parse_target(target):
+    if target['name'] == 'l_eval':
         return target['target']
+    elif target['name'] == 'train_mixmatch':
+        return target['target_x']
     else:
         return None
 
-def parse_class(output):
-    if isinstance(output, dict) and output['name'] == 'l':
-        output = output['target']
-    elif isinstance(output, Tensor):
+def parse_output(output):
+    if isinstance(output, Tensor):
+        return output
+    elif isinstance(output, dict):
+        return output['x_mix']
+    else:
+        raise ValueError('Not support output type {}'.format(type(output)))
+
+def parse_output_cls(y):
+    if isinstance(y, dict):
+        y = y['x_mix']
+    elif isinstance(y, Tensor):
         pass
     else:
         return None
 
-    if output is None:
+    if y is None:
         return None
-    elif len(output.shape) == 2:
-        output_cpu = to_cpu(output.argmax(dim=1), use_numpy=True)
-    elif len(output.shape) == 1:
-        output_cpu = to_cpu(output, use_numpy=True)
+    elif len(y.shape) == 2:
+        output_cpu = to_cpu(y.argmax(dim=1), use_numpy=True)
+    elif len(y.shape) == 1:
+        output_cpu = to_cpu(y, use_numpy=True)
     else:
-        raise ValueError("Only support dims 1 or 2, but got {}".format(len(output.shape)))
+        raise ValueError("Only support dims 1 or 2, but got {}".format(len(y.shape)))
+    output_cpu = output_cpu.astype(int)
+    return output_cpu
+
+def parse_target_cls(y):
+    if y['name'] == 'train_mixmatch':
+        y = y['target_x']
+    elif y['name'] == 'l_eval':
+        y = y['target']
+    else:
+        return None
+
+    if y is None:
+        return None
+    elif len(y.shape) == 2:
+        output_cpu = to_cpu(y.argmax(dim=1), use_numpy=True)
+    elif len(y.shape) == 1:
+        output_cpu = to_cpu(y, use_numpy=True)
+    else:
+        raise ValueError("Only support dims 1 or 2, but got {}".format(len(y.shape)))
     output_cpu = output_cpu.astype(int)
     return output_cpu
 
@@ -52,8 +81,6 @@ class SSConfusionMatrixVisualizer(ConfusionMatrixVisualizer):
                 self._corrects += [self._labels[i] for i in to_cpu(target_cls, use_numpy=True).tolist()]
                 self._predicts += [self._labels[i] for i in to_cpu(pred_cls, use_numpy=True).tolist()]
 
-def cond_accuracy_meter(target, output):
-    return target['name'] == 'l'
 
 def parse_target_accuracy_meter(target):
     if target['name'] == 'l':

@@ -11,7 +11,7 @@ from collagen.logging import MeterLogging
 from collagen.callbacks.visualizer import ConfusionMatrixVisualizer
 
 from examples.mixmatch.utils import init_args, parse_item, init_transforms, parse_target_accuracy_meter
-from examples.mixmatch.utils import cond_accuracy_meter, parse_class
+from examples.mixmatch.utils import cond_accuracy_meter, parse_output, parse_target, parse_output_cls, parse_target_cls
 from examples.mixmatch.losses import MixMatchModelLoss
 from examples.mixmatch.data_provider import mixmatch_data_provider
 from examples.mixmatch.networks import Model01
@@ -58,23 +58,23 @@ if __name__ == "__main__":
     callbacks_train = (RunningAverageMeter(prefix='train', name='loss_x'),
                        RunningAverageMeter(prefix='train', name='loss_u'),
                        MeterLogging(writer=summary_writer),
-                       AccuracyMeter(prefix="train", name="acc", parse_target=parse_target_accuracy_meter,
+                       AccuracyMeter(prefix="train", name="acc", parse_target=parse_target, parse_output=parse_output,
                                      cond=cond_accuracy_meter),
-                       KappaMeter(prefix='train', name='kappa', parse_target=parse_class, parse_output=parse_class,
+                       KappaMeter(prefix='train', name='kappa', parse_target=parse_target_cls, parse_output=parse_output_cls,
                                   cond=cond_accuracy_meter),
                        ConfusionMatrixVisualizer(writer=summary_writer, cond=cond_accuracy_meter,
-                                                 parse_class=parse_class,
+                                                 parse_target=parse_target_cls, parse_output=parse_output_cls,
                                                  labels=[str(i) for i in range(10)], tag="train/confusion_matrix"))
 
     callbacks_eval = (RunningAverageMeter(prefix='eval', name='loss_x'),
                       RunningAverageMeter(prefix='eval', name='loss_u'),
-                      AccuracyMeter(prefix="eval", name="acc", parse_target=parse_target_accuracy_meter,
+                      AccuracyMeter(prefix="eval", name="acc", parse_target=parse_target, parse_output=parse_output,
                                     cond=cond_accuracy_meter),
                       MeterLogging(writer=summary_writer),
-                      KappaMeter(prefix='eval', name='kappa', parse_target=parse_class, parse_output=parse_class,
+                      KappaMeter(prefix='eval', name='kappa', parse_target=parse_target_cls, parse_output=parse_output_cls,
                                  cond=cond_accuracy_meter),
                       ConfusionMatrixVisualizer(writer=summary_writer, cond=cond_accuracy_meter,
-                                                parse_class=parse_class,
+                                                parse_target=parse_target_cls, parse_output=parse_output_cls,
                                                 labels=[str(i) for i in range(10)], tag="eval/confusion_matrix"))
 
     st_callbacks = MeterLogging(writer=summary_writer)

@@ -51,10 +51,10 @@ class MixMatchSampler(object):
         for i in range(len(df1)):
             if len(df1[i]['data']) != len(df2[i]['data']):
                 min_len = min(len(df1[i]['data']), len(df2[i]['data']))
-                df1[i][self._data_key] = df1[i][:min_len][self._data_key]
-                df2[i][self._data_key] = df2[i][:min_len][self._data_key]
-                df1[i][self._target_key] = df1[i][:min_len][self._target_key]
-                df2[i][self._target_key] = df2[i][:min_len][self._target_key]
+                df1[i][self._data_key] = df1[i][self._data_key][:min_len, :]
+                df2[i][self._data_key] = df2[i][self._data_key][:min_len, :]
+                df1[i][self._target_key] = df1[i][self._target_key][:min_len]
+                df2[i][self._target_key] = df2[i][self._target_key][:min_len]
         return df1, df2
 
     def sharpen(self, x, T=0.5):
@@ -72,7 +72,7 @@ class MixMatchSampler(object):
         for i in range(len(r1)):
             union_rows = dict()
             union_rows[self._data_key] = torch.cat([r1[i][self._data_key], r2[i][self._data_key]], dim=0)
-            union_rows[self._target_key] = torch.cat([r1[i][self._target_key], r2[i][self._target_key]], dim=0)
+            union_rows["probs"] = torch.cat([r1[i]["probs"], r2[i]["probs"]], dim=0)
             union_rows['name'] = r1[i]['name']
             r.append(union_rows)
         return r
@@ -123,7 +123,7 @@ class MixMatchSampler(object):
             mean_preds = torch.mean(preds, dim=1)
             guessing_labels = self.sharpen(mean_preds).detach()
 
-            unlabeled_sampled_rows[i][self._target_key] = guessing_labels
+            unlabeled_sampled_rows[i]["probs"] = guessing_labels
 
             # Labeled data
             labeled_sampled_rows[i][self._data_key] = labeled_sampled_rows[i][self._data_key].to(
@@ -131,7 +131,7 @@ class MixMatchSampler(object):
             target_l = labeled_sampled_rows[i][self._target_key]
             onehot_l = torch.zeros(guessing_labels.shape)
             onehot_l.scatter_(1, target_l.type(torch.int64).unsqueeze(-1), 1.0)
-            labeled_sampled_rows[i][self._target_key] = onehot_l.to(next(self._model.parameters()).device)
+            labeled_sampled_rows[i]["probs"] = onehot_l.to(next(self._model.parameters()).device)
 
         union_rows = self._create_union_data(labeled_sampled_rows, unlabeled_sampled_rows)
 
@@ -140,13 +140,13 @@ class MixMatchSampler(object):
             u = unlabeled_sampled_rows[i]
             x = labeled_sampled_rows[i]
 
-            x_mix, target_mix = self._mixup(x[self._data_key], x[self._target_key],
-                                            union_rows[i][self._data_key][ridx[i]], union_rows[i][self._target_key][ridx[i]])
-            u_mix, pred_mix = self._mixup(u[self._data_key], u[self._target_key], union_rows[i][self._data_key][ridx[k + i]],
-                                          union_rows[i][self._target_key][ridx[k + i]])
+            x_mix, target_mix = self._mixup(x[self._data_key], x["probs"],
+                                            union_rows[i][self._data_key][ridx[i]], union_rows[i]["probs"][ridx[i]])
+            u_mix, pred_mix = self._mixup(u[self._data_key], u["probs"], union_rows[i][self._data_key][ridx[k + i]],
+                                          union_rows[i]["probs"][ridx[k + i]])
 
             samples.append({'name': self._name, 'x_mix': x_mix, 'target_mix_x': target_mix, 'u_mix': u_mix,
-                            'target_mix_u': pred_mix})
+                            'target_mix_u': pred_mix, 'target_x': x[self._target_key]})
         return samples
 
 

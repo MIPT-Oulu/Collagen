@@ -10,6 +10,7 @@ train:
         - "name"
         - "target_mix_x"
         - "target_mix_u"
+        - "target_x"
 
 eval:
   data_provider:
@@ -19,5 +20,4 @@ eval:
       data_key: "data"
       target_key:
         - "target"
-        - "logits"
         - "name"

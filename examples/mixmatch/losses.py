@@ -31,24 +31,27 @@ class MixMatchModelLoss(Module):
         return F.mse_loss(input_softmax, target_softmax, reduction='sum') / n_classes
 
     def forward(self, pred, target):
-        n_minibatch_size = pred['x_mix'].shape[0]
+        if target['name'] == 'train_mixmatch':
+            n_minibatch_size = pred['x_mix'].shape[0]
 
-        target_mix_x = target['target_mix_x']
-        target_mix_u = target['target_mix_u']
+            target_mix_x = target['target_mix_x']
+            target_mix_u = target['target_mix_u']
 
-        preds_l = torch.log_softmax(pred['x_mix'], dim=1)
-        logits_u = pred['u_mix']
+            preds_l = torch.log_softmax(pred['x_mix'], dim=1)
+            logits_u = pred['u_mix']
 
-        loss_x = -(preds_l * target_mix_x).sum(dim=1).mean()
-        loss_u = self.__loss_cons(logits_u, target_mix_u)
+            loss_x = -(preds_l * target_mix_x).sum(dim=1).mean()
+            loss_u = self.__loss_cons(logits_u, target_mix_u)
 
-        self.__losses['loss_u'] = self.__alpha * loss_u / (self.__n_minibatches * n_minibatch_size)
-        self.__losses['loss_x'] = loss_x / self.__n_minibatches
-        self.__losses['loss'] = self.__losses['loss_x'] + self.__losses['loss_u']
+            self.__losses['loss_u'] = self.__alpha * loss_u / (self.__n_minibatches * n_minibatch_size)
+            self.__losses['loss_x'] = loss_x / self.__n_minibatches
+            self.__losses['loss'] = self.__losses['loss_x'] + self.__losses['loss_u']
+        elif target['name'] == 'l_eval':
+            self.__losses['loss_x'] = None
+            self.__losses['loss_u'] = None
+            self.__losses['loss'] = self.__loss_cls(pred, target['target'].type(torch.int64))
 
-        _loss = self.__losses['loss']
-
-        return _loss
+        return self.__losses['loss']
 
     def get_loss_by_name(self, name):
         if name in self.__losses:
