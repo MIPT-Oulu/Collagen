@@ -117,9 +117,10 @@ def init_transforms(nc=1):
         slc.Stream([
             slt.ResizeTransform(resize_to=(32, 32), interpolation='bilinear'),
             slt.RandomScale(range_x=(0.9, 1.1), same=False, p=0.5),
-            slt.RandomShear(range_x=(-0.05, 0.05), p=0.5),
-            slt.RandomRotate(rotation_range=(-10, 10), p=0.5),
-            # slt.RandomRotate(rotation_range=(-5, 5), p=0.5),
+            slt.RandomFlip(axis=1, p=0.5),
+            # slt.RandomShear(range_x=(-0.05, 0.05), p=0.5),
+            # slt.RandomRotate(rotation_range=(-10, 10), p=0.5),
+            slt.RandomRotate(rotation_range=(-5, 5), p=0.5),
             slt.PadTransform(pad_to=36),
             slt.CropTransform(crop_size=32, crop_mode='r'),
             slt.ImageAdditiveGaussianNoise(p=1.0)
@@ -141,9 +142,10 @@ def init_transforms(nc=1):
             slc.Stream([
                 slt.ResizeTransform(resize_to=(32, 32), interpolation='bilinear'),
                 slt.RandomScale(range_x=(0.9, 1.1), same=False, p=0.5),
-                slt.RandomShear(range_x=(-0.05, 0.05), p=0.5),
-                slt.RandomRotate(rotation_range=(-10, 10), p=0.5),
-                # slt.RandomRotate(rotation_range=(-5, 5), p=0.5),
+                slt.RandomFlip(axis=1, p=0.5),
+                # slt.RandomShear(range_x=(-0.05, 0.05), p=0.5),
+                # slt.RandomRotate(rotation_range=(-10, 10), p=0.5),
+                slt.RandomRotate(rotation_range=(-5, 5), p=0.5),
                 slt.PadTransform(pad_to=36),
                 slt.CropTransform(crop_size=32, crop_mode='r'),
                 slt.ImageAdditiveGaussianNoise(p=1.0)
@@ -168,17 +170,17 @@ def init_args():
     parser.add_argument('--n_epochs', type=int, default=1000, help='Number of epochs')
     parser.add_argument('--dataset', type=str, default="cifar10", help='Dataset name')
     parser.add_argument('--bs', type=int, default=32, help='Batch size')
-    parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate (Discriminator)')
+    parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate (Discriminator)')
     parser.add_argument('--wd', type=float, default=4e-2, help='Weight decay')
     parser.add_argument('--beta1', type=float, default=0.5, help='Weight decay')
-    parser.add_argument('--n_features', type=int, default=128, help='Number of features')
+    parser.add_argument('--n_depths', type=int, default=28, help='Depth of Wide-ResNet')
+    parser.add_argument('--w_factor', type=int, default=2, help='widen factor of Wide-ResNet')
+    parser.add_argument('--dropout_rate', type=float, default=0.5, help='Dropout rate of Wide-ResNet')
     parser.add_argument('--num_threads', type=int, default=0, help='Number of threads for data loader')
     parser.add_argument('--save_data', default='data', help='Where to save downloaded dataset')
     parser.add_argument('--seed', type=int, default=12345, help='Random seed')
     parser.add_argument('--n_classes', type=int, default=10, help='Num of classes')
-    parser.add_argument('--device', type=str, default="cuda", help='Use `cuda` or `cpu`')
     parser.add_argument('--log_dir', type=str, default=None, help='Log directory')
-    parser.add_argument('--grid_shape', type=tuple, default=(24, 24), help='Shape of grid of generated images')
     parser.add_argument('--ngpu', type=int, default=1, help='Num of GPUs')
     parser.add_argument('--n_training_batches', type=int, default=-1,
                         help='Num of training batches, if -1, auto computed')

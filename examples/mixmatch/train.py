@@ -41,7 +41,8 @@ if __name__ == "__main__":
                            equal_target=True, equal_unlabeled_target=True, shuffle=True, unlabeled_target_col='target')
 
     # Initializing Discriminator
-    model = Wide_ResNet(depth=28, widen_factor=2, dropout_rate=0.2, num_classes=args.n_classes).to(device)
+    model = Wide_ResNet(depth=args.n_depths, widen_factor=args.w_factor, dropout_rate=args.dropout_rate,
+                        num_classes=args.n_classes).to(device)
     optim = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.wd, betas=(args.beta1, 0.999))
     crit = MixMatchModelLoss(alpha=75.0).to(device)
 
@@ -49,7 +50,7 @@ if __name__ == "__main__":
 
     data_provider = mixmatch_data_provider(model=model, labeled_meta_data=train_labeled_data, parse_item=parse_item,
                                            unlabeled_meta_data=train_unlabeled_data, bs=args.bs,
-                                           augmentation=init_transforms(nc=n_channels)[2], n_augmentations=3,
+                                           augmentation=init_transforms(nc=n_channels)[2], n_augmentations=2,
                                            num_threads=args.num_threads, val_labeled_data=val_labeled_data,
                                            transforms=init_transforms(nc=n_channels))
 
@@ -60,7 +61,8 @@ if __name__ == "__main__":
                        MeterLogging(writer=summary_writer),
                        AccuracyMeter(prefix="train", name="acc", parse_target=parse_target, parse_output=parse_output,
                                      cond=cond_accuracy_meter),
-                       KappaMeter(prefix='train', name='kappa', parse_target=parse_target_cls, parse_output=parse_output_cls,
+                       KappaMeter(prefix='train', name='kappa', parse_target=parse_target_cls,
+                                  parse_output=parse_output_cls,
                                   cond=cond_accuracy_meter),
                        ConfusionMatrixVisualizer(writer=summary_writer, cond=cond_accuracy_meter,
                                                  parse_target=parse_target_cls, parse_output=parse_output_cls,
@@ -71,7 +73,8 @@ if __name__ == "__main__":
                       AccuracyMeter(prefix="eval", name="acc", parse_target=parse_target, parse_output=parse_output,
                                     cond=cond_accuracy_meter),
                       MeterLogging(writer=summary_writer),
-                      KappaMeter(prefix='eval', name='kappa', parse_target=parse_target_cls, parse_output=parse_output_cls,
+                      KappaMeter(prefix='eval', name='kappa', parse_target=parse_target_cls,
+                                 parse_output=parse_output_cls,
                                  cond=cond_accuracy_meter),
                       ConfusionMatrixVisualizer(writer=summary_writer, cond=cond_accuracy_meter,
                                                 parse_target=parse_target_cls, parse_output=parse_output_cls,
@@ -92,6 +95,6 @@ if __name__ == "__main__":
                         optimizer=optim,
                         train_callbacks=callbacks_train,
                         val_callbacks=callbacks_eval,
-                        device=args.device)
+                        device=device)
 
     mixmatch.run()

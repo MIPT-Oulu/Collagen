@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.utils.data.dataloader import default_collate
 import pandas as pd
 import numpy as np
@@ -119,7 +120,9 @@ class MixMatchSampler(object):
             elif self._output_type == 'features':
                 out = self._model.get_features(batch_imgs)
 
-            preds = out.view(u_imgs.shape[0], -1, out.shape[-1])
+            preds = F.softmax(out, dim=1)
+            preds = preds.view(u_imgs.shape[0], -1, preds.shape[-1])
+
             mean_preds = torch.mean(preds, dim=1)
             guessing_labels = self.sharpen(mean_preds).detach()
 
