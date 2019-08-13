@@ -9,9 +9,9 @@ class MixMatchModelLoss(Module):
     def __init__(self, alpha=0.5):
         super().__init__()
         self.__loss_cons = self.softmax_mse_loss
-        self.__loss_cls = CrossEntropyLoss(reduction='sum')
+        self.__loss_cls = CrossEntropyLoss()
         self.__alpha = alpha
-        self.__losses = {'loss_cls': None, 'loss_cons': None}
+        self.__losses = {'loss_x': None, 'loss_u': None}
 
         self.__n_minibatches = 1.0
 

@@ -14,7 +14,7 @@ from examples.mixmatch.utils import init_args, parse_item, init_transforms, pars
 from examples.mixmatch.utils import cond_accuracy_meter, parse_output, parse_target, parse_output_cls, parse_target_cls
 from examples.mixmatch.losses import MixMatchModelLoss
 from examples.mixmatch.data_provider import mixmatch_data_provider
-from examples.mixmatch.networks import Model01
+from examples.mixmatch.networks import Wide_ResNet
 
 device = auto_detect_device()
 
@@ -41,7 +41,7 @@ if __name__ == "__main__":
                            equal_target=True, equal_unlabeled_target=True, shuffle=True, unlabeled_target_col='target')
 
     # Initializing Discriminator
-    model = Model01(nc=n_channels, ndf=args.n_features, drop_rate=0.5).to(device)
+    model = Wide_ResNet(depth=28, widen_factor=2, dropout_rate=0.2, num_classes=args.n_classes).to(device)
     optim = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.wd, betas=(args.beta1, 0.999))
     crit = MixMatchModelLoss(alpha=75.0).to(device)
 

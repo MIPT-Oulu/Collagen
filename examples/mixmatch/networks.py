@@ -1,146 +1,92 @@
+import torch
 import torch.nn as nn
+import torch.nn.init as init
 import torch.nn.functional as F
-from torch.tensor import OrderedDict
-from collagen.core import Module
+from torch.autograd import Variable
 
+import sys
+import numpy as np
 
-def weights_init(m):
+def conv3x3(in_planes, out_planes, stride=1):
+    return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride, padding=1, bias=True)
+
+def conv_init(m):
     classname = m.__class__.__name__
     if classname.find('Conv') != -1:
-        m.weight.data.normal_(0.0, 0.02)
+        init.xavier_uniform(m.weight, gain=np.sqrt(2))
+        init.constant(m.bias, 0)
     elif classname.find('BatchNorm') != -1:
-        m.weight.data.normal_(1.0, 0.02)
-        m.bias.data.fill_(0)
+        init.constant(m.weight, 1)
+        init.constant(m.bias, 0)
 
-class Discriminator(Module):
-    def __init__(self, nc=1, ndf=64, n_cls=10, ngpu=1, drop_rate=0.35):
-        super(Discriminator, self).__init__()
-        # input is (nc) x 32 x 32
-        self.__ngpu = ngpu
-        self.__drop_rate = drop_rate
+class wide_basic(nn.Module):
+    def __init__(self, in_planes, planes, dropout_rate, stride=1):
+        super(wide_basic, self).__init__()
+        self.bn1 = nn.BatchNorm2d(in_planes)
+        self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=3, padding=1, bias=True)
+        self.dropout = nn.Dropout(p=dropout_rate)
+        self.bn2 = nn.BatchNorm2d(planes)
+        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=stride, padding=1, bias=True)
 
-        self.dropout = nn.Dropout(p=self.__drop_rate)
-        # input is (nc) x 64 x 64
-        self._layer1 = nn.Sequential(nn.Conv2d(nc, ndf, 4, 2, 1, bias=False),
-                                     nn.LeakyReLU(0.2, inplace=True))  # state size. (ndf) x 32 x 32
-
-        self._layer2 = nn.Sequential(nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False),
-                                     nn.BatchNorm2d(ndf * 2),
-                                     nn.LeakyReLU(0.2, inplace=True))  # state size. (ndf*2) x 16 x 16
-
-        self._layer3 = nn.Sequential(nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1, bias=False),
-                                     nn.BatchNorm2d(ndf * 4),
-                                     nn.LeakyReLU(0.2, inplace=True))  # state size. (ndf*4) x 8 x 8
-
-        self._layer4 = nn.Sequential(nn.Conv2d(ndf * 4, ndf * 8, 4, 2, 1, bias=False),
-                                     nn.BatchNorm2d(ndf * 8),
-                                     nn.LeakyReLU(0.2, inplace=True))  # state size. (ndf*4) x 4 x 4
-
-        self.main_flow = nn.Sequential(OrderedDict([("conv_block1", self._layer1),
-                                                    # ("dropout1", self.dropout),
-                                                    ("conv_block2", self._layer2),
-                                                    # ("dropout2", self.dropout),
-                                                    ("conv_block3", self._layer3),
-                                                    # ("dropout3", self.dropout),
-                                                    ("conv_block4", self._layer4),
-                                                    # ("dropout3", self.dropout),
-                                                    # ("conv_final", self._layer5)
-                                                    ]))
-
-        self.classify = nn.Sequential(nn.Conv2d(ndf * 8, n_cls, 4, 1, 0, bias=False),
-                                      nn.Softmax(dim=1))  # state size. n_clsx1x1
-
-        self.apply(weights_init)
-
-    def get_features(self, x):
-        f = self.main_flow(x)
-        return f
+        self.shortcut = nn.Sequential()
+        if stride != 1 or in_planes != planes:
+            self.shortcut = nn.Sequential(
+                nn.Conv2d(in_planes, planes, kernel_size=1, stride=stride, bias=True),
+            )
 
     def forward(self, x):
-        o3 = self.main_flow(x)
-        classifier = self.classify(o3).squeeze(-1).squeeze(-1)
-        return classifier
+        out = self.dropout(self.conv1(F.relu(self.bn1(x))))
+        out = self.conv2(F.relu(self.bn2(out)))
+        out += self.shortcut(x)
 
-class Model01(Module):
-    def __init__(self, nc=1, ndf=64, n_cls=10, ngpu=1, drop_rate=0.5):
-        super().__init__()
-        # input is (nc) x 32 x 32
-        self.__ngpu = ngpu
-        self.__drop_rate = drop_rate
+        return out
 
-        self._maxpool = nn.MaxPool2d(2, 2)
+class Wide_ResNet(nn.Module):
+    def __init__(self, depth, widen_factor, dropout_rate, num_classes):
+        super(Wide_ResNet, self).__init__()
+        self.in_planes = 16
 
-        self._dropout = nn.Dropout(p=self.__drop_rate)
-        # input is (nc) x 64 x 64
-        self._layer11 = nn.Sequential(nn.Conv2d(nc, ndf, 3, 1, 1, bias=False),
-                                      nn.InstanceNorm2d(ndf),
-                                      nn.LeakyReLU(0.1, inplace=True))  # state size. (ndf) x 32 x 32
+        assert ((depth-4)%6 ==0), 'Wide-resnet depth should be 6n+4'
+        n = int((depth-4)/6 + 0.5)
+        k = widen_factor
 
-        self._layer12 = nn.Sequential(nn.Conv2d(ndf, ndf, 3, 1, 1, bias=False),
-                                      nn.InstanceNorm2d(ndf),
-                                      nn.LeakyReLU(0.1, inplace=True))  # state size. (ndf) x 32 x 32
+        print('| Wide-Resnet %dx%d' %(depth, k))
+        nStages = [16, 16*k, 32*k, 64*k]
 
-        self._layer13 = nn.Sequential(nn.Conv2d(ndf, ndf, 3, 1, 1, bias=False),
-                                      nn.InstanceNorm2d(ndf),
-                                      nn.LeakyReLU(0.1, inplace=True))  # state size. (ndf) x 32 x 32
+        self.conv1 = conv3x3(3,nStages[0])
+        self.layer1 = self._wide_layer(wide_basic, nStages[1], n, dropout_rate, stride=1)
+        self.layer2 = self._wide_layer(wide_basic, nStages[2], n, dropout_rate, stride=2)
+        self.layer3 = self._wide_layer(wide_basic, nStages[3], n, dropout_rate, stride=2)
+        self.bn1 = nn.BatchNorm2d(nStages[3], momentum=0.9)
+        self.linear = nn.Linear(nStages[3], num_classes)
 
-        self._layer21 = nn.Sequential(nn.Conv2d(ndf, ndf*2, 3, 1, 1, bias=False),
-                                      nn.InstanceNorm2d(ndf*2),
-                                      nn.LeakyReLU(0.1, inplace=True))  # state size. (ndf) x 32 x 32
+    def _wide_layer(self, block, planes, num_blocks, dropout_rate, stride):
+        strides = [stride] + [1]*(num_blocks-1)
+        layers = []
 
-        self._layer22 = nn.Sequential(nn.Conv2d(ndf*2, ndf*2, 3, 1, 1, bias=False),
-                                      nn.InstanceNorm2d(ndf * 2),
-                                      nn.LeakyReLU(0.1, inplace=True))  # state size. (ndf) x 32 x 32
+        for stride in strides:
+            layers.append(block(self.in_planes, planes, dropout_rate, stride))
+            self.in_planes = planes
 
-        self._layer23 = nn.Sequential(nn.Conv2d(ndf*2, ndf*2, 3, 1, 1, bias=False),
-                                      nn.InstanceNorm2d(ndf * 2),
-                                      nn.LeakyReLU(0.1, inplace=True))  # state size. (ndf) x 32 x 32
-
-        self._layer31 = nn.Sequential(nn.Conv2d(ndf*2, ndf*4, 3, 1, 0, bias=False),
-                                      nn.InstanceNorm2d(ndf * 4),
-                                      nn.LeakyReLU(0.1, inplace=True))  # state size. (ndf) x 32 x 32
-
-        self._layer32 = nn.Sequential(nn.Conv2d(ndf*4, ndf*2, 1, 1, 1, bias=False),
-                                      nn.InstanceNorm2d(ndf * 2),
-                                      nn.LeakyReLU(0.1, inplace=True))  # state size. (ndf) x 32 x 32
-
-        self._layer33 = nn.Sequential(nn.Conv2d(ndf*2, ndf, 1, 1, 1, bias=False),
-                                      nn.InstanceNorm2d(ndf),
-                                      nn.LeakyReLU(0.1, inplace=True))  # state size. (ndf) x 32 x 32
-
-        self._gap = nn.AvgPool2d(6, 6)
-
-        self._classifier = nn.Conv2d(128, n_cls, 1, 1, 0, bias=False)
-
-        self.main_flow = nn.Sequential(self._layer11,
-                                       self._layer12,
-                                       self._layer13,
-
-                                       self._maxpool,
-                                       self._dropout,
-
-                                       self._layer21,
-                                       self._layer22,
-                                       self._layer23,
-
-                                       self._maxpool,
-                                       self._dropout,
-
-                                       self._layer31,
-                                       self._layer32,
-                                       self._layer33
-                                       )
-
-        self.apply(weights_init)
-
-    def get_features(self, x):
-        f = self.main_flow(x)
-        f = self._gap(f).squeeze(-1).squeeze(-1)
-        return f
+        return nn.Sequential(*layers)
 
     def forward(self, x):
-        f = self.main_flow(x)
-        f = self._gap(f)
-        classifier = self._classifier(f).squeeze(-1).squeeze(-1)
-        classifier = F.softmax(classifier, dim=-1)
-        return classifier
+        out = self.conv1(x)
+        out = self.layer1(out)
+        out = self.layer2(out)
+        out = self.layer3(out)
+        out = F.relu(self.bn1(out))
+        out = F.avg_pool2d(out, 8)
+        out = out.view(out.size(0), -1)
+        out = self.linear(out)
+
+        return out
+
+    def get_features(self, x):
+        return self.forward(x)
+
+if __name__ == '__main__':
+    net=Wide_ResNet(28, 10, 0.3, 10)
+    y = net(Variable(torch.randn(1,3,32,32)))
+
+    print(y.size())

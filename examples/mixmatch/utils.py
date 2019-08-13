@@ -169,7 +169,7 @@ def init_args():
     parser.add_argument('--dataset', type=str, default="cifar10", help='Dataset name')
     parser.add_argument('--bs', type=int, default=32, help='Batch size')
     parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate (Discriminator)')
-    parser.add_argument('--wd', type=float, default=1e-4, help='Weight decay')
+    parser.add_argument('--wd', type=float, default=4e-2, help='Weight decay')
     parser.add_argument('--beta1', type=float, default=0.5, help='Weight decay')
     parser.add_argument('--n_features', type=int, default=128, help='Number of features')
     parser.add_argument('--num_threads', type=int, default=0, help='Number of threads for data loader')
