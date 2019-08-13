@@ -196,14 +196,6 @@ class MixUpSampler(ItemLoader):
             else:
                 logits_mixup = None
 
-            # onehot1 = torch.zeros([batch_size, self.__n_classes])
-            # onehot2 = torch.zeros([batch_size, self.__n_classes])
-
-            # batch_size = imgs1.shape[0]
-            # onehot1.scatter_(1, target1.type(torch.int64).unsqueeze(-1), 1.0)
-            # onehot2.scatter_(1, target2.type(torch.int64).unsqueeze(-1), 1.0)
-            # mixup_target = l*onehot1 + (1 - l)*onehot2
-
             samples.append({'name': self.__name, 'mixup_data': mixup_imgs, 'target': target1, 'target_bg': target2,
                             'alpha': l, 'logits_mixup': logits_mixup})
         return samples
@@ -277,17 +269,6 @@ class MixUpSampler2(ItemLoader):
             imgs1_cpu = to_cpu(imgs1.permute(0, 2, 3, 1), use_numpy=True)
             imgs1_aug = self.__augmentation(imgs1_cpu)
             logits1_aug = self.__model(imgs1_aug.to(device))
-
-            # mixup_imgs_cpu = to_cpu(mixup_imgs.permute(0, 2, 3, 1), use_numpy=True)
-            # mixup_aug_imgs = self.__augmentation(mixup_imgs_cpu)
-
-            # onehot1 = torch.zeros([batch_size, self.__n_classes])
-            # onehot2 = torch.zeros([batch_size, self.__n_classes])
-
-            # batch_size = imgs1.shape[0]
-            # onehot1.scatter_(1, target1.type(torch.int64).unsqueeze(-1), 1.0)
-            # onehot2.scatter_(1, target2.type(torch.int64).unsqueeze(-1), 1.0)
-            # mixup_target = l*onehot1 + (1 - l)*onehot2
 
             logits_mixup = l*logits1 + (1 - l)*logits2
             samples.append({'name': self.__name, 'mixup_data': mixup_imgs,

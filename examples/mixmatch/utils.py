@@ -82,13 +82,6 @@ class SSConfusionMatrixVisualizer(ConfusionMatrixVisualizer):
                 self._predicts += [self._labels[i] for i in to_cpu(pred_cls, use_numpy=True).tolist()]
 
 
-def parse_target_accuracy_meter(target):
-    if target['name'] == 'l':
-        return target['target']
-    else:
-        return None
-
-
 def wrap2solt(inp):
     if len(inp) == 2:
         img, label = inp
@@ -137,6 +130,7 @@ def init_transforms(nc=1):
     ])
 
     def custom_augment(img):
+
         tr = Compose([
             wrap2solt,
             slc.Stream([
@@ -154,8 +148,20 @@ def init_transforms(nc=1):
             ApplyTransform(norm_mean_std)
         ])
 
-        img_tr, _ = tr((img, 0))
-        return img_tr
+        if len(img.shape) == 3:
+            imgs = np.expand_dims(img, axis=0)
+        elif len(img.shape) == 4:
+            imgs = img
+        else:
+            raise ValueError('Expect num of dims 3 or 4, but got {}'.format(len(img.shape)))
+
+        out_imgs = []
+        for b in range(imgs.shape[0]):
+            _img = imgs[b, :].astype(np.uint8)
+            _img, _ = tr((_img, 0))
+            out_imgs.append(_img)
+
+        return torch.stack(out_imgs, dim=0)
 
     return train_trf, test_trf, custom_augment
 
@@ -175,7 +181,7 @@ def init_args():
     parser.add_argument('--beta1', type=float, default=0.5, help='Weight decay')
     parser.add_argument('--n_depths', type=int, default=28, help='Depth of Wide-ResNet')
     parser.add_argument('--w_factor', type=int, default=2, help='widen factor of Wide-ResNet')
-    parser.add_argument('--dropout_rate', type=float, default=0.5, help='Dropout rate of Wide-ResNet')
+    parser.add_argument('--dropout_rate', type=float, default=0.25, help='Dropout rate of Wide-ResNet')
     parser.add_argument('--num_threads', type=int, default=0, help='Number of threads for data loader')
     parser.add_argument('--save_data', default='data', help='Where to save downloaded dataset')
     parser.add_argument('--seed', type=int, default=12345, help='Random seed')

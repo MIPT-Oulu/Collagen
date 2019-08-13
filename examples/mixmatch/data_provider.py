@@ -113,7 +113,7 @@ class MixMatchSampler(object):
                     aug_img = self._augmentation(img_cpu)
                     list_imgs.append(aug_img)
 
-            batch_imgs = torch.stack(list_imgs, dim=0)
+            batch_imgs = torch.cat(list_imgs, dim=0)
             batch_imgs = batch_imgs.to(next(self._model.parameters()).device)
             if self._output_type == 'logits':
                 out = self._model(batch_imgs)

@@ -10,7 +10,7 @@ from collagen.data.utils import get_mnist, get_cifar10
 from collagen.logging import MeterLogging
 from collagen.callbacks.visualizer import ConfusionMatrixVisualizer
 
-from examples.mixmatch.utils import init_args, parse_item, init_transforms, parse_target_accuracy_meter
+from examples.mixmatch.utils import init_args, parse_item, init_transforms
 from examples.mixmatch.utils import cond_accuracy_meter, parse_output, parse_target, parse_output_cls, parse_target_cls
 from examples.mixmatch.losses import MixMatchModelLoss
 from examples.mixmatch.data_provider import mixmatch_data_provider
