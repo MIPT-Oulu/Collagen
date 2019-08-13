@@ -88,8 +88,8 @@ class GANStrategy(object):
         if n_training_batches is not None:
             self.__num_batches_by_stage['train'] = n_training_batches
 
-        self.__use_cuda = torch.cuda.is_available() and device == "cuda"
-        self.__device = torch.device("cuda" if self.__use_cuda and torch.cuda.is_available() else "cpu")
+        self.__use_cuda = torch.cuda.is_available() and "cuda" in device.type
+        self.__device = device
         self.__trainers = {"D": d_trainer, "G": g_trainer}
 
         # Default minibatch level callbacks
