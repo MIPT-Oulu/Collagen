@@ -3,16 +3,18 @@ from tensorboardX import SummaryWriter
 from torch import optim, Tensor
 from torch.nn import BCELoss, CrossEntropyLoss
 
-from collagen.callbacks.logging.visualization import ConfusionMatrixVisualizer
-from collagen.callbacks.logging.visualization import ImageSamplingVisualizer
-from collagen.callbacks.train.backprop import ClipGradCallback
 from collagen.core import Module, Trainer
 from collagen.core.utils import auto_detect_device, to_cpu
 from collagen.data import DataProvider, ItemLoader, SSFoldSplit
 from collagen.data.samplers import  SSGANFakeSampler
 from collagen.data.utils.datasets import get_mnist
-from collagen.callbacks.logging.loggers import ScalarMeterLogger
-from collagen.callbacks.meters import SSAccuracyMeter, SSValidityMeter
+
+from collagen.callbacks import ConfusionMatrixVisualizer
+from collagen.callbacks import ImageSamplingVisualizer
+from collagen.callbacks import ClipGradCallback
+from collagen.callbacks import ScalarMeterLogger
+from collagen.callbacks import SSAccuracyMeter, SSValidityMeter
+
 from collagen.strategies import GANStrategy
 from examples.ssgan.utils import Discriminator, Generator
 from examples.ssgan.utils import init_args, parse_item_mnist_ssgan, init_mnist_transforms

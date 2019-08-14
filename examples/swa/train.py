@@ -2,20 +2,23 @@ import yaml
 from tensorboardX import SummaryWriter
 from torch import optim
 
-from collagen.callbacks.lr_scheduling import CycleRampUpDownScheduler
-from collagen.callbacks.train.swa import UpdateSWA
-from collagen.callbacks.logging.loggers import ProgressbarLogger
 from collagen.core import Callback
 from collagen.core import Trainer
 from collagen.core.utils import auto_detect_device
 from collagen.data import SSFoldSplit
 from collagen.data.data_provider import mt_data_provider
 from collagen.data.utils.datasets import get_cifar10, get_mnist
-from collagen.callbacks.logging.loggers import ScalarMeterLogger, EpochLRLogger
+
 from collagen.losses.ssl import MTLoss
-from collagen.callbacks.meters import RunningAverageMeter, AccuracyMeter, KappaMeter
 from collagen.strategies import DualModelStrategy
 from examples.swa.networks import Model01
+
+from collagen.callbacks import CycleRampUpDownScheduler
+from collagen.callbacks import UpdateSWA
+from collagen.callbacks import ProgressbarLogger
+from collagen.callbacks import ScalarMeterLogger, EpochLRLogger
+from collagen.callbacks import RunningAverageMeter, AccuracyMeter, KappaMeter
+
 from examples.swa.utils import SSConfusionMatrixVisualizer, cond_accuracy_meter
 from examples.swa.utils import init_args, parse_item, init_transforms, parse_target, parse_class
 

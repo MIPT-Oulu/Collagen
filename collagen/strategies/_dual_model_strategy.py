@@ -4,7 +4,7 @@ import torch
 from tqdm import tqdm
 
 from collagen.callbacks.logging.loggers import ProgressbarLogger
-from collagen.callbacks.train.freeze import SamplingFreezer
+from collagen.callbacks.train._freeze import SamplingFreezer
 
 from collagen.core import Trainer, Callback
 from collagen.core.utils import wrap_tuple

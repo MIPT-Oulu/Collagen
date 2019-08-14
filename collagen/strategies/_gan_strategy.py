@@ -3,8 +3,8 @@ from typing import Tuple
 import torch
 from tqdm import tqdm
 
-from collagen.callbacks.train.gan import DiscriminatorBatchFreezer, GeneratorBatchFreezer
-from collagen.callbacks.train.freeze import SamplingFreezer
+from collagen.callbacks.train._gan import DiscriminatorBatchFreezer, GeneratorBatchFreezer
+from collagen.callbacks.train._freeze import SamplingFreezer
 from collagen.callbacks.logging.loggers import ProgressbarLogger
 
 from collagen.core import Trainer, Callback
