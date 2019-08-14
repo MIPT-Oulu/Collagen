@@ -5,7 +5,6 @@ import torch
 import yaml
 from tensorboardX import SummaryWriter
 
-from collagen.core.utils import auto_detect_device
 from collagen.data import FoldSplit
 from collagen.data import ItemLoader, DataProvider
 from collagen.data.utils.datasets import get_mnist, get_cifar10
@@ -17,8 +16,6 @@ from collagen.callbacks import ModelSaver
 from collagen.strategies import Strategy
 from examples.cnn.utils import SimpleConvNet
 from examples.cnn.utils import init_mnist_cifar_transforms, init_args
-
-device = auto_detect_device()
 
 
 def parse_item_mnist(root, entry, trf, data_key, target_key):

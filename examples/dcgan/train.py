@@ -5,7 +5,6 @@ from torch.nn import BCELoss
 
 from collagen.callbacks.logging.visualization import ImageSamplingVisualizer
 from collagen.core import Trainer
-from collagen.core.utils import auto_detect_device
 from collagen.data.data_provider import gan_data_provider
 from collagen.data.utils.datasets import get_mnist
 from collagen.callbacks import ScalarMeterLogger
@@ -13,8 +12,6 @@ from collagen.losses.gan import GeneratorLoss
 from collagen.strategies import GANStrategy
 from examples.dcgan.model import Discriminator, Generator
 from examples.dcgan.utils import init_args, parse_item_mnist_gan, init_mnist_transforms
-
-device = auto_detect_device()
 
 if __name__ == "__main__":
     # Setup configs

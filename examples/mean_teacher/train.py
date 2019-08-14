@@ -22,6 +22,7 @@ from collagen.callbacks import RunningAverageMeter, AccuracyMeter, KappaMeter
 
 device = auto_detect_device()
 
+
 class SetTeacherTrain(Callback):
     def __init__(self, te_model):
         super().__init__(ctype='custom')

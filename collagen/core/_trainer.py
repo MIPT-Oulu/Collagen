@@ -44,7 +44,7 @@ class Trainer(object):
     def __init__(self, data_provider: DataProvider,
                  train_loader_names: str or Tuple[str] or None,
                  module: Module,
-                 optimizer: Optimizer,
+                 optimizer: Optimizer or None,
                  loss: Module,
                  val_loader_names: str or Tuple[str] = None,
                  train_callbacks: Tuple[Callback] or Callback or None = None,

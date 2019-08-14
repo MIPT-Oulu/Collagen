@@ -3,14 +3,13 @@ from tensorboardX import SummaryWriter
 import yaml
 
 from collagen.core import Trainer
-from collagen.core.utils import auto_detect_device
 from collagen.data import SSFoldSplit
 from collagen.strategies import DualModelStrategy
-from collagen.metrics import RunningAverageMeter, AccuracyMeter, KappaMeter
-from collagen.data.utils import get_mnist, get_cifar10
-from collagen.logging import MeterLogging
-from collagen.callbacks.visualizer import ConfusionMatrixVisualizer, ProgressbarVisualizer
-from collagen.callbacks.dualmodel import SetTeacherTrain, UpdateEMA
+from collagen.callbacks import RunningAverageMeter, AccuracyMeter, KappaMeter
+from collagen.data.utils.datasets import get_mnist, get_cifar10
+from collagen.callbacks import ScalarMeterLogger
+from collagen.callbacks import ConfusionMatrixVisualizer, ProgressbarLogger
+from collagen.callbacks import SetTeacherTrain, UpdateEMA
 
 from examples.mixmatch.utils import init_args, parse_item, init_transforms
 from examples.mixmatch.utils import cond_accuracy_meter, parse_output, parse_target, parse_output_cls, parse_target_cls
@@ -18,7 +17,6 @@ from examples.mixmatch.losses import MixMatchModelLoss
 from examples.mixmatch.data_provider import mixmatch_ema_data_provider
 from examples.mixmatch.networks import Wide_ResNet
 
-device = auto_detect_device()
 
 if __name__ == "__main__":
     args = init_args()
@@ -44,14 +42,14 @@ if __name__ == "__main__":
 
     # Initializing Discriminator
     st_network = Wide_ResNet(depth=args.n_depths, widen_factor=args.w_factor, dropout_rate=args.dropout_rate,
-                             num_classes=args.n_classes).to(device)
+                             num_classes=args.n_classes).to(args.device)
     te_network = Wide_ResNet(depth=args.n_depths, widen_factor=args.w_factor, dropout_rate=args.dropout_rate,
-                             num_classes=args.n_classes).to(device)
+                             num_classes=args.n_classes).to(args.device)
     st_optim = optim.Adam(st_network.parameters(), lr=args.lr, weight_decay=args.wd, betas=(args.beta1, 0.999))
     te_optim = optim.Adam(te_network.parameters(), lr=args.lr, weight_decay=args.wd, betas=(args.beta1, 0.999))
 
-    st_crit = MixMatchModelLoss(alpha=75.0).to(device)
-    te_crit = MixMatchModelLoss(alpha=75.0).to(device)
+    st_crit = MixMatchModelLoss(alpha=75.0).to(args.device)
+    te_crit = MixMatchModelLoss(alpha=75.0).to(args.device)
 
     train_labeled_data, val_labeled_data, train_unlabeled_data, val_unlabeled_data = next(splitter)
 
@@ -65,11 +63,11 @@ if __name__ == "__main__":
 
     summary_writer = SummaryWriter(log_dir=log_dir, comment=comment)
     # Callbacks
-    scheme_cbs = (MeterLogging(writer=summary_writer), ProgressbarVisualizer())
+    scheme_cbs = (ScalarMeterLogger(writer=summary_writer), ProgressbarLogger())
 
     st_train_cbs = (RunningAverageMeter(prefix='train/S', name='loss_x'),
                     RunningAverageMeter(prefix='train/S', name='loss_u'),
-                    MeterLogging(writer=summary_writer),
+                    ScalarMeterLogger(writer=summary_writer),
                     AccuracyMeter(prefix="train/S", name="acc", parse_target=parse_target, parse_output=parse_output,
                                   cond=cond_accuracy_meter),
                     KappaMeter(prefix='train/S', name='kappa', parse_target=parse_target_cls,
@@ -83,7 +81,7 @@ if __name__ == "__main__":
                    RunningAverageMeter(prefix='eval/S', name='loss_u'),
                    AccuracyMeter(prefix="eval/S", name="acc", parse_target=parse_target, parse_output=parse_output,
                                  cond=cond_accuracy_meter),
-                   MeterLogging(writer=summary_writer),
+                   ScalarMeterLogger(writer=summary_writer),
                    KappaMeter(prefix='eval/S', name='kappa', parse_target=parse_target_cls,
                               parse_output=parse_output_cls,
                               cond=cond_accuracy_meter),
@@ -101,7 +99,7 @@ if __name__ == "__main__":
                                              parse_output=parse_output_cls, parse_target=parse_target_cls,
                                              labels=[str(i) for i in range(10)], tag="eval/T/confusion_matrix"))
 
-    st_callbacks = MeterLogging(writer=summary_writer)
+    st_callbacks = ScalarMeterLogger(writer=summary_writer)
 
     with open("settings_ema.yml", "r") as f:
         sampling_config = yaml.load(f)
@@ -121,6 +119,6 @@ if __name__ == "__main__":
     mixmatch = DualModelStrategy(data_provider=data_provider, data_sampling_config=sampling_config,
                                  model_names=("S", "T"),
                                  m0_trainer=st_trainer, m1_trainer=te_trainer, n_epochs=args.n_epochs,
-                                 n_training_batches=args.n_training_batches, callbacks=scheme_cbs, device=device)
+                                 n_training_batches=args.n_training_batches, callbacks=scheme_cbs, device=args.device)
 
     mixmatch.run()

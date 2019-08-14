@@ -13,4 +13,4 @@ from .train import UpdateBackwardParamCallback, ClipGradCallback
 from .train import SamplingFreezer
 from .train import GeneratorBatchFreezer, DiscriminatorBatchFreezer
 from .train import ModelSaver
-from .train import M1BatchFreezer, M2BatchFreezer, UpdateEMA
+from .train import M1BatchFreezer, M2BatchFreezer, UpdateEMA, SetTeacherTrain
