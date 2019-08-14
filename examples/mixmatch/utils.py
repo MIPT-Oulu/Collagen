@@ -190,8 +190,6 @@ def init_args():
     parser.add_argument('--seed', type=int, default=12345, help='Random seed')
     parser.add_argument('--n_classes', type=int, default=10, help='Num of classes')
     parser.add_argument('--log_dir', type=str, default=None, help='Log directory')
-    parser.add_argument('--ngpu', type=int, default=1, help='Num of GPUs')
-    parser.add_argument('--device', default='cuda', help='Where to train the model')
     parser.add_argument('--n_training_batches', type=int, default=-1,
                         help='Num of training batches, if -1, auto computed')
     args = parser.parse_args()

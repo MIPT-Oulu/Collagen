@@ -3,6 +3,7 @@ from tensorboardX import SummaryWriter
 import yaml
 
 from collagen.core import Trainer
+from collagen.core.utils import auto_detect_device
 from collagen.data import SSFoldSplit
 from collagen.strategies import DualModelStrategy
 from collagen.callbacks import RunningAverageMeter, AccuracyMeter, KappaMeter
@@ -19,6 +20,8 @@ from examples.mixmatch.networks import Wide_ResNet
 
 
 if __name__ == "__main__":
+    device = auto_detect_device()
+
     args = init_args()
     log_dir = args.log_dir
     comment = "MixMatchEMA"
@@ -42,14 +45,14 @@ if __name__ == "__main__":
 
     # Initializing Discriminator
     st_network = Wide_ResNet(depth=args.n_depths, widen_factor=args.w_factor, dropout_rate=args.dropout_rate,
-                             num_classes=args.n_classes).to(args.device)
+                             num_classes=args.n_classes).to(device)
     te_network = Wide_ResNet(depth=args.n_depths, widen_factor=args.w_factor, dropout_rate=args.dropout_rate,
-                             num_classes=args.n_classes).to(args.device)
+                             num_classes=args.n_classes).to(device)
     st_optim = optim.Adam(st_network.parameters(), lr=args.lr, weight_decay=args.wd, betas=(args.beta1, 0.999))
     te_optim = optim.Adam(te_network.parameters(), lr=args.lr, weight_decay=args.wd, betas=(args.beta1, 0.999))
 
-    st_crit = MixMatchModelLoss(alpha=75.0).to(args.device)
-    te_crit = MixMatchModelLoss(alpha=75.0).to(args.device)
+    st_crit = MixMatchModelLoss(alpha=75.0).to(device)
+    te_crit = MixMatchModelLoss(alpha=75.0).to(device)
 
     train_labeled_data, val_labeled_data, train_unlabeled_data, val_unlabeled_data = next(splitter)
 
@@ -119,6 +122,6 @@ if __name__ == "__main__":
     mixmatch = DualModelStrategy(data_provider=data_provider, data_sampling_config=sampling_config,
                                  model_names=("S", "T"),
                                  m0_trainer=st_trainer, m1_trainer=te_trainer, n_epochs=args.n_epochs,
-                                 n_training_batches=args.n_training_batches, callbacks=scheme_cbs, device=args.device)
+                                 n_training_batches=args.n_training_batches, callbacks=scheme_cbs, device=device)
 
     mixmatch.run()

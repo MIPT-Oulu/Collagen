@@ -6,7 +6,7 @@ from torch.nn import BCELoss, CrossEntropyLoss
 from collagen.core import Module, Trainer
 from collagen.core.utils import auto_detect_device, to_cpu
 from collagen.data import DataProvider, ItemLoader, SSFoldSplit
-from collagen.data.samplers import  SSGANFakeSampler
+from collagen.data.samplers import SSGANFakeSampler
 from collagen.data.utils.datasets import get_mnist
 
 from collagen.callbacks import ConfusionMatrixVisualizer
@@ -15,11 +15,9 @@ from collagen.callbacks import ClipGradCallback
 from collagen.callbacks import ScalarMeterLogger
 from collagen.callbacks import SSAccuracyMeter, SSValidityMeter
 
-from collagen.strategies import GANStrategy
+from collagen.strategies import DualModelStrategy
 from examples.ssgan.utils import Discriminator, Generator
 from examples.ssgan.utils import init_args, parse_item_mnist_ssgan, init_mnist_transforms
-
-device = auto_detect_device()
 
 
 class SSDicriminatorLoss(Module):
@@ -83,6 +81,7 @@ class SSConfusionMatrixVisualizer(ConfusionMatrixVisualizer):
 
 if __name__ == "__main__":
     args = init_args()
+    device = auto_detect_device()
     log_dir = args.log_dir
     comment = "ssgan"
 
@@ -182,12 +181,13 @@ if __name__ == "__main__":
                         train_callbacks=g_callbacks_train)
 
     # Strategy
-    ssgan = GANStrategy(data_provider=data_provider,
-                        data_sampling_config=sampling_config,
-                        d_trainer=d_trainer,
-                        g_trainer=g_trainer,
-                        n_epochs=args.n_epochs,
-                        callbacks=st_callbacks,
-                        device=args.device)
+    ssgan = DualModelStrategy(data_provider=data_provider,
+                              data_sampling_config=sampling_config,
+                              m0_trainer=d_trainer,
+                              m1_trainer=g_trainer,
+                              model_names=("D", "G"),
+                              n_epochs=args.n_epochs,
+                              callbacks=st_callbacks,
+                              device=device)
 
     ssgan.run()

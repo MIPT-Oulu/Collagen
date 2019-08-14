@@ -137,6 +137,6 @@ if __name__ == "__main__":
     swa_strategy = DualModelStrategy(data_provider=data_provider, data_sampling_config=sampling_config,
                                      model_names=("S", "T"),
                                      m0_trainer=st_trainer, m1_trainer=te_trainer, n_epochs=args.n_epochs,
-                                     n_training_batches=args.n_training_batches, callbacks=stra_cbs, device=args.device)
+                                     n_training_batches=args.n_training_batches, callbacks=stra_cbs, device=device)
 
     swa_strategy.run()

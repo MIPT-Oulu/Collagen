@@ -175,6 +175,6 @@ if __name__ == "__main__":
                         optimizer=optim,
                         train_callbacks=callbacks_train,
                         val_callbacks=callbacks_eval,
-                        device=args.device)
+                        device=device)
 
     pi_model.run()

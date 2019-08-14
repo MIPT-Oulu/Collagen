@@ -1,7 +1,7 @@
 train:
   data_provider:
     S:
-      unlabeled_train_student:
+      unlabeled_train_st:
         object: AugmentedGroupSampler
         num_samples: 1
         data_key: "data"
@@ -9,7 +9,7 @@ train:
           - "logits"
           - "name"
 
-      labeled_train_student:
+      labeled_train_st:
         object: AugmentedGroupSampler
         num_samples: 1
         data_key: "data"
@@ -18,7 +18,7 @@ train:
           - "logits"
           - "name"
 
-      unlabeled_train_teacher:
+      unlabeled_train_te:
         object: AugmentedGroupSampler
         num_samples: 1
         data_key: "data"
@@ -26,7 +26,7 @@ train:
           - "logits"
           - "name"
 
-      labeled_train_teacher:
+      labeled_train_te:
         object: AugmentedGroupSampler
         num_samples: 1
         data_key: "data"
@@ -38,7 +38,7 @@ train:
 eval:
   data_provider:
     S:
-      unlabeled_eval_student:
+      unlabeled_eval_st:
         object: AugmentedGroupSampler
         num_samples: 1
         data_key: "data"
@@ -46,7 +46,7 @@ eval:
           - "logits"
           - "name"
 
-      labeled_eval_student:
+      labeled_eval_st:
         object: AugmentedGroupSampler
         num_samples: 1
         data_key: "data"
@@ -55,7 +55,7 @@ eval:
           - "logits"
           - "name"
     T:
-      labeled_eval_teacher:
+      labeled_eval_te:
         object: ItemLoader
         num_samples: 1
         data_key: "data"

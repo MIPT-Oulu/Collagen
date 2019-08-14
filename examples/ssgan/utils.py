@@ -185,10 +185,8 @@ def init_args():
     parser.add_argument('--save_data', default='data', help='Where to save downloaded dataset')
     parser.add_argument('--seed', type=int, default=12345, help='Random seed')
     parser.add_argument('--n_classes', type=int, default=10, help='Num of classes')
-    parser.add_argument('--device', type=str, default="cuda", help='Use `cuda` or `cpu`')
     parser.add_argument('--log_dir', type=str, default=None, help='Log directory')
     parser.add_argument('--grid_shape', type=tuple, default=(24, 24), help='Shape of grid of generated images')
-    parser.add_argument('--ngpu', type=int, default=1, help='Num of GPUs')
     args = parser.parse_args()
 
     torch.manual_seed(args.seed)

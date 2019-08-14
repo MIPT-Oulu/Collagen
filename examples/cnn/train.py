@@ -5,6 +5,7 @@ import torch
 import yaml
 from tensorboardX import SummaryWriter
 
+from collagen.core.utils import auto_detect_device
 from collagen.data import FoldSplit
 from collagen.data import ItemLoader, DataProvider
 from collagen.data.utils.datasets import get_mnist, get_cifar10
@@ -25,6 +26,8 @@ def parse_item_mnist(root, entry, trf, data_key, target_key):
 
 if __name__ == "__main__":
     args = init_args()
+
+    device = auto_detect_device()
 
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
@@ -87,7 +90,7 @@ if __name__ == "__main__":
                             optimizer=optimizer,
                             train_callbacks=train_cbs,
                             val_callbacks=val_cbs,
-                            device=args.device)
+                            device=device)
 
         strategy.run()
         kfold_train_losses.append(train_cbs[0].current())

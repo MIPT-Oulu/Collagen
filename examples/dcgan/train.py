@@ -5,15 +5,18 @@ from torch.nn import BCELoss
 
 from collagen.callbacks.logging.visualization import ImageSamplingVisualizer
 from collagen.core import Trainer
+from collagen.core.utils import auto_detect_device
 from collagen.data.data_provider import gan_data_provider
 from collagen.data.utils.datasets import get_mnist
 from collagen.callbacks import ScalarMeterLogger
 from collagen.losses.gan import GeneratorLoss
-from collagen.strategies import GANStrategy
+from collagen.strategies import DualModelStrategy
 from examples.dcgan.model import Discriminator, Generator
 from examples.dcgan.utils import init_args, parse_item_mnist_gan, init_mnist_transforms
 
 if __name__ == "__main__":
+    # Get device
+    device = auto_detect_device()
     # Setup configs
     args = init_args()
     summary_writer = SummaryWriter(log_dir=args.log_dir, comment=args.comment)
@@ -56,10 +59,8 @@ if __name__ == "__main__":
                         module=g_network, optimizer=g_optim, loss=g_crit)
 
     # Strategy
-    dcgan = GANStrategy(data_provider=data_provider, data_sampling_config=sampling_config,
-                        d_trainer=d_trainer, g_trainer=g_trainer,
-                        n_epochs=args.n_epochs,
-                        callbacks=st_callbacks,
-                        device=args.device)
+    dcgan = DualModelStrategy(data_provider=data_provider, data_sampling_config=sampling_config,
+                              m0_trainer=d_trainer, m1_trainer=g_trainer, model_names=("D", "G"),
+                              n_epochs=args.n_epochs, callbacks=st_callbacks, device=device)
 
     dcgan.run()

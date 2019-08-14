@@ -24,7 +24,6 @@ def init_args():
     parser.add_argument('--snapshots', default='snapshots', help='Where to save the snapshots')
     parser.add_argument('--seed', type=int, default=12345, help='Random seed')
     parser.add_argument('--dataset', type=str, default="mnist", help='Dataset name')
-    parser.add_argument('--device', type=str, default="cuda", help='Use `cuda` or `cpu`')
     parser.add_argument('--data_dir', type=str, default="data", help='Data directory')
     parser.add_argument('--log_dir', type=str, default=None, help='Log directory')
     parser.add_argument('--comment', type=str, default="cnn", help='Comment of log')

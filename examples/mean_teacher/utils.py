@@ -143,7 +143,7 @@ def init_args():
     parser.add_argument('--lr', type=float, default=1e-1, help='Max learning rate')
     parser.add_argument('--initial_lr', default=0.0, type=float, help='Initial learning rate when using linear rampup')
     parser.add_argument('--lr_rampup', default=20, type=int, help='Length of learning rate rampup in the beginning')
-    parser.add_argument('--lr_rampdown_epochs', default=350, type=int,
+    parser.add_argument('--lr_rampdown_epochs', default=550, type=int,
                         help='Length of learning rate cosine rampdown (>= length of training)')
     parser.add_argument('--start_cycle_epoch', default=300, type=int, help='Epoch to start cycle')
     parser.add_argument('--cycle_rampdown_epochs', default=0, type=int, help='Length of epoch cycle to ramp down')
@@ -157,10 +157,8 @@ def init_args():
     parser.add_argument('--save_data', default='data', help='Where to save downloaded dataset')
     parser.add_argument('--seed', type=int, default=12345, help='Random seed')
     parser.add_argument('--n_classes', type=int, default=10, help='Num of classes')
-    parser.add_argument('--device', type=str, default="cuda", help='Use `cuda` or `cpu`')
     parser.add_argument('--log_dir', type=str, default=None, help='Log directory')
     parser.add_argument('--grid_shape', type=tuple, default=(24, 24), help='Shape of grid of generated images')
-    parser.add_argument('--ngpu', type=int, default=1, help='Num of GPUs')
     parser.add_argument('--n_training_batches', type=int, default=-1,
                         help='Num of training batches, if -1, auto computed')
     args = parser.parse_args()
