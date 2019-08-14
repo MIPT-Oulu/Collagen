@@ -57,7 +57,7 @@ class ItemLoader(object):
                  num_workers: int = 0, shuffle: bool = False, pin_memory: bool = False,
                  collate_fn: callable = default_collate, transform: callable or None = None,
                  sampler: torch.utils.data.sampler.Sampler or None = None,
-                 drop_last: bool = False, timeout: int = 0, name: str = "loader"):
+                 batch_sampler=None, drop_last: bool = False, timeout: int = 0, name: str = "loader"):
         if root is None:
             root = ''
 
@@ -75,6 +75,7 @@ class ItemLoader(object):
                                                              batch_size=batch_size,
                                                              shuffle=shuffle,
                                                              sampler=sampler,
+                                                             batch_sampler=batch_sampler,
                                                              num_workers=num_workers,
                                                              collate_fn=collate_fn,
                                                              pin_memory=pin_memory,
