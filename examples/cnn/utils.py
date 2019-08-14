@@ -49,10 +49,13 @@ def unpack_solt(dc: sld.DataContainer):
 
 
 def init_mnist_transforms(n_channels=1):
-    if n_channels == 1:
+    if nc == 1:
         norm_mean_std = Normalize((0.1307,), (0.3081,))
-    elif n_channels == 3:
-        norm_mean_std = Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+    elif nc == 3:
+        norm_mean_std = Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261))
+    else:
+        raise ValueError("Not support channels of {}".format(nc))
+    
     train_trf = Compose([
         wrap2solt,
         slc.Stream([

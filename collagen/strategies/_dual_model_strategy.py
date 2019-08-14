@@ -89,8 +89,8 @@ class DualModelStrategy(object):
         if n_training_batches is not None and n_training_batches > 0:
             self.__num_batches_by_stage['train'] = n_training_batches
 
-        self.__use_cuda = torch.cuda.is_available() and device == "cuda"
-        self.__device = torch.device("cuda" if self.__use_cuda and torch.cuda.is_available() else "cpu")
+        self.__use_cuda = torch.cuda.is_available() and "cuda" in device.type
+        self.__device = device
         self.__trainers = {self.__model_names[0]: m0_trainer, self.__model_names[1]: m1_trainer}
 
         # Default minibatch level callbacks

@@ -44,6 +44,7 @@ class M2BatchFreezer(DualModelCallback):
     def on_m2_batch_end(self, *args, **kwargs):
         freeze_modules(self.__modules, invert=True)
 
+
 class UpdateEMA(Callback):
     def __init__(self, st_model, te_model, decay=0.97):
         super().__init__(ctype="update_weight")
@@ -56,3 +57,12 @@ class UpdateEMA(Callback):
         alpha = min(1 - 1 / (epoch + 1), self.__alpha)
         for ema_param, param in zip(self.__te_model.parameters(), self.__st_model.parameters()):
             ema_param.data.mul_(alpha).add_(1 - alpha, param.data)
+
+
+class SetTeacherTrain(Callback):
+    def __init__(self, te_model):
+        super().__init__(ctype='custom')
+        self.__te_model = te_model
+
+    def on_batch_begin(self, *args, **kwargs):
+        self.__te_model.train(True)
