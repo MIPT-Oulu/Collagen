@@ -170,3 +170,29 @@ def mixmatch_data_provider(model, augmentation, labeled_meta_data, unlabeled_met
                                                  batch_size=bs, num_workers=num_threads,
                                                  shuffle=False)
     return DataProvider(itemloader_dict)
+
+
+def mixmatch_ema_data_provider(model, augmentation, labeled_meta_data, unlabeled_meta_data, val_labeled_data,
+                               n_augmentations, parse_item, bs, transforms, root="", num_threads=4):
+    itemloader_dict = {}
+    itemloader_dict['all_train'] = MixMatchSampler(model=model, name="train_mixmatch", augmentation=augmentation,
+                                                   labeled_meta_data=labeled_meta_data,
+                                                   unlabeled_meta_data=unlabeled_meta_data,
+                                                   n_augmentations=n_augmentations,
+                                                   data_key='data', target_key='target', parse_item_cb=parse_item,
+                                                   batch_size=bs, transform=transforms[0],
+                                                   num_workers=num_threads, shuffle=True)
+
+    itemloader_dict['labeled_eval_st'] = ItemLoader(root=root, meta_data=val_labeled_data, name='l_eval',
+                                                    transform=transforms[1],
+                                                    parse_item_cb=parse_item,
+                                                    batch_size=bs, num_workers=num_threads,
+                                                    shuffle=False)
+
+    itemloader_dict['labeled_eval_te'] = ItemLoader(root=root, meta_data=val_labeled_data, name='l_eval',
+                                                    transform=transforms[1],
+                                                    parse_item_cb=parse_item,
+                                                    batch_size=bs, num_workers=num_threads,
+                                                    shuffle=False)
+
+    return DataProvider(itemloader_dict)
