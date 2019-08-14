@@ -44,6 +44,9 @@ class Session(object):
     def loss(self, new_loss: torch.nn.Module):
         self.__loss: torch.nn.Module = new_loss
 
+    def _check_single_element_tuple(self, x):
+        return isinstance(x, tuple) and len(x) == 1
+
     def optimizer_params(self, param_name):
         """Returns the value of optimizer parameter for every group of trainable parameters.
         """
@@ -196,16 +199,27 @@ class Session(object):
                 raise ValueError
 
         with torch.set_grad_enabled(with_grad):
-            if isinstance(batch, tuple) and len(batch) == 1:
+            if self._check_single_element_tuple(batch):
                 batch = batch[0]
-            if isinstance(target, tuple) and len(target) == 1:
+            if self._check_single_element_tuple(target):
                 target = target[0]
 
             # Transfer input and target into proper device
             if isinstance(batch, tuple) or isinstance(batch, list):
                 batch_on_device = tuple([b.to(module_device) for b in batch])
-            else:
+            elif isinstance(batch, Tensor):
                 batch_on_device = batch.to(module_device)
+            elif isinstance(batch, dict):
+                batch_on_device = dict()
+                for k in batch:
+                    if isinstance(batch[k], Tensor) and not batch[k].is_cuda:
+                        batch_on_device[k] = batch[k].to(module_device)
+                    elif isinstance(batch[k], np.ndarray):
+                        batch_on_device[k] = torch.tensor(batch[k]).to(module_device)
+                    else:
+                        batch_on_device[k] = batch[k]
+            else:
+                raise ValueError('Not support input type {}'.format(type(batch)))
 
             if isinstance(target, tuple) or isinstance(target, list):
                 target_on_device = tuple([t.to(module_device) if isinstance(t, Tensor) else t for t in target])
@@ -232,7 +246,17 @@ class Session(object):
                                     optimizer=self.__optimizer,
                                     criterion=self.__loss)
 
-            out = self.__module(batch_on_device)
+            if isinstance(batch_on_device, list) or isinstance(batch_on_device, tuple):
+                out = [self.__module(_batch) for _batch in batch_on_device]
+            elif isinstance(batch_on_device, dict):
+                out = {}
+                for k in batch_on_device:
+                    if isinstance(batch_on_device[k], Tensor):
+                        out[k] = self.__module(batch_on_device[k])
+            elif isinstance(batch_on_device, Tensor):
+                out = self.__module(batch_on_device)
+            else:
+                raise ValueError('Not support batch type {}'.format(type(batch_on_device)))
 
             for cb in callbacks:
                 cb.on_forward_end(module=self.__module,

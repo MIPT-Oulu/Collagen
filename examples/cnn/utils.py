@@ -44,13 +44,14 @@ def unpack_solt(dc: sld.DataContainer):
     return img, target
 
 
-def init_mnist_cifar_transforms(n_channels=1, stage='train'):
+def init_mnist_cifar_transforms(n_channels=1):
     if n_channels == 1:
         norm_mean_std = Normalize((0.1307,), (0.3081,))
     elif n_channels == 3:
-        norm_mean_std = Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        norm_mean_std = Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261))
     else:
-        raise NotImplementedError('The number of channels is not accepted.')
+        raise ValueError("Not support channels of {}".format(n_channels))
+
     train_trf = Compose([
         wrap2solt,
         slc.Stream([

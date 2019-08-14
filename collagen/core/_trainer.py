@@ -100,6 +100,21 @@ class Trainer(object):
     def check_last_minibatch(n_loaders, loader_i, n_minibatches, minibatch_i):
         return loader_i >= n_loaders - 1 and minibatch_i >= n_minibatches - 1
 
+    def _parse_data(self, batch, keys):
+        parsed_data = {}
+        if isinstance(keys, str):
+            parsed_data = batch[keys]
+        elif isinstance(keys, list) or isinstance(keys, tuple):
+            for key_i in keys:
+                if key_i in batch:
+                    parsed_data[key_i] = batch[key_i]
+                else:
+                    raise ValueError('Not found key {} in sampled batch'.format(key_i))
+        else:
+            raise ValueError('Not support keys type {}'.format(type(keys)))
+        return parsed_data
+
+
     def train(self, data_key: Tuple[str] or str = 'img', target_key: Tuple[str] or str = 'target',
               minibatch_accumulate_grad: bool = True, accumulate_grad=False, cast_target=None):
         """
@@ -121,37 +136,29 @@ class Trainer(object):
             Performs type casting for target
 
         """
+
+        data_key = wrap_tuple(data_key)
+        target_key = wrap_tuple(target_key)
+
         for ind, loader_name in enumerate(self.__train_loader_names):
             cur_loader_state = self.__data_provider.state_dict()[loader_name]
             n_iter = len(cur_loader_state["samples"])
 
-            if isinstance(data_key, str):
-                data_key = (data_key,)
-
-            if isinstance(target_key, str):
-                target_key = (target_key,)
-
             i = 0
             for i in range(n_iter - 1):
                 batch = cur_loader_state["samples"][i]
+                input_data = self._parse_data(batch, data_key[ind])
+                target = self._parse_data(batch, target_key[ind])
+
                 for cb in self.__train_callbacks:
                     cb.on_minibatch_begin(loader_name=loader_name,
                                           batches_count=self.__train_batches_count,
                                           batch=batch,
+                                          input=input_data,
+                                          target=target,
                                           data_key=data_key[ind],
                                           target_key=target_key[ind],
                                           session=self.__session)
-
-                input_data = batch[data_key[ind]]
-                if isinstance(target_key[ind], str):
-                    target = cast_tensor(batch[target_key[ind]], cast_target)
-                elif isinstance(target_key[ind], list) or isinstance(target_key[ind], tuple):
-                    target = {}
-                    for key_i in target_key[ind]:
-                        if key_i in batch:
-                            target[key_i] = cast_tensor(batch[key_i], cast_target)
-                        else:
-                            raise ValueError('Not found key {} in sampled batch'.format(key_i))
 
                 first_minibatch = self.check_first_minibatch(loader_i=ind, minibatch_i=i)
                 last_minibatch = self.check_last_minibatch(n_loaders=len(self.__train_loader_names), loader_i=ind,
@@ -177,25 +184,18 @@ class Trainer(object):
                                         session=self.__session)
 
             batch = cur_loader_state["samples"][i]
+            input_data = self._parse_data(batch, data_key[ind])
+            target = self._parse_data(batch, target_key[ind])
+
             for cb in self.__train_callbacks:
                 cb.on_minibatch_begin(loader_name=loader_name,
                                       batches_count=self.__train_batches_count,
                                       batch=batch,
+                                      input=input_data,
+                                      target=target,
                                       data_key=data_key[ind],
                                       target_key=target_key[ind],
                                       session=self.__session)
-
-            input_data = batch[data_key[ind]]
-
-            if isinstance(target_key[ind], str):
-                target = cast_tensor(batch[target_key[ind]], cast_target)
-            elif isinstance(target_key[ind], list) or isinstance(target_key[ind], tuple):
-                target = {}
-                for key_i in target_key[ind]:
-                    if key_i in batch:
-                        target[key_i] = cast_tensor(batch[key_i], cast_target)
-                    else:
-                        raise ValueError('Not found key {} in sampled batch'.format(key_i))
 
             first_minibatch = self.check_first_minibatch(loader_i=ind, minibatch_i=i)
             last_minibatch = self.check_last_minibatch(n_loaders=len(self.__train_loader_names), loader_i=ind,
@@ -207,7 +207,6 @@ class Trainer(object):
                                                            with_step=with_step,
                                                            callbacks=self.__train_callbacks)
             self.__train_batches_count += 1
-            # TODO: support tuple of target_key, inputs and targets
             for cb in self.__train_callbacks:
                 cb.on_minibatch_end(loader_name=loader_name,
                                     batches_count=self.__train_batches_count,
@@ -244,37 +243,29 @@ class Trainer(object):
 
         """
 
+        data_key = wrap_tuple(data_key)
+        target_key = wrap_tuple(target_key)
+
         for ind, loader_name in enumerate(self.__val_loader_names):
             cur_loader_state = self.__data_provider.state_dict()[loader_name]
             n_iter = len(cur_loader_state["samples"])
 
-            if isinstance(data_key, str):
-                data_key = (data_key,)
-
-            if isinstance(target_key, str):
-                target_key = (target_key,)
-
             i = 0
             for i in range(n_iter - 1):
                 batch = cur_loader_state["samples"][i]
+                input_data = self._parse_data(batch, data_key[ind])
+                target = self._parse_data(batch, target_key[ind])
+
                 for cb in self.__val_callbacks:
                     cb.on_minibatch_begin(loader_name=loader_name,
                                           batches_count=self.__eval_batches_count,
                                           batch=batch,
+                                          input=input_data,
+                                          target=target,
                                           data_key=data_key[ind],
                                           target_key=target_key[ind],
                                           session=self.__session)
 
-                input_data = batch[data_key[ind]]
-                if isinstance(target_key[ind], str):
-                    target = cast_tensor(batch[target_key[ind]], cast_target)
-                elif isinstance(target_key[ind], list) or isinstance(target_key[ind], tuple):
-                    target = {}
-                    for key_i in target_key[ind]:
-                        if key_i in batch:
-                            target[key_i] = cast_tensor(batch[key_i], cast_target)
-                        else:
-                            raise ValueError('Not found key {} in sampled batch'.format(key_i))
                 loss, eval_result = self.__session.eval_step(input_data,
                                                              target,
                                                              return_out=True,
@@ -293,24 +284,18 @@ class Trainer(object):
                                         session=self.__session)
 
             batch = cur_loader_state["samples"][i]
+            input_data = self._parse_data(batch, data_key[ind])
+            target = self._parse_data(batch, target_key[ind])
+
             for cb in self.__val_callbacks:
                 cb.on_minibatch_begin(loader_name=loader_name,
                                       batches_count=self.__eval_batches_count,
                                       batch=batch,
+                                      input=input_data,
+                                      target=target,
                                       data_key=data_key[ind],
-                                      target_key=target_key,
+                                      target_key=target_key[ind],
                                       session=self.__session)
-
-            input_data = batch[data_key[ind]]
-            if isinstance(target_key[ind], str):
-                target = cast_tensor(batch[target_key[ind]], cast_target)
-            elif isinstance(target_key[ind], list) or isinstance(target_key[ind], tuple):
-                target = {}
-                for key_i in target_key[ind]:
-                    if key_i in batch:
-                        target[key_i] = cast_tensor(batch[key_i], cast_target)
-                    else:
-                        raise ValueError('Not found key {} in sampled batch'.format(key_i))
 
             loss, eval_result = self.__session.eval_step(input_data,
                                                          target,

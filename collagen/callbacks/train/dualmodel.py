@@ -25,7 +25,7 @@ class DualModelCallback(Callback):
 
 class M1BatchFreezer(DualModelCallback):
     def __init__(self, modules: Module or Tuple[Module]):
-        super().__init__(ctype="freezer")
+        super().__init__()
         self.__modules: Tuple[Module] = wrap_tuple(modules)
 
     def on_m1_batch_begin(self, *args, **kwargs):
@@ -37,7 +37,7 @@ class M1BatchFreezer(DualModelCallback):
 
 class M2BatchFreezer(DualModelCallback):
     def __init__(self, modules: Module or Tuple[Module]):
-        super().__init__(ctype="freezer")
+        super().__init__()
         self.__modules: Tuple[Module] = wrap_tuple(modules)
 
     def on_m2_batch_begin(self, *args, **kwargs):
@@ -59,3 +59,12 @@ class UpdateEMA(Callback):
         alpha = min(1 - 1 / (epoch + 1), self.__alpha)
         for ema_param, param in zip(self.__te_model.parameters(), self.__st_model.parameters()):
             ema_param.data.mul_(alpha).add_(1 - alpha, param.data)
+
+
+class SetTeacherTrain(Callback):
+    def __init__(self, te_model):
+        super().__init__(ctype='custom')
+        self.__te_model = te_model
+
+    def on_batch_begin(self, *args, **kwargs):
+        self.__te_model.train(True)

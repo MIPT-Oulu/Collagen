@@ -1,7 +1,11 @@
 import numpy as np
 import pandas as pd
 import torch
-from torch.utils.data.dataloader import default_collate
+try:  # Handling API difference between pytorch 1.1 and 1.2
+    from torch.utils.data.dataloader import default_collate
+except ImportError:
+    from torch.utils.data._utils.collate import default_collate
+
 
 from ._dataset import DataFrameDataset
 
@@ -53,7 +57,7 @@ class ItemLoader(object):
                  num_workers: int = 0, shuffle: bool = False, pin_memory: bool = False,
                  collate_fn: callable = default_collate, transform: callable or None = None,
                  sampler: torch.utils.data.sampler.Sampler or None = None,
-                 batch_sampler=None, drop_last: bool = False, timeout: int = 0, name: str = "loader"):
+                 drop_last: bool = False, timeout: int = 0, name: str = "loader"):
         if root is None:
             root = ''
 
@@ -67,11 +71,10 @@ class ItemLoader(object):
         if self.__dataset is None:
             self.__data_loader = None
         else:
-            self.__data_loader = torch.utils.data.DataLoader(self.__dataset,
+            self.__data_loader = torch.utils.data.DataLoader(dataset=self.__dataset,
                                                              batch_size=batch_size,
                                                              shuffle=shuffle,
                                                              sampler=sampler,
-                                                             batch_sampler=batch_sampler,
                                                              num_workers=num_workers,
                                                              collate_fn=collate_fn,
                                                              pin_memory=pin_memory,
@@ -123,5 +126,4 @@ class ItemLoader(object):
             samples.append(batch)
 
         return samples
-
 

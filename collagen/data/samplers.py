@@ -1,7 +1,10 @@
 import pandas as pd
 import torch
 from torch import nn as nn
-from torch.utils.data.dataloader import default_collate
+try:  # Handling API difference between pytorch 1.1 and 1.2
+    from torch.utils.data.dataloader import default_collate
+except ImportError:
+    from torch.utils.data._utils.collate import default_collate
 
 from collagen.core.utils import to_cpu
 from collagen.data import ItemLoader
@@ -19,7 +22,7 @@ class MixUpSampler(ItemLoader):
                  drop_last: bool = False, timeout: int = 0, detach: bool = False):
         super().__init__(meta_data=meta_data, parse_item_cb=parse_item_cb, root=root, batch_size=batch_size,
                          num_workers=num_workers, shuffle=shuffle, pin_memory=pin_memory, collate_fn=collate_fn,
-                         transform=transform, sampler=sampler, batch_sampler=batch_sampler, drop_last=drop_last,
+                         transform=transform, sampler=sampler, drop_last=drop_last,
                          timeout=timeout)
 
         self.__model = model

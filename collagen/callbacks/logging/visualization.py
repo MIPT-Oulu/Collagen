@@ -18,7 +18,7 @@ from collagen.core.utils import to_cpu
 
 class ConfusionMatrixVisualizer(Callback):
     def __init__(self, writer, labels: list or None = None, tag="confusion_matrix", normalize=True, name='cm',
-                 cond=None, parse_class=None):
+                 cond=None, parse_class=None, parse_output=None, parse_target=None):
         """ConfusionMatrixVisualizer class, which is a callback calculating accuracy after each forwarding step and
         exporting confusion matrix to TensorboardX at the end of each epoch
 
@@ -43,7 +43,13 @@ class ConfusionMatrixVisualizer(Callback):
         self._corrects = []
         self._name = name
         self.__cond = self._default_cond if cond is None else cond
-        self.__parse_class = self._default_parse_class if parse_class is None else parse_class
+        if parse_target is None or parse_output is None:
+            self.__parse_class = self._default_parse_class if parse_class is None else parse_class
+            self.__parse_target = self.__parse_class if parse_target is None else parse_target
+            self.__parse_output = self.__parse_class if parse_output is None else parse_output
+        else:
+            self.__parse_target = parse_target
+            self.__parse_output = parse_output
 
     @staticmethod
     def _default_cond(target, output):
@@ -75,8 +81,8 @@ class ConfusionMatrixVisualizer(Callback):
 
     def on_forward_end(self, output: Tensor, target: Tensor or dict, **kwargs):
         if self.__cond(target, output):
-            target_cls = self.__parse_class(target)
-            pred_cls = self.__parse_class(output)
+            target_cls = self.__parse_target(target)
+            pred_cls = self.__parse_output(output)
             if target_cls is not None and pred_cls is not None:
                 # decoded_pred_cls = pred_cls.argmax(dim=-1)
                 self._corrects += [self._labels[i] for i in to_cpu(target_cls, use_numpy=True).tolist()]

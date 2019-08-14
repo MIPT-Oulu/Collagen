@@ -12,17 +12,6 @@ from collagen.core.utils import to_cpu
 from collagen.data.utils import ApplyTransform, Normalize, Compose
 
 
-def cond_accuracy_meter(target, output):
-    return target['name'] == 'l'
-
-
-def parse_target_accuracy_meter(target):
-    if target['name'] == 'l':
-        return target['target']
-    else:
-        return None
-
-
 def parse_class(output):
     if isinstance(output, dict) and output['name'] == 'l':
         output = output['target']
@@ -86,9 +75,9 @@ def unpack_solt(dc: sld.DataContainer):
 
 def init_transforms(nc=1):
     if nc == 1:
-        norm_mean_std = Normalize((0.5,), (0.5,))
+        norm_mean_std = Normalize((0.1307,), (0.3081,))
     elif nc == 3:
-        norm_mean_std = Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        norm_mean_std = Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261))
     else:
         raise ValueError("Not support channels of {}".format(nc))
 
