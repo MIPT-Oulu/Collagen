@@ -60,7 +60,7 @@ class FoldSplit(Splitter):
         return len(self.__cv_folds_idx)
 
     def fold_idx(self, i):
-        return self.__cv_folds_idx
+        return self.__cv_folds_idx[i]
 
 
 class SSFoldSplit(Splitter):
