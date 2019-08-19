@@ -1,14 +1,22 @@
-import torch.nn as nn
-from torch.optim import Optimizer
 from typing import Tuple
+
 import torch
+import torch.nn as nn
+try:
+    from torch.optim import Optimizer
+except ImportError:
+    from torch.optim.optimizer import Optimizer
+
 from tqdm import tqdm
-from collagen.core import Trainer, Session, Module
-from collagen.metrics import RunningAverageMeter
-from collagen.callbacks import ProgressbarVisualizer
-from collagen.core.utils import wrap_tuple
+
 from collagen.core import Callback
+from collagen.core import Trainer, Session, Module
+from collagen.core.utils import wrap_tuple
+
 from collagen.data import DataProvider
+
+from collagen.callbacks.meters import RunningAverageMeter
+from collagen.callbacks.logging.loggers import ProgressbarLogger
 
 
 class Strategy(object):
@@ -126,11 +134,12 @@ class Strategy(object):
         self.__loss.to(self.__device)
 
         self.__default_callbacks_train = (RunningAverageMeter(prefix='train', name='loss'),
-                                          ProgressbarVisualizer(update_freq=1))
+                                          ProgressbarLogger(update_freq=1, name='pbar/train'))
         self.__default_callbacks_eval = (RunningAverageMeter(prefix='eval', name='loss'),
-                                         ProgressbarVisualizer(update_freq=1),)
+                                         ProgressbarLogger(update_freq=1, name='pbar/eval'),)
 
-        self.__train_callbacks = self._auto_add_default_callbacks(self.__default_callbacks_train, self.__train_callbacks)
+        self.__train_callbacks = self._auto_add_default_callbacks(self.__default_callbacks_train,
+                                                                  self.__train_callbacks)
         self.__val_callbacks = self._auto_add_default_callbacks(self.__default_callbacks_eval, self.__val_callbacks)
 
         self.__session = Session(module=self.__model,
@@ -146,12 +155,13 @@ class Strategy(object):
                                  train_callbacks=self.__train_callbacks,
                                  val_callbacks=self.__val_callbacks)
 
-    def _auto_add_default_callbacks(self, d_cbs, cbs):
+    @staticmethod
+    def _auto_add_default_callbacks(d_cbs, cbs):
         added_train_cbs = []
         for d_cb in d_cbs:
             exist = False
             for cb in cbs:
-                if cb.ctype==d_cb.ctype and cb.name == d_cb.name:
+                if cb.ctype == d_cb.ctype and cb.name == d_cb.name:
                     exist = True
                     break
             if not exist:
@@ -199,7 +209,8 @@ class Strategy(object):
                                                  batch_i=batch_i,
                                                  trainer=self.__trainer)
 
-                    getattr(self.__trainer, stage)(data_key=self.__data_key_by_stage[stage], target_key=self.__target_key_by_stage[stage])
+                    getattr(self.__trainer, stage)(data_key=self.__data_key_by_stage[stage],
+                                                   target_key=self.__target_key_by_stage[stage])
 
                     self._call_callbacks_by_name('on_batch_end',
                                                  progress_bar=progress_bar,

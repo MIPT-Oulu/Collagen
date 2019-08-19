@@ -1,6 +1,7 @@
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.tensor import OrderedDict
+
 from collagen.core import Module
 
 
@@ -11,6 +12,7 @@ def weights_init(m):
     elif classname.find('BatchNorm') != -1:
         m.weight.data.normal_(1.0, 0.02)
         m.bias.data.fill_(0)
+
 
 class Discriminator(Module):
     def __init__(self, nc=1, ndf=64, n_cls=10, ngpu=1, drop_rate=0.35):
@@ -61,6 +63,7 @@ class Discriminator(Module):
         classifier = self.classify(o3).squeeze(-1).squeeze(-1)
         return classifier
 
+
 class Model01(Module):
     def __init__(self, nc=1, ndf=64, n_cls=10, ngpu=1, drop_rate=0.5):
         super().__init__()
@@ -84,27 +87,27 @@ class Model01(Module):
                                       nn.InstanceNorm2d(ndf),
                                       nn.LeakyReLU(0.1, inplace=True))  # state size. (ndf) x 32 x 32
 
-        self._layer21 = nn.Sequential(nn.Conv2d(ndf, ndf*2, 3, 1, 1, bias=False),
-                                      nn.InstanceNorm2d(ndf*2),
-                                      nn.LeakyReLU(0.1, inplace=True))  # state size. (ndf) x 32 x 32
-
-        self._layer22 = nn.Sequential(nn.Conv2d(ndf*2, ndf*2, 3, 1, 1, bias=False),
+        self._layer21 = nn.Sequential(nn.Conv2d(ndf, ndf * 2, 3, 1, 1, bias=False),
                                       nn.InstanceNorm2d(ndf * 2),
                                       nn.LeakyReLU(0.1, inplace=True))  # state size. (ndf) x 32 x 32
 
-        self._layer23 = nn.Sequential(nn.Conv2d(ndf*2, ndf*2, 3, 1, 1, bias=False),
+        self._layer22 = nn.Sequential(nn.Conv2d(ndf * 2, ndf * 2, 3, 1, 1, bias=False),
                                       nn.InstanceNorm2d(ndf * 2),
                                       nn.LeakyReLU(0.1, inplace=True))  # state size. (ndf) x 32 x 32
 
-        self._layer31 = nn.Sequential(nn.Conv2d(ndf*2, ndf*4, 3, 1, 0, bias=False),
+        self._layer23 = nn.Sequential(nn.Conv2d(ndf * 2, ndf * 2, 3, 1, 1, bias=False),
+                                      nn.InstanceNorm2d(ndf * 2),
+                                      nn.LeakyReLU(0.1, inplace=True))  # state size. (ndf) x 32 x 32
+
+        self._layer31 = nn.Sequential(nn.Conv2d(ndf * 2, ndf * 4, 3, 1, 0, bias=False),
                                       nn.InstanceNorm2d(ndf * 4),
                                       nn.LeakyReLU(0.1, inplace=True))  # state size. (ndf) x 32 x 32
 
-        self._layer32 = nn.Sequential(nn.Conv2d(ndf*4, ndf*2, 1, 1, 1, bias=False),
+        self._layer32 = nn.Sequential(nn.Conv2d(ndf * 4, ndf * 2, 1, 1, 1, bias=False),
                                       nn.InstanceNorm2d(ndf * 2),
                                       nn.LeakyReLU(0.1, inplace=True))  # state size. (ndf) x 32 x 32
 
-        self._layer33 = nn.Sequential(nn.Conv2d(ndf*2, ndf, 1, 1, 1, bias=False),
+        self._layer33 = nn.Sequential(nn.Conv2d(ndf * 2, ndf, 1, 1, 1, bias=False),
                                       nn.InstanceNorm2d(ndf),
                                       nn.LeakyReLU(0.1, inplace=True))  # state size. (ndf) x 32 x 32
 

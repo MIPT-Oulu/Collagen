@@ -1,18 +1,14 @@
 import argparse
-import torch
-import numpy as np
 
-import pandas as pd
-import torchvision.datasets as datasets
+import solt.core as slc
+import solt.data as sld
+import solt.transforms as slt
+import torch
 import torch.nn.functional as F
 from torch import nn
 
-import solt.data as sld
-import solt.core as slc
-import solt.transforms as slt
-
-from collagen.data.utils import ApplyTransform, Normalize, Compose
 from collagen.core import Module
+from collagen.data.utils import ApplyTransform, Normalize, Compose
 
 
 def init_args():
@@ -28,7 +24,6 @@ def init_args():
     parser.add_argument('--snapshots', default='snapshots', help='Where to save the snapshots')
     parser.add_argument('--seed', type=int, default=12345, help='Random seed')
     parser.add_argument('--dataset', type=str, default="mnist", help='Dataset name')
-    parser.add_argument('--device', type=str, default="cuda", help='Use `cuda` or `cpu`')
     parser.add_argument('--data_dir', type=str, default="data", help='Data directory')
     parser.add_argument('--log_dir', type=str, default=None, help='Log directory')
     parser.add_argument('--comment', type=str, default="cnn", help='Comment of log')
@@ -48,14 +43,14 @@ def unpack_solt(dc: sld.DataContainer):
     return img, target
 
 
-def init_mnist_transforms(n_channels=1):
-    if nc == 1:
+def init_mnist_cifar_transforms(n_channels=1, stage='train'):
+    if n_channels == 1:
         norm_mean_std = Normalize((0.1307,), (0.3081,))
-    elif nc == 3:
+    elif n_channels == 3:
         norm_mean_std = Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261))
     else:
-        raise ValueError("Not support channels of {}".format(nc))
-    
+        raise ValueError("Not support channels of {}".format(n_channels))
+
     train_trf = Compose([
         wrap2solt,
         slc.Stream([
@@ -69,6 +64,9 @@ def init_mnist_transforms(n_channels=1):
         ApplyTransform(norm_mean_std)
     ])
 
+    if stage == 'train':
+        return train_trf
+
     test_trf = Compose([
         wrap2solt,
         slt.PadTransform(pad_to=32),
@@ -76,17 +74,17 @@ def init_mnist_transforms(n_channels=1):
         ApplyTransform(norm_mean_std)
     ])
 
-    return train_trf, test_trf
+    return test_trf
 
 
 class SimpleConvNet(Module):
     def __init__(self, bw, drop=0.5, n_cls=10, n_channels=1):
         super(SimpleConvNet, self).__init__()
-        self.n_filters_last = bw*2
+        self.n_filters_last = bw * 2
 
         self.conv1 = self.make_layer(n_channels, bw)
-        self.conv2 = self.make_layer(bw, bw*2)
-        self.conv3 = self.make_layer(bw*2, self.n_filters_last)
+        self.conv2 = self.make_layer(bw, bw * 2)
+        self.conv3 = self.make_layer(bw * 2, self.n_filters_last)
 
         self.classifier = nn.Sequential(nn.Dropout(drop),
                                         nn.Linear(self.n_filters_last, n_cls))
@@ -113,4 +111,3 @@ class SimpleConvNet(Module):
 
     def get_features_by_name(self, name):
         pass
-

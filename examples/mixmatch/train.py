@@ -5,10 +5,10 @@ import yaml
 from collagen.core.utils import auto_detect_device
 from collagen.data import SSFoldSplit
 from collagen.strategies import Strategy
-from collagen.metrics import RunningAverageMeter, AccuracyMeter, KappaMeter
-from collagen.data.utils import get_mnist, get_cifar10
-from collagen.logging import MeterLogging
-from collagen.callbacks.visualizer import ConfusionMatrixVisualizer
+from collagen.callbacks import RunningAverageMeter, AccuracyMeter, KappaMeter
+from collagen.data.utils.datasets import get_mnist, get_cifar10
+from collagen.callbacks import ScalarMeterLogger
+from collagen.callbacks import ConfusionMatrixVisualizer
 
 from examples.mixmatch.utils import init_args, parse_item, init_transforms
 from examples.mixmatch.utils import cond_accuracy_meter, parse_output, parse_target, parse_output_cls, parse_target_cls
@@ -58,7 +58,7 @@ if __name__ == "__main__":
     # Callbacks
     callbacks_train = (RunningAverageMeter(prefix='train', name='loss_x'),
                        RunningAverageMeter(prefix='train', name='loss_u'),
-                       MeterLogging(writer=summary_writer),
+                       ScalarMeterLogger(writer=summary_writer),
                        AccuracyMeter(prefix="train", name="acc", parse_target=parse_target, parse_output=parse_output,
                                      cond=cond_accuracy_meter),
                        KappaMeter(prefix='train', name='kappa', parse_target=parse_target_cls,
@@ -72,7 +72,7 @@ if __name__ == "__main__":
                       RunningAverageMeter(prefix='eval', name='loss_u'),
                       AccuracyMeter(prefix="eval", name="acc", parse_target=parse_target, parse_output=parse_output,
                                     cond=cond_accuracy_meter),
-                      MeterLogging(writer=summary_writer),
+                      ScalarMeterLogger(writer=summary_writer),
                       KappaMeter(prefix='eval', name='kappa', parse_target=parse_target_cls,
                                  parse_output=parse_output_cls,
                                  cond=cond_accuracy_meter),
@@ -80,7 +80,7 @@ if __name__ == "__main__":
                                                 parse_target=parse_target_cls, parse_output=parse_output_cls,
                                                 labels=[str(i) for i in range(10)], tag="eval/confusion_matrix"))
 
-    st_callbacks = MeterLogging(writer=summary_writer)
+    st_callbacks = ScalarMeterLogger(writer=summary_writer)
 
     with open("settings.yml", "r") as f:
         sampling_config = yaml.load(f)

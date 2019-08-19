@@ -29,6 +29,7 @@ def parse_output(output):
     else:
         raise ValueError('Not support output type {}'.format(type(output)))
 
+
 def parse_output_cls(y):
     if isinstance(y, dict):
         y = y['x_mix']
@@ -48,6 +49,7 @@ def parse_output_cls(y):
     output_cpu = output_cpu.astype(int)
     return output_cpu
 
+
 def parse_target_cls(y):
     if y['name'] == 'train_mixmatch':
         y = y['target_x']
@@ -66,6 +68,7 @@ def parse_target_cls(y):
         raise ValueError("Only support dims 1 or 2, but got {}".format(len(y.shape)))
     output_cpu = output_cpu.astype(int)
     return output_cpu
+
 
 class SSConfusionMatrixVisualizer(ConfusionMatrixVisualizer):
     def __init__(self, cond, parse_class, writer, labels: list or None = None, tag="confusion_matrix", normalize=False):
@@ -187,7 +190,6 @@ def init_args():
     parser.add_argument('--seed', type=int, default=12345, help='Random seed')
     parser.add_argument('--n_classes', type=int, default=10, help='Num of classes')
     parser.add_argument('--log_dir', type=str, default=None, help='Log directory')
-    parser.add_argument('--ngpu', type=int, default=1, help='Num of GPUs')
     parser.add_argument('--n_training_batches', type=int, default=-1,
                         help='Num of training batches, if -1, auto computed')
     args = parser.parse_args()

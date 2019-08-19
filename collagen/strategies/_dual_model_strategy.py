@@ -1,12 +1,15 @@
+from typing import Tuple
+
+import torch
+from tqdm import tqdm
+
+from collagen.callbacks.logging.loggers import ProgressbarLogger
+from collagen.callbacks.train._freeze import SamplingFreezer
+
 from collagen.core import Trainer, Callback
 from collagen.core.utils import wrap_tuple
 from collagen.data import DataProvider
-from collagen.metrics import RunningAverageMeter
-from collagen.callbacks import DiscriminatorBatchFreezer, GeneratorBatchFreezer
-from collagen.callbacks import ProgressbarVisualizer, SamplingFreezer
-from typing import Tuple
-import torch
-from tqdm import tqdm
+from collagen.callbacks.meters import RunningAverageMeter
 
 
 class DualModelStrategy(object):
@@ -22,7 +25,7 @@ class DualModelStrategy(object):
     def __init__(self, data_provider: DataProvider,
                  data_sampling_config: dict,
                  m1_trainer: Trainer, m0_trainer: Trainer,
-                 model_names: Tuple[str] = ("M0", "M1"),
+                 model_names: Tuple[str, str] = ("M0", "M1"),
                  n_epochs: int or None = 100,
                  callbacks: Tuple[Callback] or Callback = None,
                  device: str or None = "cuda",
@@ -32,7 +35,7 @@ class DualModelStrategy(object):
         Parameters
         ----------
         data_provider: DataProvider
-            Provides batches of data to D and G models
+            Provides batches of data to D and G modelzoo
         data_sampling_config: dict
             Configuration of the itemloader names and the corresponding numbers of samples
         m1_trainer: Trainer
@@ -106,8 +109,8 @@ class DualModelStrategy(object):
 
         # Default epoch level callbacks
         self.__default_st_callbacks = (
-        SamplingFreezer(modules=wrap_tuple(m1_trainer.model) + wrap_tuple(m0_trainer.model)),
-        ProgressbarVisualizer(update_freq=1))
+            SamplingFreezer(modules=wrap_tuple(m1_trainer.model) + wrap_tuple(m0_trainer.model)),
+            ProgressbarLogger(update_freq=1))
         self.__callbacks += self.__default_st_callbacks
 
     def _call_callbacks_by_name(self, cb_func_name, **kwargs):

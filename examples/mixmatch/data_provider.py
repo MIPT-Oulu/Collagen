@@ -1,7 +1,11 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data.dataloader import default_collate
+try:  # Handling API difference between pytorch 1.1 and 1.2
+    from torch.utils.data.dataloader import default_collate
+except ImportError:
+    from torch.utils.data._utils.collate import default_collate
+
 import pandas as pd
 import numpy as np
 

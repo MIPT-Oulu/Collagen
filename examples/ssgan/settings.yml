@@ -33,18 +33,18 @@ eval:
         data_key: "data"
         target_key: "target"
       real_unlabeled_val:
-        cate: ItemLoader
+        object: ItemLoader
         num_samples: 1
         data_key: "data"
         target_key: "valid"
       fake_unlabeled_gen:
-        cate: SSFakeSampler
+        object: SSFakeSampler
         num_samples: 1
         data_key: "data"
         target_key: "valid"
     G:
       fake_unlabeled_latent:
-        cate: SSFakeSampler
+        object: SSFakeSampler
         num_samples: 1
         data_key: "latent"
         target_key: "valid"

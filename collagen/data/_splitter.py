@@ -1,7 +1,7 @@
+import dill as pickle
+import pandas as pd
 from sklearn import model_selection
 from sklearn.utils import resample
-import pandas as pd
-import dill as pickle
 
 
 class Splitter(object):
@@ -60,7 +60,7 @@ class FoldSplit(Splitter):
         return len(self.__cv_folds_idx)
 
     def fold_idx(self, i):
-        return self.__cv_folds_idx
+        return self.__cv_folds_idx[i]
 
 
 class SSFoldSplit(Splitter):
@@ -104,7 +104,7 @@ class SSFoldSplit(Splitter):
 
         # split of train/val data
         if group_col is None:
-            unlabeled_splitter = model_selection.StratifiedKFold(n_splits=n_folds, random_state=random_state+1)
+            unlabeled_splitter = model_selection.StratifiedKFold(n_splits=n_folds, random_state=random_state + 1)
             unlabeled_spl_iter = unlabeled_splitter.split(unlabeled_ds, unlabeled_ds[target_col])
         else:
             unlabeled_splitter = model_selection.GroupKFold(n_splits=n_folds)
@@ -112,7 +112,7 @@ class SSFoldSplit(Splitter):
                                                           groups=unlabeled_ds[group_col])
 
         if group_col is None:
-            labeled_splitter = model_selection.StratifiedKFold(n_splits=n_folds, random_state=random_state+2)
+            labeled_splitter = model_selection.StratifiedKFold(n_splits=n_folds, random_state=random_state + 2)
             labeled_spl_iter = labeled_splitter.split(labeled_ds, labeled_ds[target_col])
         else:
             labeled_splitter = model_selection.GroupKFold(n_splits=n_folds)
@@ -138,17 +138,19 @@ class SSFoldSplit(Splitter):
                                                                                  random_state)
 
                 filtered_l_test_idx, chosen_l_test = self._sample_labeled_data(l_test_data, l_test_target,
-                                                                                 target_col,
-                                                                                 int(labeled_train_size_per_class*self._test_ratio),
-                                                                                 random_state)
+                                                                               target_col,
+                                                                               int(
+                                                                                   labeled_train_size_per_class * self._test_ratio),
+                                                                               random_state)
             else:
                 if labeled_train_size is not None:
                     chosen_l_train, _ = model_selection.train_test_split(l_train, train_size=labeled_train_size,
                                                                          random_state=random_state, shuffle=shuffle,
                                                                          stratify=l_train_target)
-                    chosen_l_test, _ = model_selection.train_test_split(l_test, train_size=int(labeled_train_size*self._test_ratio),
-                                                                         random_state=random_state, shuffle=shuffle,
-                                                                         stratify=l_train_target)
+                    chosen_l_test, _ = model_selection.train_test_split(l_test, train_size=int(
+                        labeled_train_size * self._test_ratio),
+                                                                        random_state=random_state, shuffle=shuffle,
+                                                                        stratify=l_train_target)
                 else:
                     chosen_l_train = l_train
                     chosen_l_test = l_test
@@ -157,25 +159,29 @@ class SSFoldSplit(Splitter):
 
             # Sample unlabeled_train_size of labeled data
             if equal_unlabeled_target:
-                filtered_u_train_idx, chosen_u_train = self._sample_unlabeled_data(unlabeled_ds, u_train, unlabeled_target_col,
+                filtered_u_train_idx, chosen_u_train = self._sample_unlabeled_data(unlabeled_ds, u_train,
+                                                                                   unlabeled_target_col,
                                                                                    u_train_target,
                                                                                    unlabeled_train_size_per_class,
                                                                                    random_state)
 
                 filtered_u_test_idx, chosen_u_test = self._sample_unlabeled_data(unlabeled_ds, u_test,
-                                                                                   unlabeled_target_col,
-                                                                                   u_test_target,
-                                                                                   int(unlabeled_train_size_per_class*self._test_ratio),
-                                                                                   random_state)
+                                                                                 unlabeled_target_col,
+                                                                                 u_test_target,
+                                                                                 int(
+                                                                                     unlabeled_train_size_per_class * self._test_ratio),
+                                                                                 random_state)
             else:
                 if unlabeled_train_size is not None:
                     # chosen_u_train, _ = model_selection.train_test_split(u_train, train_size=unlabeled_train_size,
                     #                                                      random_state=random_state, shuffle=shuffle)
                     is_replace = unlabeled_train_size > len(u_train)
-                    chosen_u_train = resample(u_train, n_samples=unlabeled_train_size, replace=is_replace, random_state=random_state)
-                    unlabeled_test_size = int(unlabeled_train_size*self._test_ratio)
+                    chosen_u_train = resample(u_train, n_samples=unlabeled_train_size, replace=is_replace,
+                                              random_state=random_state)
+                    unlabeled_test_size = int(unlabeled_train_size * self._test_ratio)
                     is_replace = unlabeled_test_size > len(u_test)
-                    chosen_u_test = resample(u_test, n_samples=unlabeled_test_size, replace=is_replace, random_state=random_state)
+                    chosen_u_test = resample(u_test, n_samples=unlabeled_test_size, replace=is_replace,
+                                             random_state=random_state)
                 else:
                     chosen_u_train = u_train
                     chosen_u_test = u_test
@@ -185,8 +191,7 @@ class SSFoldSplit(Splitter):
 
             self.__cv_folds_idx.append((chosen_l_train, chosen_l_test, chosen_u_train, chosen_u_test))
 
-
-            self.__ds_chunks.append((filtered_l_train_idx,   filtered_l_test_idx,
+            self.__ds_chunks.append((filtered_l_train_idx, filtered_l_test_idx,
                                      filtered_u_train_idx, filtered_u_test_idx))
 
         self.__folds_iter = iter(self.__ds_chunks)
@@ -199,12 +204,13 @@ class SSFoldSplit(Splitter):
             filtered_rows_idx = filtered_rows.index
             replace = data_per_class > len(filtered_rows_idx)
             chosen_idx_by_target = resample(filtered_rows_idx, n_samples=data_per_class,
-                                                replace=replace, random_state=random_state)
+                                            replace=replace, random_state=random_state)
             chosen_data += chosen_idx_by_target.tolist()
         filtered_idx = data.loc[chosen_data]
         return filtered_idx, chosen_data
 
-    def _sample_unlabeled_data(self, unlabeled_ds, u_train, unlabeled_target_col, u_train_target, data_per_class, random_state, replace=False):
+    def _sample_unlabeled_data(self, unlabeled_ds, u_train, unlabeled_target_col, u_train_target, data_per_class,
+                               random_state, replace=False):
         u_train_target = unlabeled_ds.iloc[u_train][unlabeled_target_col]
         u_train_data = unlabeled_ds.iloc[u_train]
         ideal_labeled_targets = list(set(u_train_target.tolist()))

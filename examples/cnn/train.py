@@ -1,22 +1,22 @@
-import torch
-import numpy as np
-import yaml
-
-from collagen.data import ItemLoader, DataProvider
-from collagen.data import FoldSplit
-from collagen.core.utils import auto_detect_device
-from collagen.strategies import Strategy
-from collagen.metrics import RunningAverageMeter, AccuracyMeter
-from collagen.callbacks import ProgressbarVisualizer
-from collagen.data.utils import get_mnist, get_cifar10
-from collagen.savers import ModelSaver
 import random
-from collagen.logging import MeterLogging
-from tensorboardX import SummaryWriter
-from examples.cnn.utils import init_mnist_transforms, init_args
-from examples.cnn.utils import SimpleConvNet
 
-device = auto_detect_device()
+import numpy as np
+import torch
+import yaml
+from tensorboardX import SummaryWriter
+
+from collagen.core.utils import auto_detect_device
+from collagen.data import FoldSplit
+from collagen.data import ItemLoader, DataProvider
+from collagen.data.utils.datasets import get_mnist, get_cifar10
+
+from collagen.callbacks import ScalarMeterLogger
+from collagen.callbacks import RunningAverageMeter, AccuracyMeter
+from collagen.callbacks import ModelSaver
+
+from collagen.strategies import Strategy
+from examples.cnn.utils import SimpleConvNet
+from examples.cnn.utils import init_mnist_cifar_transforms, init_args
 
 
 def parse_item_mnist(root, entry, trf, data_key, target_key):
@@ -26,6 +26,8 @@ def parse_item_mnist(root, entry, trf, data_key, target_key):
 
 if __name__ == "__main__":
     args = init_args()
+
+    device = auto_detect_device()
 
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
@@ -39,7 +41,6 @@ if __name__ == "__main__":
         n_channels = 1
     else:
         raise ValueError('Not support dataset {}'.format(args.dataset))
-
 
     criterion = torch.nn.CrossEntropyLoss()
 
@@ -62,7 +63,7 @@ if __name__ == "__main__":
 
         for stage, df in zip(['train', 'eval'], [df_train, df_val]):
             item_loaders[f'mnist_{stage}'] = ItemLoader(meta_data=df,
-                                                        transform=init_mnist_transforms()[0],
+                                                        transform=init_mnist_cifar_transforms(n_channels, stage),
                                                         parse_item_cb=parse_item_mnist,
                                                         batch_size=args.bs, num_workers=args.num_threads,
                                                         shuffle=True if stage == "train" else False)
@@ -76,7 +77,7 @@ if __name__ == "__main__":
 
         val_cbs = (RunningAverageMeter(prefix="eval", name="loss"),
                    AccuracyMeter(prefix="eval", name="acc"),
-                   MeterLogging(writer=summary_writer),
+                   ScalarMeterLogger(writer=summary_writer),
                    ModelSaver(metric_names='eval/loss', save_dir=args.snapshots, conditions='min', model=model))
 
         strategy = Strategy(data_provider=data_provider,
@@ -89,7 +90,7 @@ if __name__ == "__main__":
                             optimizer=optimizer,
                             train_callbacks=train_cbs,
                             val_callbacks=val_cbs,
-                            device=args.device)
+                            device=device)
 
         strategy.run()
         kfold_train_losses.append(train_cbs[0].current())

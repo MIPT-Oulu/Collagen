@@ -12,17 +12,20 @@ matrix:
       os: linux
       dist: xenial
       sudo: true
-      python: 3.7
+      python: 3.7.3
 
 before_install:
   - sh ci/conda_setup.sh
   - bash $HOME/miniconda.sh -b -p $HOME/miniconda
   - export OPATH="$PATH" && export PATH="$HOME/miniconda/bin:$PATH"
-
+  - conda update -y -n base -c defaults conda
 install:
   - conda create -q -y -n collagen_test_env python=$TRAVIS_PYTHON_VERSION
-  - conda install -y -n collagen_test_env pandoc
   - source activate collagen_test_env
+  - conda install -y -n collagen_test_env pandoc -c anaconda
+  - conda install -y -n collagen_test_env numpy scipy matplotlib pandas -c anaconda
+  - conda install -y -n collagen_test_env coverage=4.5.1 -c anaconda
+  - conda install -y -n collagen_test_env pytorch torchvision -c pytorch
   - pip install -r ci/requirements.txt
   - pip install .
 

@@ -1,13 +1,15 @@
 import argparse
-from collagen.core import Module
+
+import numpy as np
+import solt.core as slc
+import solt.data as sld
+import solt.transforms as slt
+import torch
 from torch import nn
 from torch.tensor import OrderedDict
-import torch
-import numpy as np
-import solt.data as sld
+
+from collagen.core import Module
 from collagen.data.utils import ApplyTransform, Normalize, Compose
-import solt.core as slc
-import solt.transforms as slt
 
 
 def wrap2solt(inp):
@@ -18,7 +20,7 @@ def wrap2solt(inp):
 def unpack_solt(dc: sld.DataContainer):
     img, target = dc.data
     img, target = torch.from_numpy(img).permute(2, 0, 1).float(), target
-    return img/255.0, np.float32(target)
+    return img / 255.0, np.float32(target)
 
 
 def init_mnist_transforms():
@@ -161,7 +163,7 @@ class Generator(nn.Module):
 
 def parse_item_mnist_ssgan(root, entry, trf, data_key, target_key):
     img, target = trf((entry[data_key], entry[target_key]))
-    ext_y = np.zeros(10+2, dtype=np.float32)
+    ext_y = np.zeros(10 + 2, dtype=np.float32)
     ext_y[-1] = 1.0
     ext_y[int(round(target))] = 1.0
     return {data_key: img, target_key: ext_y, 'class': target, 'valid': ext_y[-1]}
@@ -183,17 +185,11 @@ def init_args():
     parser.add_argument('--save_data', default='data', help='Where to save downloaded dataset')
     parser.add_argument('--seed', type=int, default=12345, help='Random seed')
     parser.add_argument('--n_classes', type=int, default=10, help='Num of classes')
-    parser.add_argument('--device', type=str, default="cuda", help='Use `cuda` or `cpu`')
     parser.add_argument('--log_dir', type=str, default=None, help='Log directory')
     parser.add_argument('--grid_shape', type=tuple, default=(24, 24), help='Shape of grid of generated images')
-    parser.add_argument('--ngpu', type=int, default=1, help='Num of GPUs')
     args = parser.parse_args()
 
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
 
     return args
-
-
-
-

@@ -1,10 +1,14 @@
-from torch.optim import Optimizer
-from ..data import DataProvider
-from ._session import Session
+try:
+    from torch.optim import Optimizer
+except ImportError:
+    from torch.optim.optimizer import Optimizer
 from typing import Tuple
-from collagen.core.utils import wrap_tuple
+
 from collagen.core import Module
 from collagen.core._callback import Callback
+from collagen.core.utils import wrap_tuple
+from ._session import Session
+from ..data import DataProvider
 from ..data.utils import cast_tensor
 
 
@@ -40,7 +44,7 @@ class Trainer(object):
     def __init__(self, data_provider: DataProvider,
                  train_loader_names: str or Tuple[str] or None,
                  module: Module,
-                 optimizer: Optimizer,
+                 optimizer: Optimizer or None,
                  loss: Module,
                  val_loader_names: str or Tuple[str] = None,
                  train_callbacks: Tuple[Callback] or Callback or None = None,
@@ -121,10 +125,10 @@ class Trainer(object):
         Parameters
         ----------
         data_key : Tuple[str] or str
-            Key of the dictionary, which corresponds to the data. Sometimes (e.g. in Siamese models),
+            Key of the dictionary, which corresponds to the data. Sometimes (e.g. in Siamese modelzoo),
             we need two items thus we might need multiple keys.
         target_key : Tuple[str] or str
-            Key of the dictionary, which corresponds to the target. In case of models with e.g. multiple
+            Key of the dictionary, which corresponds to the target. In case of modelzoo with e.g. multiple
             heads and heterogeneous outputs, it could be useful to use multiple keys.
         accumulate_grad : bool
             Whether to accumulate gradient.
@@ -194,7 +198,8 @@ class Trainer(object):
                                       session=self.__session)
 
             first_minibatch = self.check_first_minibatch(loader_i=ind, minibatch_i=i)
-            last_minibatch = self.check_last_minibatch(n_loaders=len(self.__train_loader_names), loader_i=ind, n_minibatches=n_iter, minibatch_i=i)
+            last_minibatch = self.check_last_minibatch(n_loaders=len(self.__train_loader_names), loader_i=ind,
+                                                       n_minibatches=n_iter, minibatch_i=i)
             no_zero_grad = accumulate_grad or (not first_minibatch and minibatch_accumulate_grad)
             with_step = last_minibatch or not minibatch_accumulate_grad
             loss, train_result = self.__session.train_step(input_data, target, return_out=True,
@@ -228,10 +233,10 @@ class Trainer(object):
         Parameters
         ----------
         data_key : Tuple[str] or str
-            Key of the dictionary, which corresponds to the data. Sometimes (e.g. in Siamese models),
+            Key of the dictionary, which corresponds to the data. Sometimes (e.g. in Siamese modelzoo),
             we need two items thus we might need multiple keys.
         target_key : Tuple[str] or str
-            Key of the dictionary, which corresponds to the target. In case of models with e.g. multiple
+            Key of the dictionary, which corresponds to the target. In case of modelzoo with e.g. multiple
             heads and heterogeneous outputs, it could be useful to use multiple keys.
         cast_target : None or str
             Performs type casting for target

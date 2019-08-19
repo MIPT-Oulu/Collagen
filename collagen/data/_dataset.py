@@ -1,5 +1,5 @@
-from torch.utils.data import Dataset
 import pandas as pd
+from torch.utils.data import Dataset
 
 
 class DataFrameDataset(Dataset):
@@ -24,6 +24,7 @@ class DataFrameDataset(Dataset):
         `meta_data` must be `pandas.DataFrame`.
     
     """
+
     def __init__(self, root, meta_data, parse_item_cb, transform=None, data_key='data', target_key='target'):
         if not isinstance(root, str):
             raise TypeError("`root` must be `str`")

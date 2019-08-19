@@ -1,15 +1,18 @@
-import torch
-from typing import Tuple, Dict
 from abc import abstractmethod
+from typing import Tuple, Dict
+
+import torch
+import torch.nn as nn
 
 
-class Module(torch.nn.Module):
+class Module(nn.Module):
     """
     Generic building block, which assumes to have trainable parameters within it.
 
     This extension allows to group the layers and have an easy access to them via group names.
 
     """
+
     def __init__(self, input_shape=None, output_shape=None):
         super(Module, self).__init__()
         self.__param_groups = dict()
@@ -63,7 +66,7 @@ class Module(torch.nn.Module):
         else:
             if name is None:
                 if isinstance(group, str):
-                    group = (group, )
+                    group = (group,)
                 for group_name in group:
                     yield {'params': self.__param_groups[group_name],
                            'name': None,
@@ -73,7 +76,7 @@ class Module(torch.nn.Module):
                     raise ValueError
 
                 if isinstance(name, str):
-                    name = (name, )
+                    name = (name,)
 
                 for module_name in name:
                     yield {'params': self.__param_groups[group][module_name], 'name': module_name, 'group_name': group}
@@ -111,3 +114,13 @@ class Module(torch.nn.Module):
     @abstractmethod
     def get_features_by_name(self, name: str):
         raise NotImplementedError
+
+    def initialize(self):
+        def init_weights(m):
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+
+        self.apply(init_weights)
