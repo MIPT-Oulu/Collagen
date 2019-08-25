@@ -6,7 +6,8 @@ from collagen.modelzoo.segmentation import decoders
 
 class EncoderDecoder(Module):
     def __init__(self, n_outputs, backbone: str or Module, decoder: str or Module,
-                 decoder_normalization='BN', spatial_dropout=None, bayesian_dropout=None):
+                 decoder_normalization='BN', spatial_dropout=None, bayesian_dropout=None,
+                 unet_activation='relu', unet_width=32):
         super(EncoderDecoder, self).__init__()
         if isinstance(backbone, str):
             if backbone in constants.allowed_encoders:
@@ -26,6 +27,11 @@ class EncoderDecoder(Module):
                                                   final_channels=n_outputs, spatial_dropout=spatial_dropout,
                                                   normalization=decoder_normalization,
                                                   bayesian_dropout=bayesian_dropout)
+                elif decoder == 'UNet':
+                    decoder = decoders.UNetDecoder(encoder_channels=backbone.output_shapes,
+                                                   width=unet_width, activation=unet_activation,
+                                                   final_channels=n_outputs,
+                                                   spatial_dropout=spatial_dropout)
 
         decoder.initialize()
 
