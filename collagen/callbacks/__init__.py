@@ -6,7 +6,7 @@ from .lr_scheduling  import SingleRampUpDownScheduler, TemporalBasedScheduler
 
 from .meters import KappaMeter, SSBalancedAccuracyMeter, BalancedAccuracyMeter
 from .meters import Meter, RunningAverageMeter, AccuracyMeter, AccuracyThresholdMeter, SSAccuracyMeter, SSValidityMeter
-from .meters import ConfusionMeter, JaccardDiceMeter
+from .meters import ConfusionMeter, JaccardDiceMeter, ItemWiseBinaryJaccardDiceMeter
 
 from .train import UpdateSWA
 from .train import UpdateBackwardParamCallback, ClipGradCallback
