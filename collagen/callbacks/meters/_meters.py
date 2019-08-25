@@ -564,3 +564,76 @@ class JaccardDiceMeter(Meter):
         return dices
 
 
+
+class ItemWiseBinaryJaccardDiceMeter(Meter):
+    """
+    Implements device-invariant image-Wise Jaccard and Dice Meter for binary segmentation problems.
+    If both target and out are on gpu, then the computations will happen there.
+
+    Parameters
+    ----------
+    prefix: str
+        Prefix to be displayed in the progressbar and tensorboard
+    name: str
+        Name of the metric. Can only be `jaccard` or `dice`
+    parse_output: Callable
+        Function to parse the output
+    parse_target: Callable
+        Function to parse the target tensor
+    cond: Callable
+        Condition under which the metric will be updated
+    """
+    def __init__(self, prefix="", name="jaccard", parse_output=None, parse_target=None, cond=None):
+        super(ItemWiseBinaryJaccardDiceMeter, self).__init__(name=name, prefix=prefix, desc_name=None)
+        assert name in ['jaccard', 'dice']
+
+        self.__parse_target = Meter.default_parse_target if parse_target is None else parse_target
+        self.__parse_output = Meter.default_parse_output if parse_output is None else parse_output
+        self.__cond = Meter.default_cond if cond is None else cond
+        self.__value = None
+        self.__batch_count = None
+
+    @staticmethod
+    def compute_dice(target, output):
+        num = output.size(0)
+        m1 = output.view(num, -1).float()
+        m2 = target.view(num, -1).float()
+
+        intersection = (m1 * m2).sum(1)
+        union = (m1.sum(1) + m2.sum(1))
+        dice_1 = union.eq(0)
+
+        result = intersection.mul(2)
+        result[~dice_1] = result[~dice_1].div(union[~dice_1])
+        result[dice_1] = 1
+
+        result = result.mean(0).item()
+
+        return result
+
+    @staticmethod
+    def compute_jaccard(self, target, output):
+        d = self.compute_dice(target, output)
+        return d / (2 - d)
+
+    def on_epoch_begin(self, *args, **kwargs):
+        self.__value = 0
+        self.__batch_count = 0
+
+    def on_minibatch_end(self, target, output, **kwargs):
+        target = self.__parse_target(target)
+        output = self.__parse_output(output)
+
+        if self.__cond(target, output):
+            if target is not None and output is not None and target.shape == output.shape:
+                with torch.no_grad():
+                    if self.name == 'dice':
+                        self.__value += self.compute_dice(target, output)
+                    else:
+                        self.__value += self.compute_jaccard(target, output)
+                    self.__batch_count += 1
+
+    def current(self):
+        if self.__batch_count == 0 and self.__value == 0:
+            return 0
+        return self.__value / self.__batch_count
