@@ -31,7 +31,8 @@ class EncoderDecoder(Module):
                     decoder = decoders.UNetDecoder(encoder_channels=backbone.output_shapes,
                                                    width=unet_width, activation=unet_activation,
                                                    final_channels=n_outputs,
-                                                   spatial_dropout=spatial_dropout)
+                                                   spatial_dropout=spatial_dropout,
+                                                   normalization=decoder_normalization)
 
         decoder.initialize()
 
