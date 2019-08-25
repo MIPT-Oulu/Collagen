@@ -513,6 +513,9 @@ class JaccardDiceMeter(Meter):
         else:
             self.updating_cm = False
 
+    def on_epoch_begin(self, *args, **kwargs):
+        self.confusion_matrix.on_epoch_begin(*args, *kwargs)
+
     def on_minibatch_end(self, target, output, **kwargs):
 
         self.confusion_matrix.on_minibatch_end(target, output)
