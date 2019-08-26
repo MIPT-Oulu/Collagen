@@ -586,7 +586,8 @@ class ItemWiseBinaryJaccardDiceMeter(Meter):
     cond: Callable
         Condition under which the metric will be updated
     """
-    def __init__(self, prefix="", name="jaccard", parse_output=None, parse_target=None, cond=None):
+    def __init__(self, prefix="", name="jaccard",
+                 parse_output=None, parse_target=None, cond=None):
         super(ItemWiseBinaryJaccardDiceMeter, self).__init__(name=name, prefix=prefix, desc_name=None)
         assert name in ['jaccard', 'dice']
 
@@ -620,7 +621,7 @@ class ItemWiseBinaryJaccardDiceMeter(Meter):
         return d / (2 - d)
 
     def on_epoch_begin(self, *args, **kwargs):
-        self.__value = 0
+        self.__value = None
         self.__batch_count = 0
 
     def on_minibatch_end(self, target, output, **kwargs):
@@ -631,12 +632,18 @@ class ItemWiseBinaryJaccardDiceMeter(Meter):
             if target is not None and output is not None and target.shape == output.shape:
                 with torch.no_grad():
                     if self.name == 'dice':
-                        self.__value += self.compute_dice(target, output)
+                        if self.__value is not None:
+                            self.__value += self.compute_dice(target, output)
+                        else:
+                            self.__value = self.compute_dice(target, output)
                     else:
-                        self.__value += self.compute_jaccard(target, output)
+                        if self.__value is not None:
+                            self.__value += self.compute_jaccard(target, output)
+                        else:
+                            self.__value = self.compute_jaccard(target, output)
                     self.__batch_count += 1
 
     def current(self):
-        if self.__batch_count == 0 and self.__value == 0:
-            return 0
+        if self.__batch_count == 0 or self.__value is None:
+            return None
         return self.__value / self.__batch_count
