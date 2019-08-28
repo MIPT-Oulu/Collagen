@@ -247,17 +247,21 @@ class ImageMaskVisualizer(Callback):
     def on_batch_end(self, *args, **kwargs):
         pass
 
-    def on_minibatch_end(self, metric, session, batches_count, input, output, **kwargs):
+    def on_minibatch_end(self, loss, session, batches_count, input, output, **kwargs):
         if hasattr(session.loss, 'get_loss_by_name'):
             metric_value = session.loss.get_loss_by_name(self.name)
         else:
-            metric_value = metric
+            metric_value = loss
         # Update metric
         if metric_value is not None:
             # No previous metric
             if self.__min_loss is None:
                 self.__min_loss = metric_value
                 self.__max_loss = metric_value
+                self.__input_worst = input
+                self.__pred_worst = output
+                self.__input_best = input
+                self.__pred_best = output
             # Best case improved
             elif metric_value < self.__min_loss:
                 self.__min_loss = metric_value
@@ -269,20 +273,19 @@ class ImageMaskVisualizer(Callback):
                 self.__input_worst = input
                 self.__pred_worst = output
 
-
     def on_epoch_end(self, epoch, strategy, stage, **kwargs):
         # Plot images on tensorboard
         self.__summary_writer.add_images(tag='Input image (best)', dataformats='NCHW', global_step=epoch,
-                                        img_tensor=self.undo_transform(self.__input_best, self.__mean, self.__std))
+                                         img_tensor=self.undo_transform(self.__input_best, self.__mean, self.__std))
 
         self.__summary_writer.add_images(tag='Best prediction', img_tensor=torch.sigmoid(self.__pred_best),
-                                        dataformats='NCHW', global_step=epoch)
+                                         dataformats='NCHW', global_step=epoch)
 
         self.__summary_writer.add_images(tag='Input image (worst)', dataformats='NCHW', global_step=epoch,
-                                        img_tensor=self.undo_transform(self.__input_worst, self.__mean, self.__std))
+                                         img_tensor=self.undo_transform(self.__input_worst, self.__mean, self.__std))
 
         self.__summary_writer.add_images(tag='Worst prediction', img_tensor=torch.sigmoid(self.__pred_worst),
-                                        dataformats='NCHW', global_step=epoch)
+                                         dataformats='NCHW', global_step=epoch)
         # Reset the variables for new epoch
         self.__min_loss, self.__max_loss = None, None
         self.__input_best, self.__pred_best = None, None
