@@ -228,7 +228,7 @@ class ImageMaskVisualizer(Callback):
     """
     def __init__(self, writer, log_dir: str = None, comment: str = '', grid_shape: int = (2, 1),
                  mean: float = None, std: float = None):
-        super().__init__()
+        super().__init__(ctype="visualizer")
         self.__log_dir = log_dir
         self.__comment = comment
         self.__summary_writer = writer
@@ -258,38 +258,41 @@ class ImageMaskVisualizer(Callback):
             if self.__min_loss is None:
                 self.__min_loss = metric_value
                 self.__max_loss = metric_value
-                self.__input_worst = input
-                self.__pred_worst = output
-                self.__input_best = input
-                self.__pred_best = output
+                self.__input_worst = input.detach()
+                self.__pred_worst = output.detach()
+                self.__input_best = input.detach()
+                self.__pred_best = output.detach()
             # Best case improved
             elif metric_value < self.__min_loss:
                 self.__min_loss = metric_value
-                self.__input_best = input
-                self.__pred_best = output
+                self.__input_best = input.detach()
+                self.__pred_best = output.detach()
             # Worst case decreased
             elif metric_value > self.__max_loss:
                 self.__max_loss = metric_value
-                self.__input_worst = input
-                self.__pred_worst = output
+                self.__input_worst = input.detach()
+                self.__pred_worst = output.detach()
 
-    def on_epoch_end(self, epoch, strategy, stage, **kwargs):
-        # Plot images on tensorboard
-        self.__summary_writer.add_images(tag='Input image (best)', dataformats='NCHW', global_step=epoch,
-                                         img_tensor=self.undo_transform(self.__input_best, self.__mean, self.__std))
-
-        self.__summary_writer.add_images(tag='Best prediction', img_tensor=torch.sigmoid(self.__pred_best),
-                                         dataformats='NCHW', global_step=epoch)
-
-        self.__summary_writer.add_images(tag='Input image (worst)', dataformats='NCHW', global_step=epoch,
-                                         img_tensor=self.undo_transform(self.__input_worst, self.__mean, self.__std))
-
-        self.__summary_writer.add_images(tag='Worst prediction', img_tensor=torch.sigmoid(self.__pred_worst),
-                                         dataformats='NCHW', global_step=epoch)
+    def on_epoch_begin(self, *args, **kwargs):
         # Reset the variables for new epoch
         self.__min_loss, self.__max_loss = None, None
         self.__input_best, self.__pred_best = None, None
         self.__input_worst, self.__pred_worst = None, None
+
+    def on_epoch_end(self, epoch, strategy, stage, **kwargs):
+        # Plot images on tensorboard
+        self.__summary_writer.add_images(tag='Input_best', dataformats='NCHW', global_step=epoch,
+                                         img_tensor=self.undo_transform(self.__input_best, self.__mean, self.__std))
+
+        self.__summary_writer.add_images(tag='Prediction_best', img_tensor=torch.sigmoid(self.__pred_best),
+                                         dataformats='NCHW', global_step=epoch)
+
+        self.__summary_writer.add_images(tag='Input_worst', dataformats='NCHW', global_step=epoch,
+                                         img_tensor=self.undo_transform(self.__input_worst, self.__mean, self.__std))
+
+        self.__summary_writer.add_images(tag='Prediction_worst', img_tensor=torch.sigmoid(self.__pred_worst),
+                                         dataformats='NCHW', global_step=epoch)
+
 
     @staticmethod
     def undo_transform(data, mean, std):

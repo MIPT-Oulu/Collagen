@@ -22,11 +22,13 @@ class SimpleLRScheduler(LRScheduler):
     def on_epoch_end(self, epoch, strategy, stage, **kwargs):
         for cb in strategy.get_callbacks_by_name("minibatch", stage=stage):
             if cb.ctype == "meter" and cb.desc == self.metric_name:
-                try:
-                    self.__lr_scheduler.step(cb.current())
-                except TypeError:  # TODO: find out what is causing the error
+                # try:
+                self.__lr_scheduler.step(cb.current())
+                """
+                except TypeError:
+                    print('LR scheduler failed!')
                     continue
-
+"""
 
 class TemporalBasedScheduler(LRScheduler):
     def __init__(self, lr_scheduler, name='single_ramupdown_lrs'):
