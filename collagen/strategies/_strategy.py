@@ -17,7 +17,6 @@ from collagen.data import DataProvider
 
 from collagen.callbacks.meters import RunningAverageMeter
 from collagen.callbacks.logging.loggers import ProgressbarLogger
-from collagen.core.utils import auto_detect_device
 
 
 class Strategy(object):
@@ -58,7 +57,7 @@ class Strategy(object):
                  train_callbacks: Tuple[Callback] or Callback = None,
                  val_callbacks: Tuple[Callback] or Callback = None,
                  n_training_batches: int or None = None,
-                 device: torch.device or None = auto_detect_device()):
+                 device: torch.device = torch.device('cpu')):
         self.__data_provider: DataProvider = data_provider
         self.__loss: nn.Module = loss
         self.__optimizer: Optimizer = optimizer
