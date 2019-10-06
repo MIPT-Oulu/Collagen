@@ -447,8 +447,11 @@ class ConfusionMeter(Meter):
     def is_blocked(self):
         return self._blocked
 
-    def on_epoch_begin(self, *args, **kwargs):
+    def reset(self):
         self._confusion_matrix = np.zeros((self._n_classes, self._n_classes), dtype=np.uint64)
+
+    def on_epoch_begin(self, *args, **kwargs):
+        self.reset()
 
     def _compute_confusion_matrix(self, targets, predictions):
         """
@@ -522,14 +525,14 @@ class JaccardDiceMeter(Meter):
 
     def current(self):
         if self.name == 'jaccrad':
-            coeffs = self._compute_jaccard(self.confusion_matrix.current())
+            coeffs = self.compute_jaccard(self.confusion_matrix.current())
         else:
-            coeffs = self._compute_dice(self.confusion_matrix.current())
+            coeffs = self.compute_dice(self.confusion_matrix.current())
 
         return {cls:res for cls, res in zip(self.class_names, coeffs)}
 
     @staticmethod
-    def _compute_jaccard(confusion_matrix):
+    def compute_jaccard(confusion_matrix):
         """
         https://github.com/ternaus/robot-surgery-segmentation/blob/master/validation.py
         """
@@ -548,7 +551,7 @@ class JaccardDiceMeter(Meter):
         return ious
 
     @staticmethod
-    def _compute_dice(confusion_matrix):
+    def compute_dice(confusion_matrix):
         """
         https://github.com/ternaus/robot-surgery-segmentation/blob/master/validation.py
         """
@@ -565,6 +568,42 @@ class JaccardDiceMeter(Meter):
                 dice = 2 * float(true_positives) / denom
             dices.append(dice)
         return dices
+
+class AverageItemWiseJaccardDiceMeter(Meter):
+    def __init__(self, n_classes=2, prefix="", name='jaccard', parse_output=None, class_names=None,
+                 parse_target=None, cond=None):
+        super(AverageItemWiseJaccardDiceMeter, self).__init__(name=name, prefix=prefix, desc_name=None)
+        assert name in ['jaccard', 'dice']
+
+        self.confusion_matrix = ConfusionMeter(n_classes=n_classes,
+                                               prefix="", parse_target=parse_target,
+                                               parse_output=parse_output, cond=cond, class_dim=1)
+        if class_names is None:
+            self.class_names = list(range(n_classes))
+        else:
+            assert len(class_names) == n_classes
+            self.class_names = class_names
+
+        self.values = np.zeros(n_classes)
+        self.n_samples = 0
+
+    def on_epoch_begin(self, *args, **kwargs):
+        self.n_samples = 0
+
+    def on_minibatch_end(self, target, output, **kwargs):
+        for i in range(target.size(0)):
+            self.confusion_matrix.reset()
+            self.confusion_matrix.on_minibatch_end(target[i].squeeze().unsqueeze(0),
+                                                   output[i].squeeze().unsqueeze(0))
+            if self.name == 'jaccrad':
+                coeffs = JaccardDiceMeter.compute_jaccard(self.confusion_matrix.current())
+            else:
+                coeffs = JaccardDiceMeter.compute_dice(self.confusion_matrix.current())
+            self.n_samples += 1
+            self.values += np.array(coeffs)
+
+    def current(self):
+        return (self.values / self.n_samples).mean()
 
 
 
