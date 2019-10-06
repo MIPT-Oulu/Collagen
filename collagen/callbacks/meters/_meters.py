@@ -569,15 +569,13 @@ class JaccardDiceMeter(Meter):
             dices.append(dice)
         return dices
 
-class AverageItemWiseJaccardDiceMeter(Meter):
-    def __init__(self, n_classes=2, prefix="", name='jaccard', parse_output=None, class_names=None,
+class AverageItemWiseDiceMeter(Meter):
+    def __init__(self, n_classes=2, prefix="", parse_output=None, class_names=None,
                  parse_target=None, cond=None):
-        super(AverageItemWiseJaccardDiceMeter, self).__init__(name=name, prefix=prefix, desc_name=None)
-        assert name in ['jaccard', 'dice']
+        super(AverageItemWiseDiceMeter, self).__init__(name='dice', prefix=prefix, desc_name=None)
 
-        self.confusion_matrix = ConfusionMeter(n_classes=n_classes,
-                                               prefix="", parse_target=parse_target,
-                                               parse_output=parse_output, cond=cond, class_dim=1)
+
+        self.n_classes = n_classes
         if class_names is None:
             self.class_names = list(range(n_classes))
         else:
@@ -589,18 +587,25 @@ class AverageItemWiseJaccardDiceMeter(Meter):
 
     def on_epoch_begin(self, *args, **kwargs):
         self.n_samples = 0
+        self.values = np.zeros(self.n_classes)
 
     def on_minibatch_end(self, target, output, **kwargs):
-        for i in range(target.size(0)):
-            self.confusion_matrix.reset()
-            self.confusion_matrix.on_minibatch_end(target[i].squeeze().unsqueeze(0),
-                                                   output[i].squeeze().unsqueeze(0))
-            if self.name == 'jaccrad':
-                coeffs = JaccardDiceMeter.compute_jaccard(self.confusion_matrix.current())
-            else:
-                coeffs = JaccardDiceMeter.compute_dice(self.confusion_matrix.current())
-            self.n_samples += 1
-            self.values += np.array(coeffs)
+        with torch.no_grad():
+            for i in range(target.size(0)):
+                t = target[i].squeeze().to(output.device)
+                o = output[i].squeeze().argmax(0)
+                coeffs =  []
+                for cls in range(self.n_classes):
+                    t_cls = t[t==cls]
+                    o_cls = o[t==cls]
+                    if t_cls.sum() == 0 and o_cls.sum() == 0:
+                        val = 1
+                    else:
+                        val = ItemWiseBinaryJaccardDiceMeter.compute_dice(t_cls.unsqueeze(0), o_cls.unsqueeze(0)).item()
+                    coeffs.append(val)
+
+                self.n_samples += 1
+                self.values += np.array(coeffs)
 
     def current(self):
         return (self.values / self.n_samples).mean()
@@ -642,15 +647,10 @@ class ItemWiseBinaryJaccardDiceMeter(Meter):
         m1 = output.view(num, -1).float()
         m2 = target.view(num, -1).float()
 
-        intersection = (m1 * m2).sum(1)
-        union = (m1.sum(1) + m2.sum(1))
-        dice_1 = union.eq(0)
+        a = (m1 * m2).sum(1)
+        b = (m1.sum(1) + m2.sum(1))
 
-        result = intersection.mul(2)
-        result[~dice_1] = result[~dice_1].div(union[~dice_1])
-        result[dice_1] = 1
-
-        result = result.mean(0).item()
+        result = a.mul(2).div(b)
 
         return result
 
