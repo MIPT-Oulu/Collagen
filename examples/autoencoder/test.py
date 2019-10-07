@@ -3,7 +3,7 @@ import torch
 import numpy as np
 from torchvision import datasets, transforms
 from collagen.core.utils import auto_detect_device
-from examples.AutoEncoder.models import AutoEncoder
+from examples.autoencoder.models import AutoEncoder
 from torch.autograd import Variable
 import matplotlib.pyplot as plt
 
