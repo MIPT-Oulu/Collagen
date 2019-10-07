@@ -655,8 +655,8 @@ class ItemWiseBinaryJaccardDiceMeter(Meter):
         return result
 
     @staticmethod
-    def compute_jaccard(self, target, output):
-        d = self.compute_dice(target, output)
+    def compute_jaccard(target, output):
+        d = ItemWiseBinaryJaccardDiceMeter.compute_dice(target, output)
         return d / (2 - d)
 
     def on_epoch_begin(self, *args, **kwargs):

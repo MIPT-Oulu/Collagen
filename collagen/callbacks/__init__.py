@@ -1,5 +1,5 @@
 from .logging import ProgressbarLogger, BatchLRLogger, EpochLRLogger,  ScalarMeterLogger
-from .logging import ImageSamplingVisualizer, ConfusionMatrixVisualizer
+from .logging import ImageSamplingVisualizer, ConfusionMatrixVisualizer, ImageMaskVisualizer
 
 from .lr_scheduling import CycleRampUpDownScheduler, SimpleLRScheduler
 from .lr_scheduling  import SingleRampUpDownScheduler, TemporalBasedScheduler
