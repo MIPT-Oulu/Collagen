@@ -59,3 +59,19 @@ class CombinedLoss(nn.Module):
             loss += l(inputs, targets) * w
         return loss
 
+
+class BCEJaccardLoss(torch.nn.Module):
+    def __init__(self, log_jaccard=True):
+        super(BCEJaccardLoss, self).__init__()
+        self.jaccard = SoftJaccardLoss(use_log=log_jaccard)
+        self.bce = BCEWithLogitsLoss2d()
+
+    def forward(self, logits, targets):
+        bs = targets.size(0)
+        use_jaccard = targets.view(bs, -1).sum(1).gt(0)
+
+        loss = self.bce(logits, targets)
+        if use_jaccard.sum() != 0:
+            loss += self.jaccard(logits[use_jaccard], targets[use_jaccard])
+
+        return loss

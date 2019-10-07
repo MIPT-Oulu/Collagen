@@ -53,7 +53,7 @@ class SegmentationBlock(Module):
             for _ in range(1, n_upsamples):
                 blocks.append(ConvBlock(ks=3, inp=out_channels, out=out_channels, stride=1, pad=1,
                                         activation='relu',
-                                        normalization=normalization,
+                                        normalization=normalization, bias=False
                                         ))
                 blocks.append(nn.Upsample(scale_factor=2, mode='nearest'))
 

@@ -447,8 +447,11 @@ class ConfusionMeter(Meter):
     def is_blocked(self):
         return self._blocked
 
-    def on_epoch_begin(self, *args, **kwargs):
+    def reset(self):
         self._confusion_matrix = np.zeros((self._n_classes, self._n_classes), dtype=np.uint64)
+
+    def on_epoch_begin(self, *args, **kwargs):
+        self.reset()
 
     def _compute_confusion_matrix(self, targets, predictions):
         """
@@ -513,20 +516,23 @@ class JaccardDiceMeter(Meter):
         else:
             self.updating_cm = False
 
+    def on_epoch_begin(self, *args, **kwargs):
+        self.confusion_matrix.on_epoch_begin(*args, *kwargs)
+
     def on_minibatch_end(self, target, output, **kwargs):
 
         self.confusion_matrix.on_minibatch_end(target, output)
 
     def current(self):
         if self.name == 'jaccrad':
-            coeffs = self._compute_jaccard(self.confusion_matrix.current())
+            coeffs = self.compute_jaccard(self.confusion_matrix.current())
         else:
-            coeffs = self._compute_dice(self.confusion_matrix.current())
+            coeffs = self.compute_dice(self.confusion_matrix.current())
 
         return {cls:res for cls, res in zip(self.class_names, coeffs)}
 
     @staticmethod
-    def _compute_jaccard(confusion_matrix):
+    def compute_jaccard(confusion_matrix):
         """
         https://github.com/ternaus/robot-surgery-segmentation/blob/master/validation.py
         """
@@ -545,7 +551,7 @@ class JaccardDiceMeter(Meter):
         return ious
 
     @staticmethod
-    def _compute_dice(confusion_matrix):
+    def compute_dice(confusion_matrix):
         """
         https://github.com/ternaus/robot-surgery-segmentation/blob/master/validation.py
         """
@@ -563,4 +569,120 @@ class JaccardDiceMeter(Meter):
             dices.append(dice)
         return dices
 
+class AverageItemWiseDiceMeter(Meter):
+    def __init__(self, n_classes=2, prefix="", parse_output=None, class_names=None,
+                 parse_target=None, cond=None):
+        super(AverageItemWiseDiceMeter, self).__init__(name='dice', prefix=prefix, desc_name=None)
 
+
+        self.n_classes = n_classes
+        if class_names is None:
+            self.class_names = list(range(n_classes))
+        else:
+            assert len(class_names) == n_classes
+            self.class_names = class_names
+
+        self.values = np.zeros(n_classes)
+        self.n_samples = 0
+
+    def on_epoch_begin(self, *args, **kwargs):
+        self.n_samples = 0
+        self.values = np.zeros(self.n_classes)
+
+    def on_minibatch_end(self, target, output, **kwargs):
+        with torch.no_grad():
+            for i in range(target.size(0)):
+                t = target[i].squeeze().to(output.device)
+                o = output[i].squeeze().argmax(0)
+                coeffs =  []
+                for cls in range(self.n_classes):
+                    t_cls = t[t==cls]
+                    o_cls = o[t==cls]
+                    if t_cls.sum() == 0 and o_cls.sum() == 0:
+                        val = 1
+                    else:
+                        val = ItemWiseBinaryJaccardDiceMeter.compute_dice(t_cls.unsqueeze(0), o_cls.unsqueeze(0)).item()
+                    coeffs.append(val)
+
+                self.n_samples += 1
+                self.values += np.array(coeffs)
+
+    def current(self):
+        return (self.values / self.n_samples).mean()
+
+
+
+class ItemWiseBinaryJaccardDiceMeter(Meter):
+    """
+    Implements device-invariant image-Wise Jaccard and Dice Meter for binary segmentation problems.
+    If both target and out are on gpu, then the computations will happen there.
+
+    Parameters
+    ----------
+    prefix: str
+        Prefix to be displayed in the progressbar and tensorboard
+    name: str
+        Name of the metric. Can only be `jaccard` or `dice`
+    parse_output: Callable
+        Function to parse the output
+    parse_target: Callable
+        Function to parse the target tensor
+    cond: Callable
+        Condition under which the metric will be updated
+    """
+    def __init__(self, prefix="", name="jaccard",
+                 parse_output=None, parse_target=None, cond=None):
+        super(ItemWiseBinaryJaccardDiceMeter, self).__init__(name=name, prefix=prefix, desc_name=None)
+        assert name in ['jaccard', 'dice']
+
+        self.__parse_target = Meter.default_parse_target if parse_target is None else parse_target
+        self.__parse_output = Meter.default_parse_output if parse_output is None else parse_output
+        self.__cond = Meter.default_cond if cond is None else cond
+        self.__value = None
+        self.__batch_count = None
+
+    @staticmethod
+    def compute_dice(target, output):
+        num = output.size(0)
+        m1 = output.view(num, -1).float()
+        m2 = target.view(num, -1).float()
+
+        a = (m1 * m2).sum(1)
+        b = (m1.sum(1) + m2.sum(1))
+
+        result = a.mul(2).div(b)
+
+        return result
+
+    @staticmethod
+    def compute_jaccard(target, output):
+        d = ItemWiseBinaryJaccardDiceMeter.compute_dice(target, output)
+        return d / (2 - d)
+
+    def on_epoch_begin(self, *args, **kwargs):
+        self.__value = None
+        self.__batch_count = 0
+
+    def on_minibatch_end(self, target, output, **kwargs):
+        target = self.__parse_target(target)
+        output = self.__parse_output(output)
+
+        if self.__cond(target, output):
+            if target is not None and output is not None and target.shape == output.shape:
+                with torch.no_grad():
+                    if self.name == 'dice':
+                        if self.__value is not None:
+                            self.__value += self.compute_dice(target, output)
+                        else:
+                            self.__value = self.compute_dice(target, output)
+                    else:
+                        if self.__value is not None:
+                            self.__value += self.compute_jaccard(target, output)
+                        else:
+                            self.__value = self.compute_jaccard(target, output)
+                    self.__batch_count += 1
+
+    def current(self):
+        if self.__batch_count == 0 or self.__value is None:
+            return None
+        return self.__value / self.__batch_count

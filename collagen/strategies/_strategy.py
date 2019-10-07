@@ -186,7 +186,7 @@ class Strategy(object):
         for cb in self.get_callbacks_by_stage(kwargs['stage']):
             getattr(cb, cb_func_name)(strategy=self, **kwargs)
 
-    def run(self):
+    def run(self, pbar_prefix=""):
         for epoch in range(self.__n_epochs):
             for stage in ['train', 'eval']:
 
@@ -194,7 +194,7 @@ class Strategy(object):
                                              n_epochs=self.__num_batches_by_stage[stage], trainer=self.__trainer)
                 progress_bar = tqdm(range(self.__num_batches_by_stage[stage]),
                                     total=self.__num_batches_by_stage[stage],
-                                    desc=f'Epoch [{epoch}] | {stage}::')
+                                    desc=f'{pbar_prefix}Epoch [{epoch}] | {stage}::')
                 for batch_i in progress_bar:
                     self._call_callbacks_by_name('on_sample_begin', epoch=epoch, stage=stage, batch_i=batch_i,
                                                  progress_bar=progress_bar, trainer=self.__trainer)
