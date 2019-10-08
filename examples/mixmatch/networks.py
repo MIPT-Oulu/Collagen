@@ -1,14 +1,14 @@
+import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.init as init
 import torch.nn.functional as F
+import torch.nn.init as init
 from torch.autograd import Variable
 
-import sys
-import numpy as np
 
 def conv3x3(in_planes, out_planes, stride=1):
     return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride, padding=1, bias=True)
+
 
 def conv_init(m):
     classname = m.__class__.__name__
@@ -18,6 +18,7 @@ def conv_init(m):
     elif classname.find('BatchNorm') != -1:
         init.constant(m.weight, 1)
         init.constant(m.bias, 0)
+
 
 class wide_basic(nn.Module):
     def __init__(self, in_planes, planes, dropout_rate, stride=1):
@@ -41,19 +42,20 @@ class wide_basic(nn.Module):
 
         return out
 
+
 class Wide_ResNet(nn.Module):
     def __init__(self, depth, widen_factor, dropout_rate, num_classes):
         super(Wide_ResNet, self).__init__()
         self.in_planes = 16
 
-        assert ((depth-4)%6 ==0), 'Wide-resnet depth should be 6n+4'
-        n = int((depth-4)/6 + 0.5)
+        assert ((depth - 4) % 6 == 0), 'Wide-resnet depth should be 6n+4'
+        n = int((depth - 4) / 6 + 0.5)
         k = widen_factor
 
-        print('| Wide-Resnet %dx%d' %(depth, k))
-        nStages = [16, 16*k, 32*k, 64*k]
+        print('| Wide-Resnet %dx%d' % (depth, k))
+        nStages = [16, 16 * k, 32 * k, 64 * k]
 
-        self.conv1 = conv3x3(3,nStages[0])
+        self.conv1 = conv3x3(3, nStages[0])
         self.layer1 = self._wide_layer(wide_basic, nStages[1], n, dropout_rate, stride=1)
         self.layer2 = self._wide_layer(wide_basic, nStages[2], n, dropout_rate, stride=2)
         self.layer3 = self._wide_layer(wide_basic, nStages[3], n, dropout_rate, stride=2)
@@ -61,7 +63,7 @@ class Wide_ResNet(nn.Module):
         self.linear = nn.Linear(nStages[3], num_classes)
 
     def _wide_layer(self, block, planes, num_blocks, dropout_rate, stride):
-        strides = [stride] + [1]*(num_blocks-1)
+        strides = [stride] + [1] * (num_blocks - 1)
         layers = []
 
         for stride in strides:
@@ -85,8 +87,9 @@ class Wide_ResNet(nn.Module):
     def get_features(self, x):
         return self.forward(x)
 
+
 if __name__ == '__main__':
-    net=Wide_ResNet(28, 10, 0.3, 10)
-    y = net(Variable(torch.randn(1,3,32,32)))
+    net = Wide_ResNet(28, 10, 0.3, 10)
+    y = net(Variable(torch.randn(1, 3, 32, 32)))
 
     print(y.size())
