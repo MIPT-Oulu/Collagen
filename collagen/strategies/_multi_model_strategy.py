@@ -64,6 +64,7 @@ class MultiModelStrategy(object):
         # self.__model_trainer_names contains the name of trainable models. A trainable model may contain multiple
         # NN models
         self.__model_trainer_names = strategy_config['model_trainer_names']
+        self.__model_validator_names = strategy_config['model_validator_names']
         self.__n_epochs = n_epochs
         self.__data_provider = data_provider
         self.__callbacks = wrap_tuple(callbacks)
@@ -88,8 +89,14 @@ class MultiModelStrategy(object):
             self.__data_key_by_stage[stage] = dict()
             self.__num_samples_by_stage[stage] = dict()
             self.__target_key_by_stage[stage] = dict()
+
+            if stage == 'train':
+                trainer_names = self.__model_trainer_names
+            else:
+                trainer_names = self.__model_validator_names
+
             # iterate through each trainable model trainer
-            for model_trainer_name in self.__model_trainer_names:
+            for model_trainer_name in trainer_names:
                 # n_sample_dict is a local variable of dict type. trainable model name and number of samples for this
                 # trainer are saved as key: value pair.
                 # readers be aware that model_trainer_name is the name of the trainer which might contain multiple
@@ -197,6 +204,10 @@ class MultiModelStrategy(object):
         """
         for epoch in range(self.__n_epochs):
             for stage in self.__stage_names:
+                if stage == 'train':
+                    trainer_names = self.__model_trainer_names
+                else:
+                    trainer_names = self.__model_validator_names
                 self._call_callbacks_by_name(cb_func_name='on_epoch_begin', epoch=epoch, stage=stage,
                                              n_epochs=self.__n_epochs)
                 progress_bar = tqdm(range(self.__num_batches_by_stage[stage]), total=self.__num_batches_by_stage[stage],
@@ -211,7 +222,7 @@ class MultiModelStrategy(object):
                                                  n_batches=self.__num_batches_by_stage[stage])
 
                     # for scalability data sampling needs to be done every iteration
-                    for model_name in self.__model_trainer_names:
+                    for model_name in trainer_names:
                         self._call_callbacks_by_name(cb_func_name='on_sample_begin',
                                                      progress_bar=progress_bar,
                                                      epoch=epoch,

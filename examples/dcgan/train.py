@@ -10,15 +10,16 @@ from collagen.data.data_provider import gan_data_provider
 from collagen.data.utils.datasets import get_mnist
 from collagen.callbacks import ScalarMeterLogger
 from collagen.losses.gan import GeneratorLoss
-from collagen.strategies import DualModelStrategy
-from examples.dcgan.model import Discriminator, Generator
-from examples.dcgan.utils import init_args, parse_item_mnist_gan, init_mnist_transforms
+from collagen.strategies import DualModelStrategy, MultiModelStrategy
+from model import Discriminator, Generator
+from utils import init_args, parse_item_mnist_gan, init_mnist_transforms
 
 if __name__ == "__main__":
     # Get device
     device = auto_detect_device()
     # Setup configs
     args = init_args()
+    print(args)
     summary_writer = SummaryWriter(log_dir=args.log_dir, comment=args.comment)
 
     # Initializing Discriminator
@@ -34,6 +35,9 @@ if __name__ == "__main__":
     with open("settings.yml", "r") as f:
         sampling_config = yaml.load(f)
 
+    if args.mms:
+        with open("strategy.yml", "r") as f:
+            strategy_config = yaml.load(f)
     # Initializing the data provider
     item_loaders = dict()
     train_ds, classes = get_mnist(data_folder=args.save_data, train=True)
@@ -59,8 +63,19 @@ if __name__ == "__main__":
                         module=g_network, optimizer=g_optim, loss=g_crit)
 
     # Strategy
-    dcgan = DualModelStrategy(data_provider=data_provider, data_sampling_config=sampling_config,
-                              m0_trainer=d_trainer, m1_trainer=g_trainer, model_names=("D", "G"),
-                              n_epochs=args.n_epochs, callbacks=st_callbacks, device=device)
+    if args.mms:
+
+        trainers = (g_trainer, d_trainer)
+        dcgan = MultiModelStrategy(data_provider=data_provider,
+                                   data_sampling_config=sampling_config,
+                                   strategy_config=strategy_config,
+                                   device=device,
+                                   callbacks=st_callbacks,
+                                   n_epochs=args.n_epochs,
+                                   trainers=trainers)
+    else:
+        dcgan = DualModelStrategy(data_provider=data_provider, data_sampling_config=sampling_config,
+                                  m0_trainer=d_trainer, m1_trainer=g_trainer, model_names=("D", "G"),
+                                  n_epochs=args.n_epochs, callbacks=st_callbacks, device=device)
 
     dcgan.run()
