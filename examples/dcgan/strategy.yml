@@ -1,0 +1,19 @@
+stage_names:
+  - "train"
+  - "eval"
+model_names:
+  - "G"
+  - "D"
+model_trainer_names:
+  - "G"
+  - "D"
+model_validator_names:
+  - "G"
+
+accumulate_grad:
+  G: False
+  D: False
+
+train_starts_at_epoch:
+  G: 0
+  D: 0

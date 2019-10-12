@@ -50,6 +50,7 @@ def init_args():
     parser.add_argument('--log_dir', type=str, default=None, help='Log directory')
     parser.add_argument('--comment', type=str, default="dcgan", help='Comment of log')
     parser.add_argument('--grid_shape', type=int, default=8, help='Shape of grid of generated images')
+    parser.add_argument('--mms', type=bool, default=False, help='Shape of grid of generated images')
     args = parser.parse_args()
 
     torch.manual_seed(args.seed)

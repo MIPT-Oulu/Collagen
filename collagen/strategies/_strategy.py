@@ -31,8 +31,6 @@ class Strategy(object):
             Name of the training loader, which is a part of DataProvider.
         val_loader_names : str or Tuple[str] or None
             Name of the val loader, which is a part of DataProvider.
-        session : Session
-            Session to operate with
         train_callbacks : Tuple[Callback] or Callback or None
             Includes both metrics and callbacks. The callbacks can be schedulers,
             which allow to adjust the session parameters during training (can be useful for implementing super-convergence
@@ -59,7 +57,7 @@ class Strategy(object):
                  train_callbacks: Tuple[Callback] or Callback = None,
                  val_callbacks: Tuple[Callback] or Callback = None,
                  n_training_batches: int or None = None,
-                 device: str or None = "cuda"):
+                 device: torch.device = torch.device('cpu')):
         self.__data_provider: DataProvider = data_provider
         self.__loss: nn.Module = loss
         self.__optimizer: Optimizer = optimizer
@@ -142,10 +140,6 @@ class Strategy(object):
                                                                   self.__train_callbacks)
         self.__val_callbacks = self._auto_add_default_callbacks(self.__default_callbacks_eval, self.__val_callbacks)
 
-        self.__session = Session(module=self.__model,
-                                 optimizer=self.__optimizer,
-                                 loss=self.__loss)
-
         self.__trainer = Trainer(data_provider=self.__data_provider,
                                  train_loader_names=self.__train_loader_names,
                                  val_loader_names=self.__val_loader_names,
@@ -221,3 +215,4 @@ class Strategy(object):
                                                  trainer=self.__trainer)
                 self._call_callbacks_by_name('on_epoch_end', epoch=epoch, stage=stage,
                                              n_epochs=self.__num_batches_by_stage[stage], trainer=self.__trainer)
+
