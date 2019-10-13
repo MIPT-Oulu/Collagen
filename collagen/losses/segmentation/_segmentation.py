@@ -39,6 +39,20 @@ class SoftJaccardLoss(nn.Module):
             score = -torch.log(jaccard)
         return score
 
+class SoftDiceLoss(nn.Module):
+    """SoftJaccard loss for binary problems.
+    """
+
+    def forward(self, logits, labels):
+        num = labels.size(0)
+        m1 = torch.sigmoid(logits.view(num, -1))
+        m2 = labels.view(num, -1)
+        intersection = (m1 * m2).sum(1)
+        score = (intersection + 1e-15) / (m1.sum(1) + m2.sum(1) + 1e-15)
+        dice = score.sum(0) / num
+
+        return 1 - dice
+
 
 class CombinedLoss(nn.Module):
     """Combination loss.
@@ -73,5 +87,19 @@ class BCEJaccardLoss(torch.nn.Module):
         loss = self.bce(logits, targets)
         if use_jaccard.sum() != 0:
             loss += self.jaccard(logits[use_jaccard], targets[use_jaccard])
+
+        return loss
+
+class BCEDiceLoss(torch.nn.Module):
+    def __init__(self):
+        super(BCEDiceLoss, self).__init__()
+        self.dice = SoftDiceLoss()
+        self.bce = BCEWithLogitsLoss2d()
+
+    def forward(self, logits, targets):
+        bs = targets.size(0)
+
+        loss = self.bce(logits, targets)
+        loss += self.dice(logits, targets)
 
         return loss

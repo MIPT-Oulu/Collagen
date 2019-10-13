@@ -1,1 +1,1 @@
-from ._segmentation import BCEWithLogitsLoss2d, SoftJaccardLoss, CombinedLoss, BCEJaccardLoss
+from ._segmentation import BCEWithLogitsLoss2d, SoftJaccardLoss, CombinedLoss, BCEJaccardLoss, BCEDiceLoss
