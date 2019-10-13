@@ -614,22 +614,25 @@ class ItemWiseBinaryJaccardDiceMeter(Meter):
         self.__value = None
         self.__batch_count = None
 
+
     @staticmethod
-    def compute_dice(target, output):
+    def compute_dice(target, output, eps=1e-8):
+        if target.sum() == 0 and output.sum() == 0:
+            return torch.tensor(1)
         num = output.size(0)
         m1 = output.view(num, -1).float()
         m2 = target.view(num, -1).float()
 
-        a = (m1 * m2).sum(1).add(self.eps)
-        b = (m1.sum(1) + m2.sum(1)).add(self.eps)
+        a = (m1 * m2).sum(1).add(eps)
+        b = (m1.sum(1) + m2.sum(1)).add(eps)
 
         result = a.mul(2).div(b)
 
         return result
 
     @staticmethod
-    def compute_jaccard(target, output):
-        d = ItemWiseBinaryJaccardDiceMeter.compute_dice(target, output)
+    def compute_jaccard(self, target, output, eps=1e-8):
+        d = self.compute_dice(target, output, eps)
         return d / (2 - d)
 
     def on_epoch_begin(self, *args, **kwargs):
@@ -645,14 +648,14 @@ class ItemWiseBinaryJaccardDiceMeter(Meter):
                 with torch.no_grad():
                     if self.name == 'dice':
                         if self.__value is not None:
-                            self.__value += self.compute_dice(target, output)
+                            self.__value += self.compute_dice(target, output, self.eps)
                         else:
-                            self.__value = self.compute_dice(target, output)
+                            self.__value = self.compute_dice(target, output, self.eps)
                     else:
                         if self.__value is not None:
-                            self.__value += self.compute_jaccard(target, output)
+                            self.__value += self.compute_jaccard(target, output, self.eps)
                         else:
-                            self.__value = self.compute_jaccard(target, output)
+                            self.__value = self.compute_jaccard(target, output, self.eps)
                     self.__batch_count += 1
 
     def current(self):
@@ -705,11 +708,7 @@ class MultilabelDiceMeter(Meter):
                     for cls in range(self.n_labels):
                         t_cls = t[cls]
                         o_cls = o[cls]
-                        if t_cls.sum() == 0 and o_cls.sum() == 0:
-                            val = 1
-                        else:
-                            val = ItemWiseBinaryJaccardDiceMeter.compute_dice(t_cls.unsqueeze(0),
-                                                                              o_cls.unsqueeze(0)).item()
+                        val = ItemWiseBinaryJaccardDiceMeter.compute_dice(t_cls.unsqueeze(0), o_cls.unsqueeze(0)).item()
                         coeffs.append(val)
 
                     self.n_samples += 1
