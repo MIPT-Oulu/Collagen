@@ -280,7 +280,7 @@ class SSAccuracyMeter(Meter):
             discrete_output_on_device = output_on_device.argmax(dim=-1).view(n)
             discrete_target_on_device = target_on_device.argmax(dim=-1).view(n)
 
-            cls = (discrete_output_on_device.byte() == discrete_target_on_device.byte()).float()
+            cls = (discrete_output_on_device.long() == discrete_target_on_device.long()).float()
             fp = (target_valid_on_device * cls).sum()
             total = target_valid_on_device.sum().float()
             self.__correct_count += fp
@@ -386,7 +386,7 @@ class SSValidityMeter(Meter):
             if self.__sigmoid:
                 output_on_device = output_on_device.sigmoid()
 
-            valid = ((output_on_device > self.__threshold) == target_on_device.byte()).float()
+            valid = ((output_on_device > self.__threshold) == target_on_device.bool()).float()
             fp = valid.sum()
             self.__correct_count += fp
             self.__data_count += n
@@ -583,48 +583,6 @@ class JaccardDiceMeter(Meter):
             dices.append(dice)
         return dices
 
-class AverageItemWiseDiceMeter(Meter):
-    def __init__(self, n_classes=2, prefix="", parse_output=None, class_names=None,
-                 parse_target=None, cond=None):
-        super(AverageItemWiseDiceMeter, self).__init__(name='dice', prefix=prefix, desc_name=None)
-
-
-        self.n_classes = n_classes
-        if class_names is None:
-            self.class_names = list(range(n_classes))
-        else:
-            assert len(class_names) == n_classes
-            self.class_names = class_names
-
-        self.values = np.zeros(n_classes)
-        self.n_samples = 0
-
-    def on_epoch_begin(self, *args, **kwargs):
-        self.n_samples = 0
-        self.values = np.zeros(self.n_classes)
-
-    def on_minibatch_end(self, target, output, **kwargs):
-        with torch.no_grad():
-            for i in range(target.size(0)):
-                t = target[i].squeeze().to(output.device)
-                o = output[i].squeeze().argmax(0)
-                coeffs =  []
-                for cls in range(self.n_classes):
-                    t_cls = t[t==cls]
-                    o_cls = o[t==cls]
-                    if t_cls.sum() == 0 and o_cls.sum() == 0:
-                        val = 1
-                    else:
-                        val = ItemWiseBinaryJaccardDiceMeter.compute_dice(t_cls.unsqueeze(0), o_cls.unsqueeze(0)).item()
-                    coeffs.append(val)
-
-                self.n_samples += 1
-                self.values += np.array(coeffs)
-
-    def current(self):
-        return (self.values / self.n_samples).mean()
-
-
 
 class ItemWiseBinaryJaccardDiceMeter(Meter):
     """
@@ -645,10 +603,11 @@ class ItemWiseBinaryJaccardDiceMeter(Meter):
         Condition under which the metric will be updated
     """
     def __init__(self, prefix="", name="jaccard",
-                 parse_output=None, parse_target=None, cond=None):
+                 parse_output=None, parse_target=None, cond=None, eps=1e-8):
         super(ItemWiseBinaryJaccardDiceMeter, self).__init__(name=name, prefix=prefix, desc_name=None)
         assert name in ['jaccard', 'dice']
 
+        self.eps = eps
         self.__parse_target = Meter.default_parse_target if parse_target is None else parse_target
         self.__parse_output = Meter.default_parse_output if parse_output is None else parse_output
         self.__cond = Meter.default_cond if cond is None else cond
@@ -661,8 +620,8 @@ class ItemWiseBinaryJaccardDiceMeter(Meter):
         m1 = output.view(num, -1).float()
         m2 = target.view(num, -1).float()
 
-        a = (m1 * m2).sum(1)
-        b = (m1.sum(1) + m2.sum(1))
+        a = (m1 * m2).sum(1).add(self.eps)
+        b = (m1.sum(1) + m2.sum(1)).add(self.eps)
 
         result = a.mul(2).div(b)
 
@@ -700,3 +659,61 @@ class ItemWiseBinaryJaccardDiceMeter(Meter):
         if self.__batch_count == 0 or self.__value is None:
             return None
         return self.__value / self.__batch_count
+
+class MultilabelDiceMeter(Meter):
+    """
+    Implements device-invariant image-Wise Jaccard and Dice Meter for binary multilabel sigementation problems.
+
+    Parameters
+    ----------
+    n_labels: int
+        Number of outputs in the segmentation model
+    prefix: str
+        Prefix to be displayed in the progressbar and tensorboard
+    parse_output: Callable
+        Function to parse the output
+    parse_target: Callable
+        Function to parse the target tensor
+    cond: Callable
+        Condition under which the metric will be updated
+    """
+    def __init__(self, n_labels=2, prefix="", parse_output=None,
+                 parse_target=None, cond=None):
+        super(MultilabelDiceMeter, self).__init__(name='dice', prefix=prefix, desc_name=None)
+        self.__parse_output = parse_output
+        self.__parse_target = parse_target if parse_target is not None else self.default_parse_target
+        self.__cond = self.default_cond if cond is None else cond
+
+        self.n_labels = n_labels
+
+        self.values = np.zeros(n_labels)
+        self.n_samples = 0
+
+    def on_epoch_begin(self, *args, **kwargs):
+        self.n_samples = 0
+        self.values = np.zeros(self.n_labels)
+
+    def on_minibatch_end(self, target, output, **kwargs):
+        with torch.no_grad():
+            if self.__cond(target, output):
+                target = self.__parse_target(target)
+                output = self.__parse_output(output)
+                for i in range(target.size(0)):
+                    t = target[i]
+                    o = output[i]
+                    coeffs = []
+                    for cls in range(self.n_labels):
+                        t_cls = t[cls]
+                        o_cls = o[cls]
+                        if t_cls.sum() == 0 and o_cls.sum() == 0:
+                            val = 1
+                        else:
+                            val = ItemWiseBinaryJaccardDiceMeter.compute_dice(t_cls.unsqueeze(0),
+                                                                              o_cls.unsqueeze(0)).item()
+                        coeffs.append(val)
+
+                    self.n_samples += 1
+                    self.values += np.array(coeffs)
+
+    def current(self):
+        return (self.values / self.n_samples).mean()
