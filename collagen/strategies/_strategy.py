@@ -125,7 +125,7 @@ class Strategy(object):
         if n_training_batches is not None:
             self.__num_batches_by_stage['train'] = n_training_batches
 
-        self.__use_cuda = torch.cuda.is_available() and "cuda" in device
+        self.__use_cuda = torch.cuda.is_available() and "cuda" in device.type
         self.__device = device
 
         self.__model.to(self.__device)
