@@ -273,7 +273,7 @@ class MixUpSampler2(ItemLoader):
             logits_mixup = l*logits1 + (1 - l)*logits2
             samples.append({'name': self.__name, 'mixup_data': mixup_imgs,
                             'target': target1, 'target_bg': target2,
-                            'logits': logits1, 'logits_aug': logits1_aug,
+                            'logits': logits1, 'logits_aug': logits1_aug, 'logits2': logits2,
                             'logits_mixup': logits_mixup, 'alpha': l})
         return samples
 

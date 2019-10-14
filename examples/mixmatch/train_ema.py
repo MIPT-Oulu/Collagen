@@ -47,6 +47,9 @@ if __name__ == "__main__":
                              num_classes=args.n_classes).to(device)
     te_network = Wide_ResNet(depth=args.n_depths, widen_factor=args.w_factor, dropout_rate=args.dropout_rate,
                              num_classes=args.n_classes).to(device)
+    for param in te_network.parameters():
+        param.detach_()
+
     st_optim = optim.Adam(st_network.parameters(), lr=args.lr, weight_decay=args.wd, betas=(args.beta1, 0.999))
     te_optim = optim.Adam(te_network.parameters(), lr=args.lr, weight_decay=args.wd, betas=(args.beta1, 0.999))
 

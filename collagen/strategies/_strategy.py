@@ -50,12 +50,17 @@ class Strategy(object):
                  val_num_samples: Tuple[int] or int or None = None,
                  train_callbacks: Tuple[Callback] or Callback = None,
                  val_callbacks: Tuple[Callback] or Callback = None,
+                 accumulate_grad: bool or None = False,
+                 minibatch_accumulate_grad: bool or None = True,
                  n_training_batches: int or None = None,
                  device: str or None = "cuda"):
         self.__data_provider: DataProvider = data_provider
         self.__loss: nn.Module = loss
         self.__optimizer: Optimizer = optimizer
         self.__model: Module = model
+
+        self.minibatch_accumulate_grad = minibatch_accumulate_grad
+        self.accumulate_grad = accumulate_grad
 
         self.__train_num_samples: Tuple[int] or int = train_num_samples
         self.__val_num_samples: Tuple[int] or int = val_num_samples
@@ -130,7 +135,8 @@ class Strategy(object):
         self.__default_callbacks_eval = (RunningAverageMeter(prefix='eval', name='loss'),
                                          ProgressbarVisualizer(update_freq=1),)
 
-        self.__train_callbacks = self._auto_add_default_callbacks(self.__default_callbacks_train, self.__train_callbacks)
+        self.__train_callbacks = self._auto_add_default_callbacks(self.__default_callbacks_train,
+                                                                  self.__train_callbacks)
         self.__val_callbacks = self._auto_add_default_callbacks(self.__default_callbacks_eval, self.__val_callbacks)
 
         self.__session = Session(module=self.__model,
@@ -151,7 +157,7 @@ class Strategy(object):
         for d_cb in d_cbs:
             exist = False
             for cb in cbs:
-                if cb.ctype==d_cb.ctype and cb.name == d_cb.name:
+                if cb.ctype == d_cb.ctype and cb.name == d_cb.name:
                     exist = True
                     break
             if not exist:
@@ -199,7 +205,10 @@ class Strategy(object):
                                                  batch_i=batch_i,
                                                  trainer=self.__trainer)
 
-                    getattr(self.__trainer, stage)(data_key=self.__data_key_by_stage[stage], target_key=self.__target_key_by_stage[stage])
+                    getattr(self.__trainer, stage)(data_key=self.__data_key_by_stage[stage],
+                                                   target_key=self.__target_key_by_stage[stage],
+                                                   minibatch_accumulate_grad=self.minibatch_accumulate_grad,
+                                                   accumulate_grad=self.accumulate_grad)
 
                     self._call_callbacks_by_name('on_batch_end',
                                                  progress_bar=progress_bar,

@@ -25,6 +25,8 @@ class DualModelStrategy(object):
                  model_names: Tuple[str] = ("M0", "M1"),
                  n_epochs: int or None = 100,
                  callbacks: Tuple[Callback] or Callback = None,
+                 accumulate_grad: bool or None = False,
+                 minibatch_accumulate_grad: bool or None = True,
                  device: str or None = "cuda",
                  n_training_batches: int or None = None):
         """Implements a part of the training GAN loop by passing the available batches through the model.
@@ -53,6 +55,9 @@ class DualModelStrategy(object):
         self.__n_epochs = n_epochs
         self.__callbacks = wrap_tuple(callbacks)
         self.__data_provider = data_provider
+
+        self.minibatch_accumulate_grad = minibatch_accumulate_grad
+        self.accumulate_grad = accumulate_grad
 
         self.__data_sampling_config = data_sampling_config
 
@@ -106,8 +111,8 @@ class DualModelStrategy(object):
 
         # Default epoch level callbacks
         self.__default_st_callbacks = (
-        SamplingFreezer(modules=wrap_tuple(m1_trainer.model) + wrap_tuple(m0_trainer.model)),
-        ProgressbarVisualizer(update_freq=1))
+            SamplingFreezer(modules=wrap_tuple(m1_trainer.model) + wrap_tuple(m0_trainer.model)),
+            ProgressbarVisualizer(update_freq=1))
         self.__callbacks += self.__default_st_callbacks
 
     def _call_callbacks_by_name(self, cb_func_name, **kwargs):
@@ -180,7 +185,9 @@ class DualModelStrategy(object):
                     if self.__model_names[0] in self.__data_key_by_stage[stage]:
                         getattr(self.__trainers[self.__model_names[0]], stage)(
                             data_key=self.__data_key_by_stage[stage][self.__model_names[0]],
-                            target_key=self.__target_key_by_stage[stage][self.__model_names[0]])
+                            target_key=self.__target_key_by_stage[stage][self.__model_names[0]],
+                            minibatch_accumulate_grad=self.minibatch_accumulate_grad,
+                            accumulate_grad=self.accumulate_grad)
 
                     self._call_callbacks_by_name(cb_func_name='on_m1_batch_end',
                                                  progress_bar=progress_bar,
@@ -200,7 +207,9 @@ class DualModelStrategy(object):
                     if self.__model_names[1] in self.__data_key_by_stage[stage]:
                         getattr(self.__trainers[self.__model_names[1]], stage)(
                             data_key=self.__data_key_by_stage[stage][self.__model_names[1]],
-                            target_key=self.__target_key_by_stage[stage][self.__model_names[1]])
+                            target_key=self.__target_key_by_stage[stage][self.__model_names[1]],
+                            minibatch_accumulate_grad=self.minibatch_accumulate_grad,
+                            accumulate_grad=self.accumulate_grad)
 
                     self._call_callbacks_by_name(cb_func_name='on_m2_batch_end',
                                                  progress_bar=progress_bar,

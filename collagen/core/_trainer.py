@@ -133,6 +133,9 @@ class Trainer(object):
 
         """
 
+        minibatch_accumulate_grad = True if minibatch_accumulate_grad is None else minibatch_accumulate_grad
+        accumulate_grad = False if accumulate_grad is None else accumulate_grad
+
         data_key = wrap_tuple(data_key)
         target_key = wrap_tuple(target_key)
 
@@ -237,6 +240,9 @@ class Trainer(object):
             Performs type casting for target
 
         """
+
+        minibatch_accumulate_grad = None
+        accumulate_grad = None
 
         data_key = wrap_tuple(data_key)
         target_key = wrap_tuple(target_key)
