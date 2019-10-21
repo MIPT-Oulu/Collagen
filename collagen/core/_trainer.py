@@ -48,19 +48,20 @@ class Trainer(object):
                  loss: Module,
                  val_loader_names: str or Tuple[str] = None,
                  train_callbacks: Tuple[Callback] or Callback or None = None,
-                 val_callbacks: Tuple[Callback] or Callback or None = None):
+                 val_callbacks: Tuple[Callback] or Callback or None = None,
+                 distributed=False):
 
         if train_callbacks is None:
             train_callbacks = ()
         if val_callbacks is None:
             val_callbacks = ()
-
+        self.__distributed = distributed
         self.__module = module
         self.__optimizer = optimizer
         self.__loss = loss
 
         self.__data_provider: DataProvider = data_provider
-        self.__session: Session = Session(module=module, optimizer=optimizer, loss=loss)
+        self.__session: Session = Session(module=module, optimizer=optimizer, loss=loss, distributed=distributed)
 
         self.__train_loader_names: str or Tuple[str] = train_loader_names
         if isinstance(self.__train_loader_names, str):

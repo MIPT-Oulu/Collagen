@@ -30,7 +30,8 @@ class MultiModelStrategy(object):
                  callbacks: Tuple[Callback] or Callback = None,
                  n_epochs: int or None = 10,
                  n_train_batches: int or None = None,
-                 trainers: Tuple[Trainer] or Trainer = None):
+                 trainers: Tuple[Trainer] or Trainer = None,
+                 distributed=False):
         """Constructor of MultiModelStrategy
         Parameters
         ----------
@@ -83,7 +84,7 @@ class MultiModelStrategy(object):
         # target key to be used to retrieve target value from data_provider
         self.__target_key_by_stage = dict()
         self.__num_batches_by_stage = dict()
-
+        self.__distributed = distributed
         for stage in self.__stage_names:
             self.__num_batches_by_stage[stage] = -1
             self.__data_key_by_stage[stage] = dict()
@@ -254,6 +255,9 @@ class MultiModelStrategy(object):
                                                  stage=stage,
                                                  batch_i=batch_i,
                                                  n_batches=self.__num_batches_by_stage[stage])
-
+                if not self.__distributed:
+                    self._call_callbacks_by_name(cb_func_name='on_epoch_end', epoch=epoch, n_epochs=self.__n_epochs,
+                                                 stage=stage, n_batches=self.__num_batches_by_stage[stage])
+            if self.__distributed:
                 self._call_callbacks_by_name(cb_func_name='on_epoch_end', epoch=epoch, n_epochs=self.__n_epochs,
                                              stage=stage, n_batches=self.__num_batches_by_stage[stage])

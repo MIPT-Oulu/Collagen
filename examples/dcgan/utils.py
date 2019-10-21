@@ -36,8 +36,8 @@ def parse_item_mnist_gan(root, entry, trf, data_key, target_key):
 
 def init_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--n_epochs', type=int, default=1000, help='Number of epochs')
-    parser.add_argument('--bs', type=int, default=64, help='Batch size')
+    parser.add_argument('--n_epochs', type=int, default=10, help='Number of epochs')
+    parser.add_argument('--batch_size', type=int, default=128, help='Batch size')
     parser.add_argument('--d_lr', type=float, default=2e-4, help='Learning rate (Discriminator)')
     parser.add_argument('--g_lr', type=float, default=2e-4, help='Learning rate (Discriminator)')
     parser.add_argument('--beta1', type=float, default=0.5, help='beta1 for Adam')
@@ -51,8 +51,12 @@ def init_args():
     parser.add_argument('--comment', type=str, default="dcgan", help='Comment of log')
     parser.add_argument('--grid_shape', type=int, default=8, help='Shape of grid of generated images')
     parser.add_argument('--mms', type=bool, default=False, help='Shape of grid of generated images')
+    parser.add_argument('--distributed', type=bool, default=True, help='whether to use DDP')
+    parser.add_argument('--gpu', type=int, default=0, help='Default GPU id')
+    parser.add_argument('--dist-backend', default='nccl', type=str, help='distributed backend')
+    parser.add_argument('--workers', default=4, type=int, metavar='N',
+                        help='number of data loading workers (default: 4)')
     args = parser.parse_args()
-
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
     random.seed(args.seed)

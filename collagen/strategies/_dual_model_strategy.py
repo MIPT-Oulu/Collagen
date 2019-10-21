@@ -29,7 +29,8 @@ class DualModelStrategy(object):
                  n_epochs: int or None = 100,
                  callbacks: Tuple[Callback] or Callback = None,
                  device: str or None = "cuda",
-                 n_training_batches: int or None = None):
+                 n_training_batches: int or None = None,
+                 distributed=False):
         """Implements a part of the training GAN loop by passing the available batches through the model.
 
         Parameters
@@ -63,6 +64,7 @@ class DualModelStrategy(object):
         self.__data_key_by_stage = dict()
         self.__target_key_by_stage = dict()
         self.__num_batches_by_stage = dict()
+        self.__distributed = distributed
         for stage in self.__stage_names:
             self.__num_batches_by_stage[stage] = -1
             self.__data_key_by_stage[stage] = dict()
@@ -220,6 +222,9 @@ class DualModelStrategy(object):
                                                  stage=stage,
                                                  batch_i=batch_i,
                                                  n_batches=self.__num_batches_by_stage[stage])
-
+                if not self.__distributed:
+                    self._call_callbacks_by_name(cb_func_name='on_epoch_end', epoch=epoch, n_epochs=self.__n_epochs,
+                                                     stage=stage, n_batches=self.__num_batches_by_stage[stage])
+            if self.__distributed:
                 self._call_callbacks_by_name(cb_func_name='on_epoch_end', epoch=epoch, n_epochs=self.__n_epochs,
                                              stage=stage, n_batches=self.__num_batches_by_stage[stage])

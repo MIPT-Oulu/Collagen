@@ -57,7 +57,8 @@ class Strategy(object):
                  train_callbacks: Tuple[Callback] or Callback = None,
                  val_callbacks: Tuple[Callback] or Callback = None,
                  n_training_batches: int or None = None,
-                 device: torch.device = torch.device('cpu')):
+                 device: torch.device = torch.device('cpu'),
+                 distributed=False):
         self.__data_provider: DataProvider = data_provider
         self.__loss: nn.Module = loss
         self.__optimizer: Optimizer = optimizer
@@ -147,7 +148,9 @@ class Strategy(object):
                                  optimizer=self.__optimizer,
                                  loss=self.__loss,
                                  train_callbacks=self.__train_callbacks,
-                                 val_callbacks=self.__val_callbacks)
+                                 val_callbacks=self.__val_callbacks,
+                                 distributed=distributed)
+        self.__distributed = distributed
 
     @staticmethod
     def _auto_add_default_callbacks(d_cbs, cbs):
@@ -213,6 +216,10 @@ class Strategy(object):
                                                  stage=stage,
                                                  batch_i=batch_i,
                                                  trainer=self.__trainer)
+                if not self.__distributed:
+                    self._call_callbacks_by_name('on_epoch_end', epoch=epoch, stage=stage,
+                                                 n_epochs=self.__num_batches_by_stage[stage], trainer=self.__trainer)
+            if self.__distributed:
                 self._call_callbacks_by_name('on_epoch_end', epoch=epoch, stage=stage,
                                              n_epochs=self.__num_batches_by_stage[stage], trainer=self.__trainer)
 
