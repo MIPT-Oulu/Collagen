@@ -7,7 +7,7 @@ from torch import optim
 from torch.nn import BCELoss
 import torch.distributed as dist
 import torch.multiprocessing as mp
-
+import time
 import torch.backends.cudnn as cudnn
 import numpy as np
 import random
@@ -118,14 +118,19 @@ def worker_process(gpu, ngpus_per_node, classes, item_loaders,  sampling_config,
     if args.gpu == 0:
         # Setting up the callbacks
         #st_callbacks = (ScalarMeterLogger(writer=summary_writer),)
-        st_callbacks = (ScalarMeterLogger(writer=summary_writer),
-                        ImageSamplingVisualizer(generator_sampler=item_loaders['fake'],
-                                                writer=summary_writer,
-                                                grid_shape=(args.grid_shape, args.grid_shape)))
+        st_callbacks = (ScalarMeterLogger(writer=summary_writer),)
+        val_cb = (ImageSamplingVisualizer(generator_sampler=item_loaders['fake'],
+                                          writer=summary_writer,
+                                          grid_shape=(args.grid_shape, args.grid_shape)))
     else:
         st_callbacks = ()
+        val_cb =()
+    # visiualization should not be called after every stage, st strategy call backs are called after the completion of
+    # stage, so instead of putting the visualizer there,
     #st_callbacks = ()
     # Trainers
+
+
     d_trainer = Trainer(data_provider=data_provider,
                         train_loader_names=tuple(sampling_config["train"]["data_provider"]["D"].keys()),
                         val_loader_names=None,
@@ -134,6 +139,7 @@ def worker_process(gpu, ngpus_per_node, classes, item_loaders,  sampling_config,
     g_trainer = Trainer(data_provider=data_provider,
                         train_loader_names=tuple(sampling_config["train"]["data_provider"]["G"].keys()),
                         val_loader_names=tuple(sampling_config["eval"]["data_provider"]["G"].keys()),
+                        val_callbacks=val_cb,
                         module=g_network, optimizer=g_optim, loss=g_crit, distributed=args.distributed)
 
     # Strategy
@@ -158,6 +164,7 @@ def worker_process(gpu, ngpus_per_node, classes, item_loaders,  sampling_config,
 
 if __name__== '__main__':
     # parse arguments
+    t = time.time()
     args = init_args()
 
 
@@ -170,3 +177,4 @@ if __name__== '__main__':
     os.environ['WORLD_SIZE'] = '2'
     os.environ['RANK'] = '0'
     main(args)
+    print('Required Time ', time.time()-t)

@@ -222,9 +222,6 @@ class DualModelStrategy(object):
                                                  stage=stage,
                                                  batch_i=batch_i,
                                                  n_batches=self.__num_batches_by_stage[stage])
-                if not self.__distributed:
-                    self._call_callbacks_by_name(cb_func_name='on_epoch_end', epoch=epoch, n_epochs=self.__n_epochs,
-                                                     stage=stage, n_batches=self.__num_batches_by_stage[stage])
-            if self.__distributed:
+
                 self._call_callbacks_by_name(cb_func_name='on_epoch_end', epoch=epoch, n_epochs=self.__n_epochs,
                                              stage=stage, n_batches=self.__num_batches_by_stage[stage])

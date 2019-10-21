@@ -216,10 +216,8 @@ class Strategy(object):
                                                  stage=stage,
                                                  batch_i=batch_i,
                                                  trainer=self.__trainer)
-                if not self.__distributed:
-                    self._call_callbacks_by_name('on_epoch_end', epoch=epoch, stage=stage,
-                                                 n_epochs=self.__num_batches_by_stage[stage], trainer=self.__trainer)
-            if self.__distributed:
+
                 self._call_callbacks_by_name('on_epoch_end', epoch=epoch, stage=stage,
                                              n_epochs=self.__num_batches_by_stage[stage], trainer=self.__trainer)
+
 
