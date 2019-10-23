@@ -51,7 +51,7 @@ def init_args():
     parser.add_argument('--comment', type=str, default="dcgan", help='Comment of log')
     parser.add_argument('--grid_shape', type=int, default=8, help='Shape of grid of generated images')
     parser.add_argument('--mms', type=bool, default=True, help='Shape of grid of generated images')
-    parser.add_argument('--distributed', type=bool, default=False, help='whether to use DDP')
+    parser.add_argument('--distributed', type=bool, default=True, help='whether to use DDP')
     parser.add_argument('--gpu', type=int, default=0, help='Default GPU id')
     parser.add_argument('--dist-backend', default='nccl', type=str, help='distributed backend')
     parser.add_argument('--use_apex', default=True, type=bool, help='Whether to use apex library')
