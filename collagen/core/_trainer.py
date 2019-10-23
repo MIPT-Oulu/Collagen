@@ -39,6 +39,10 @@ class Trainer(object):
         Includes both metrics and callbacks. Validation callbacks can be checkpointers, loggers,
         learning rate schedulers (E.g. reduce on plateau-like things). On the other hand,
          the callbacks can also be meters batch-wise, which compute metrics.
+    use_apex: bool
+        whether to use apex amp or not, right now we support only O1 optimization
+    distributed: bool
+        whether the training would be distributed or not
     """
 
     def __init__(self, data_provider: DataProvider,
@@ -118,7 +122,6 @@ class Trainer(object):
         else:
             raise ValueError('Not support keys type {}'.format(type(keys)))
         return parsed_data
-
 
     def train(self, data_key: Tuple[str] or str = 'img', target_key: Tuple[str] or str = 'target',
               minibatch_accumulate_grad: bool = True, accumulate_grad=False, cast_target=None):

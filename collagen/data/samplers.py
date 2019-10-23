@@ -382,6 +382,21 @@ class GANFakeSampler(ItemLoader):
 
 class DistributedGANFakeSampler(ItemLoader):
     def __init__(self, g_network, batch_size, latent_size, gpu, name='ganfake_dist'):
+        """
+
+        Parameters
+        ----------
+        g_network: Module
+            generator network
+        batch_size: int
+            batch size
+        latent_size: int
+            dimension of the latent space
+        gpu: int
+            current gpu ordinal
+        name: string
+            name of the itemloader
+        """
         super().__init__(meta_data=None, parse_item_cb=None, name=name)
         self.__latent_size = latent_size
         self.batch_size = batch_size
@@ -394,6 +409,7 @@ class DistributedGANFakeSampler(ItemLoader):
         self.__g_network.eval()
         for _ in range(k):
             noise = torch.randn(self.batch_size, self.__latent_size)
+            # non blocking is chosen emperically, it performed better as true for DDP
             noise_on_device = noise.to(self.gpu, non_blocking=True)
             fake: torch.Tensor = self.__g_network(noise_on_device).to(self.gpu)
             samples.append(

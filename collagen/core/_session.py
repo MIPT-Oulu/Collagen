@@ -30,6 +30,10 @@ class Session(object):
         Optimizer to train teh model
     loss : torch.nn.Module
         Loss used in the session
+    use_apex: bool
+        whether to use apex amp or not, right now we support only O1 optimization
+    distributed: bool
+        whether the training would be distributed or not
 
     """
 
@@ -165,7 +169,23 @@ class Session(object):
 
     @staticmethod
     def transfer_to_device(batch, target, module_device, distributed=False):
-        # Transfer input and target into proper device
+        """
+        transfers data to specified device
+        Parameters
+        ----------
+        batch: Tensor or dict or list of tensor
+            data to be passed through the network
+        target: Tensor or dict or list of tensor
+            target against the batch of data
+        module_device: torch.device or device ordinal (int)
+            the device where the batch and target will be transferred
+        distributed: bool
+            whether training is distributed or not
+
+        Returns
+        -------
+        Tensor, list or dict of tensors
+        """
         if isinstance(batch, tuple) or isinstance(batch, list):
             batch_on_device = tuple([b.to(module_device, non_blocking=distributed) for b in batch])
         elif isinstance(batch, Tensor):
@@ -313,9 +333,6 @@ class Session(object):
                 if self.__use_apex:
                     with amp.scale_loss(loss, self.__optimizer) as scaled_loss:
                         scaled_loss.backward(retain_graph=self.__retain_graph or retain_graph)
-                    # loss.backward(gradient=self.__gradient,
-                    #               retain_graph=self.__retain_graph or retain_graph,
-                    #               create_graph=self.__create_graph)
                 else:
                     loss.backward(gradient=self.__gradient,
                                   retain_graph=self.__retain_graph or retain_graph,
