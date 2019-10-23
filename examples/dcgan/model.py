@@ -90,6 +90,7 @@ class Generator(Module):
         if len(x.size()) != 2:
             raise ValueError("Input must have 2 dim but found {}".format(x.shape))
         x = x.view(x.size(0), x.size(1), 1, 1)
+
         output = self.main_flow(x)
         return output
 

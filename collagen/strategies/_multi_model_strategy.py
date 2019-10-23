@@ -2,12 +2,14 @@ from typing import Tuple
 
 import torch
 import torch.nn as nn
+
 try:
     from torch.optim import Optimizer
 except ImportError:
     from torch.optim.optimizer import Optimizer
 
 from tqdm import tqdm
+import torch.distributed as dist
 
 from collagen.core import Callback
 from collagen.core import Trainer, Session, Module
@@ -23,6 +25,7 @@ class MultiModelStrategy(object):
     """MultiModelStrategy implements the functionality to deal with multiple trainers and models. A helper yml file
     is deemed necessary for MultipleModelStrategy to work properly.
     """
+
     def __init__(self, data_provider: DataProvider,
                  data_sampling_config: dict,
                  strategy_config: dict,
@@ -146,7 +149,7 @@ class MultiModelStrategy(object):
             self.__trainers[name].add_eval_callbacks(self.__default_callbacks_eval[name])
             strategy_callback_tuple += wrap_tuple(trainer.model)
 
-        self.__default_strategy_callback = (ProgressbarLogger(update_freq=1), )
+        self.__default_strategy_callback = (ProgressbarLogger(update_freq=1),)
 
         self.__callbacks += self.__default_strategy_callback
 
@@ -164,6 +167,7 @@ class MultiModelStrategy(object):
         kwargs: list or tuple
             argument for the callback function
         """
+
         for model_name in self.__model_trainer_names:
             for cb in getattr(self.__trainers[model_name], f'get_callbacks_by_stage')(kwargs['stage']):
                 if hasattr(cb, cb_func_name):
@@ -171,6 +175,7 @@ class MultiModelStrategy(object):
         for cb in self.__callbacks:
             if hasattr(cb, cb_func_name):
                 getattr(cb, cb_func_name)(strategy=self, **kwargs)
+
 
     def get_callbacks_by_name(self, name, stage):
         """
@@ -204,6 +209,7 @@ class MultiModelStrategy(object):
          model data is sampled and each trainable model is run with the sampled data.
         """
         for epoch in range(self.__n_epochs):
+            self.__data_provider.set_epoch(epoch)
             for stage in self.__stage_names:
                 if stage == 'train':
                     trainer_names = self.__model_trainer_names
@@ -257,4 +263,4 @@ class MultiModelStrategy(object):
                                                  n_batches=self.__num_batches_by_stage[stage])
 
                 self._call_callbacks_by_name(cb_func_name='on_epoch_end', epoch=epoch, n_epochs=self.__n_epochs,
-                                                 stage=stage, n_batches=self.__num_batches_by_stage[stage])
+                                             stage=stage, n_batches=self.__num_batches_by_stage[stage])

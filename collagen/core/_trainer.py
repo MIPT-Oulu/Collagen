@@ -49,19 +49,20 @@ class Trainer(object):
                  val_loader_names: str or Tuple[str] = None,
                  train_callbacks: Tuple[Callback] or Callback or None = None,
                  val_callbacks: Tuple[Callback] or Callback or None = None,
-                 distributed=False):
+                 use_apex=False, distributed=False):
 
         if train_callbacks is None:
             train_callbacks = ()
         if val_callbacks is None:
             val_callbacks = ()
-        self.__distributed = distributed
+        self.__use_apex = use_apex
         self.__module = module
         self.__optimizer = optimizer
         self.__loss = loss
 
         self.__data_provider: DataProvider = data_provider
-        self.__session: Session = Session(module=module, optimizer=optimizer, loss=loss, distributed=distributed)
+        self.__session: Session = Session(module=module, optimizer=optimizer, loss=loss, use_apex=use_apex,
+                                          distributed=distributed)
 
         self.__train_loader_names: str or Tuple[str] = train_loader_names
         if isinstance(self.__train_loader_names, str):
@@ -82,6 +83,9 @@ class Trainer(object):
 
         self.__train_batches_count = 0
         self.__eval_batches_count = 0
+
+    def set_epoch(self, epoch):
+        self.__data_provider.set_epoch(epoch)
 
     def add_train_callbacks(self, cbs):
         self.__train_callbacks += wrap_tuple(cbs)

@@ -77,6 +77,9 @@ class DistributedItemLoader(object):
         self.__iter_loader = None
         self.parse_item = parse_item_cb
 
+    def set_epoch(self, epoch):
+        self.__sampler.set_epoch(epoch)
+
     @property
     def transform(self):
         return self.__transform

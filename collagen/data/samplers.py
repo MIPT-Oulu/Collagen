@@ -391,17 +391,20 @@ class DistributedGANFakeSampler(ItemLoader):
 
     def sample(self, k=1):
         samples = []
+        self.__g_network.eval()
         for _ in range(k):
             noise = torch.randn(self.batch_size, self.__latent_size)
-            noise_on_device = noise.to(self.gpu)
+            noise_on_device = noise.to(self.gpu, non_blocking=True)
             fake: torch.Tensor = self.__g_network(noise_on_device).to(self.gpu)
             samples.append(
-                {'name': self.__name, 'data': fake.detach(), 'target': torch.zeros(self.batch_size).to(self.gpu),
+                {'name': self.__name, 'data': fake.detach(), 'target': torch.zeros(self.batch_size).to(self.gpu,
+                                                                                                       non_blocking=True),
                  'latent': noise})
         return samples
 
     def __len__(self):
         return 1
+
 
 class GaussianNoiseSampler(ItemLoader):
     def __init__(self, batch_size, latent_size, device, n_classes, name='gaussian_noise'):
@@ -411,6 +414,9 @@ class GaussianNoiseSampler(ItemLoader):
         self.batch_size = batch_size
         self.__n_classes = n_classes
         self.__name = name
+
+    def set_epoch(self, epoch):
+        pass
 
     def sample(self, k=1):
         samples = []

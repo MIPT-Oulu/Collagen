@@ -1,5 +1,5 @@
 from typing import Tuple
-
+import os
 import torch
 
 
@@ -38,3 +38,11 @@ def freeze_modules(modules: torch.nn.Module or Tuple[torch.nn.Module], invert=Fa
         # md.train(requires_grad)
         for param in md.parameters():
             param.requires_grad = requires_grad
+
+
+def init_dist_env():
+    """Set variables for multiple processes to communicate between themselves"""
+    os.environ['MASTER_ADDR'] = '127.0.0.1'
+    os.environ['MASTER_PORT'] = '22222'
+    os.environ['WORLD_SIZE'] = '2'
+    os.environ['RANK'] = '0'

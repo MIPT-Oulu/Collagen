@@ -35,11 +35,12 @@ class Session(object):
 
     def __init__(self, module: Module, optimizer: torch.optim.Optimizer,
                  loss: torch.nn.Module,
-                 distributed=False):
+                 use_apex=False, distributed=False):
 
         self.__module: Module = module
         self.__optimizer: torch.optim.Optimizer = optimizer
         self.__loss: torch.nn.Module = loss
+        self.__use_apex = use_apex
         self.__distributed = distributed
 
         # Params of ``backward``
@@ -309,7 +310,7 @@ class Session(object):
                                          target=target_on_device,
                                          output=out)
 
-                if self.__distributed:
+                if self.__use_apex:
                     with amp.scale_loss(loss, self.__optimizer) as scaled_loss:
                         scaled_loss.backward(retain_graph=self.__retain_graph or retain_graph)
                     # loss.backward(gradient=self.__gradient,
