@@ -13,7 +13,7 @@ import torch.distributed as dist
 
 from collagen.core import Callback
 from collagen.core import Trainer, Session, Module
-from collagen.core.utils import wrap_tuple
+from collagen.core.utils import wrap_tuple, first_gpu_or_cpu_in_use
 
 from collagen.data import DataProvider
 
@@ -149,7 +149,10 @@ class MultiModelStrategy(object):
             self.__trainers[name].add_eval_callbacks(self.__default_callbacks_eval[name])
             strategy_callback_tuple += wrap_tuple(trainer.model)
 
-        self.__default_strategy_callback = (ProgressbarLogger(update_freq=1),)
+        if first_gpu_or_cpu_in_use(self.__device):
+            self.__default_strategy_callback = (ProgressbarLogger(update_freq=1),)
+        else:
+            self.__default_strategy_callback = ()
 
         self.__callbacks += self.__default_strategy_callback
 
@@ -175,7 +178,6 @@ class MultiModelStrategy(object):
         for cb in self.__callbacks:
             if hasattr(cb, cb_func_name):
                 getattr(cb, cb_func_name)(strategy=self, **kwargs)
-
 
     def get_callbacks_by_name(self, name, stage):
         """
@@ -217,8 +219,11 @@ class MultiModelStrategy(object):
                     trainer_names = self.__model_validator_names
                 self._call_callbacks_by_name(cb_func_name='on_epoch_begin', epoch=epoch, stage=stage,
                                              n_epochs=self.__n_epochs)
-                progress_bar = tqdm(range(self.__num_batches_by_stage[stage]), total=self.__num_batches_by_stage[stage],
-                                    desc=f'Epoch [{epoch}][{stage}]::')
+                if first_gpu_or_cpu_in_use(self.__device):
+                    progress_bar = tqdm(range(self.__num_batches_by_stage[stage]), total=self.__num_batches_by_stage[stage],
+                                        desc=f'Epoch [{epoch}][{stage}]::')
+                else:
+                    progress_bar = range(self.__num_batches_by_stage[stage])
                 for batch_i in progress_bar:
                     self._call_callbacks_by_name(cb_func_name='on_batch_begin',
                                                  progress_bar=progress_bar,
