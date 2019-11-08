@@ -53,6 +53,10 @@ class FoldSplit(Splitter):
     def __iter__(self):
         return self
 
+    def dump(self, filename):
+        with open(filename, "wb") as f:
+            pickle.dump(self.__ds_chunks, f)
+
     def fold(self, i):
         return self.__ds_chunks[i]
 
@@ -254,7 +258,7 @@ class SSFoldSplit(Splitter):
         return len(self.__cv_folds_idx)
 
     def fold_idx(self, i):
-        return self.__cv_folds_idx
+        return self.__cv_folds_idx[i]
 
 
 class TrainValSplit(Splitter):

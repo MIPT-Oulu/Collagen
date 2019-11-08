@@ -5,8 +5,9 @@
 - [x] GAN
 - [x] SSGAN
 - [x] PI model (SSL)
-- [x] Mean Teacher
+- [x] Mean Teacher (EMA)
 - [x] Stochastic Weight Averaging (SWA)
+- [x] MixMatch (with and without EMA)
 - [ ] Metric Learning
 - [ ] VAE
 - [ ] VAE-SSL
