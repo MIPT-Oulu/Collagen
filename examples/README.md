@@ -9,6 +9,7 @@
 - [x] Stochastic Weight Averaging (SWA)
 - [x] MixMatch (with and without EMA)
 - [ ] Metric Learning
+- [x] AutoEncoder
 - [ ] VAE
 - [ ] VAE-SSL
 - [ ] VAE-GAN

@@ -117,7 +117,7 @@ class AccuracyMeter(Meter):
             target = self.__parse_target(target)
             output = self.__parse_output(output)
             n = target.shape[0]
-            output = output.argmax(dim=-1).view(n, -1)
+            output = output.float().argmax(dim=-1).view(n, -1)
             target = target.view(n, -1)
 
             if device is None:

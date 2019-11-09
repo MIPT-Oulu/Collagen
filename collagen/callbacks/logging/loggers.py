@@ -41,6 +41,20 @@ class ScalarMeterLogger(Logger):
                 self.__summary_writer.add_scalar(tag=cb.desc, scalar_value=cb.current(), global_step=epoch)
 
 
+class FakeScalarMeterLogger(Logger):
+    def __init__(self, writer, log_dir: str = None, comment: str = '', name='scalar_logger'):
+        super().__init__(name=name)
+        self.__log_dir = log_dir
+        self.__comment = comment
+        self.__summary_writer = writer
+
+    def on_batch_end(self, *args, **kwargs):
+        pass
+
+    def on_epoch_end(self, epoch, strategy, stage, **kwargs):
+        pass
+
+
 class BatchLRLogger(Logger):
     def __init__(self, writer, optimizers, names, log_dir: str = None, tag: str = '', name='batch_lr_logger'):
         super().__init__(name=name)

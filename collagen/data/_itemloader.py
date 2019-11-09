@@ -127,6 +127,8 @@ class ItemLoader(object):
             samples.append(batch)
 
         return samples
+    def set_epoch(self, epoch):
+        pass
 
 
 class MixUpSampler(ItemLoader):

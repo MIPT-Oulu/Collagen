@@ -39,6 +39,10 @@ class Trainer(object):
         Includes both metrics and callbacks. Validation callbacks can be checkpointers, loggers,
         learning rate schedulers (E.g. reduce on plateau-like things). On the other hand,
          the callbacks can also be meters batch-wise, which compute metrics.
+    use_apex: bool
+        whether to use apex amp or not, right now we support only O1 optimization
+    distributed: bool
+        whether the training would be distributed or not
     """
 
     def __init__(self, data_provider: DataProvider,
@@ -48,19 +52,21 @@ class Trainer(object):
                  loss: Module,
                  val_loader_names: str or Tuple[str] = None,
                  train_callbacks: Tuple[Callback] or Callback or None = None,
-                 val_callbacks: Tuple[Callback] or Callback or None = None):
+                 val_callbacks: Tuple[Callback] or Callback or None = None,
+                 use_apex=False, distributed=False):
 
         if train_callbacks is None:
             train_callbacks = ()
         if val_callbacks is None:
             val_callbacks = ()
-
+        self.__use_apex = use_apex
         self.__module = module
         self.__optimizer = optimizer
         self.__loss = loss
 
         self.__data_provider: DataProvider = data_provider
-        self.__session: Session = Session(module=module, optimizer=optimizer, loss=loss)
+        self.__session: Session = Session(module=module, optimizer=optimizer, loss=loss, use_apex=use_apex,
+                                          distributed=distributed)
 
         self.__train_loader_names: str or Tuple[str] = train_loader_names
         if isinstance(self.__train_loader_names, str):
@@ -81,6 +87,9 @@ class Trainer(object):
 
         self.__train_batches_count = 0
         self.__eval_batches_count = 0
+
+    def set_epoch(self, epoch):
+        self.__data_provider.set_epoch(epoch)
 
     def add_train_callbacks(self, cbs):
         self.__train_callbacks += wrap_tuple(cbs)
@@ -113,7 +122,6 @@ class Trainer(object):
         else:
             raise ValueError('Not support keys type {}'.format(type(keys)))
         return parsed_data
-
 
     def train(self, data_key: Tuple[str] or str = 'img', target_key: Tuple[str] or str = 'target',
               minibatch_accumulate_grad: bool = True, accumulate_grad=False, cast_target=None):
