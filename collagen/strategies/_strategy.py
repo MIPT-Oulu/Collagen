@@ -58,7 +58,8 @@ class Strategy(object):
                  val_callbacks: Tuple[Callback] or Callback = None,
                  n_training_batches: int or None = None,
                  device: torch.device = torch.device('cpu'),
-                 distributed=False):
+                 distributed=False,
+                 use_apex=False):
         self.__data_provider: DataProvider = data_provider
         self.__loss: nn.Module = loss
         self.__optimizer: Optimizer = optimizer
@@ -153,7 +154,8 @@ class Strategy(object):
                                  loss=self.__loss,
                                  train_callbacks=self.__train_callbacks,
                                  val_callbacks=self.__val_callbacks,
-                                 distributed=distributed)
+                                 distributed=distributed,
+                                 use_apex=use_apex)
         self.__distributed = distributed
 
     @staticmethod
