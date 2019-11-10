@@ -78,8 +78,8 @@ def convert_according_to_args(args, gpu, ngpus, network, optim):
 
 def convert_to_distributed(args, gpu, ngpus, network, optim):
     # rank will be necessary in future for cluster computing, for now we will settle for gpu
-    args.rank = int(os.environ['RANK']) * ngpus + gpu
-    dist.init_process_group(backend=args.dist_backend, world_size=args.world_size, rank=args.rank,
+    rank = int(os.environ['RANK']) * ngpus + gpu
+    dist.init_process_group(backend=args.dist_backend, world_size=args.world_size, rank=rank,
                             init_method='env://')
     print('Distributed Init done on GPU:', args.gpu)
     # we will set the benchmark to true so that the pytorch's build-in auto tuner will find the best algorithm

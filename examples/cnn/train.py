@@ -21,9 +21,9 @@ from collagen.callbacks import RunningAverageMeter, AccuracyMeter
 from collagen.callbacks import ModelSaver
 
 from collagen.strategies import Strategy
+
 from utils import SimpleConvNet
 from utils import init_mnist_cifar_transforms, init_args
-import os
 
 try:
     import apex
@@ -58,13 +58,6 @@ def worker_process(gpu, ngpus,  sampling_config, strategy_config, args):
                                                        network=model,
                                                        optim=optimizer)
 
-    # v = 0.3
-    # l = len(train_ds)
-    # lim = int(l*(1-v))
-    # df_train = train_ds[:lim]
-    # df_val = train_ds[lim:]
-    trans = transforms.Compose([transforms.ToTensor(),
-                                transforms.Normalize(mean=(0.5,), std=(0.5,))])
     item_loaders = dict()
     for stage, df in zip(['train', 'eval'], [train_ds, test_ds]):
         if args.distributed:
