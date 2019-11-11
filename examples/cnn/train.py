@@ -1,4 +1,5 @@
 import random
+import warnings
 
 import numpy as np
 import torch
@@ -11,7 +12,7 @@ import yaml
 from sklearn.model_selection import train_test_split
 from torchvision import transforms
 from torch.utils.tensorboard import SummaryWriter
-from collagen.core.utils import kick_off_launcher, convert_according_to_args
+from collagen.core.utils import kick_off_launcher, convert_according_to_args, init_dist_env
 from collagen.data import FoldSplit, ItemLoader
 from collagen.data import DistributedItemLoader, DataProvider
 from collagen.data.utils.datasets import get_mnist, get_cifar10
@@ -41,6 +42,10 @@ def parse_item_mnist(root, entry, trf, data_key, target_key):
 
 
 def worker_process(gpu, ngpus,  sampling_config, strategy_config, args):
+
+    torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
+    random.seed(args.seed)
     args.gpu = gpu  # this line of code is not redundant
     if args.distributed:
         lr_m = float(args.batch_size*args.world_size)/256.
@@ -115,6 +120,26 @@ if __name__ == '__main__':
     t = time.time()
     # parse arguments
     args = init_args()
+    if args.distributed:
+        init_dist_env()
+    if args.suppress_warning:
+        warnings.filterwarnings("ignore")
+    # set number of channels
+
+    args.n_channels = 1
+    if args.distributed:
+        args.world_size = int(os.environ['WORLD_SIZE'])
+
+    # load some yml files for sampling and strategy configuration
+    with open("settings.yml", "r") as f:
+        sampling_config = yaml.load(f)
+    if args.mms:
+        with open("strategy.yml", "r") as f:
+            strategy_config = yaml.load(f)
+    else:
+        strategy_config = None
     # kick off the main function
-    kick_off_launcher(args, worker_process)
+    # kick_off_launcher(args, worker_process)
+    ngpus = torch.cuda.device_count()
+    worker_process(args.local_rank, ngpus, sampling_config, strategy_config, args)
     print('Execution Time ', (time.time() - t), ' Seconds')

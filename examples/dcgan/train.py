@@ -15,7 +15,8 @@ from collagen.losses.gan import GeneratorLoss
 from collagen.strategies import DualModelStrategy, MultiModelStrategy
 from model import Discriminator, Generator
 from utils import init_args, parse_item_mnist_gan, init_mnist_transforms
-
+import numpy as np
+import random
 
 def worker_process(gpu, ngpus,  sampling_config, strategy_config, args):
     """
@@ -36,6 +37,9 @@ def worker_process(gpu, ngpus,  sampling_config, strategy_config, args):
     -------
 
     """
+    torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
+    random.seed(args.seed)
     # get MNIST dataset
     train_ds, classes = get_mnist(data_folder=args.save_data, train=True)
     args.gpu = gpu

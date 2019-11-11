@@ -54,7 +54,7 @@ def init_args():
     parser.add_argument('--distributed', type=bool, default=True, help='whether to use DDP')
     parser.add_argument('--gpu', type=int, default=0, help='Default GPU id')
     parser.add_argument('--dist-backend', default='nccl', type=str, help='distributed backend')
-    parser.add_argument('--use_apex', default=True, type=bool, help='Whether to use apex library')
+    parser.add_argument('--use_apex', default=False, type=bool, help='Whether to use apex library')
     parser.add_argument('--loss_scale', default=None, type=int, help='loss scale for apex amp')
     parser.add_argument('--n_channels', default=None, type=int, help='number of input channels')
     parser.add_argument('--opt_level', default='O1', type=str, help='number of input channels')
@@ -62,8 +62,6 @@ def init_args():
     parser.add_argument('--workers', default=1, type=int, metavar='N',
                         help='number of data loading workers ')
     args = parser.parse_args()
-    torch.manual_seed(args.seed)
-    np.random.seed(args.seed)
-    random.seed(args.seed)
+
 
     return args
