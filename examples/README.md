@@ -8,6 +8,7 @@
 - [x] Mean Teacher
 - [x] Stochastic Weight Averaging (SWA)
 - [ ] Metric Learning
+- [x] AutoEncoder
 - [ ] VAE
 - [ ] VAE-SSL
 - [ ] VAE-GAN

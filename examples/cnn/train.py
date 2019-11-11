@@ -110,7 +110,8 @@ def worker_process(gpu, ngpus,  sampling_config, strategy_config, args):
                         train_callbacks=train_cbs,
                         val_callbacks=val_cbs,
                         device=torch.device('cuda:{}'.format(args.gpu)),
-                        distributed=args.distributed)
+                        distributed=args.distributed,
+                        use_apex=args.use_apex)
 
     strategy.run()
 
