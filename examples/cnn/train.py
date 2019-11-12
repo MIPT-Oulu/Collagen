@@ -3,14 +3,9 @@ import warnings
 
 import numpy as np
 import torch
-import torch.multiprocessing as mp
-import torch.backends.cudnn as cudnn
-import torch.distributed as dist
 import torch.utils.data.distributed
 import time
 import yaml
-from sklearn.model_selection import train_test_split
-from torchvision import transforms
 from torch.utils.tensorboard import SummaryWriter
 from collagen.core.utils import kick_off_launcher, convert_according_to_args, init_dist_env
 from collagen.data import FoldSplit, ItemLoader
@@ -22,18 +17,11 @@ from collagen.callbacks import RunningAverageMeter, AccuracyMeter
 from collagen.callbacks import ModelSaver
 
 from collagen.strategies import Strategy
-from utils import SimpleConvNet
-from utils import init_mnist_cifar_transforms, init_args
+from examples.cnn.utils import SimpleConvNet
+from examples.cnn.utils import init_mnist_cifar_transforms
+from examples.cnn.arguments import init_args
 import os
 
-try:
-    import apex
-    from apex.parallel import DistributedDataParallel as DDP
-    from apex.fp16_utils import *
-    from apex import amp, optimizers
-    from apex.multi_tensor_apply import multi_tensor_applier
-except ImportError:
-    raise ImportError("Please install apex from https://www.github.com/nvidia/apex to run this example.")
 
 
 def parse_item_mnist(root, entry, trf, data_key, target_key):
@@ -63,13 +51,6 @@ def worker_process(gpu, ngpus,  sampling_config, strategy_config, args):
                                                        network=model,
                                                        optim=optimizer)
 
-    # v = 0.3
-    # l = len(train_ds)
-    # lim = int(l*(1-v))
-    # df_train = train_ds[:lim]
-    # df_val = train_ds[lim:]
-    trans = transforms.Compose([transforms.ToTensor(),
-                                transforms.Normalize(mean=(0.5,), std=(0.5,))])
     item_loaders = dict()
     for stage, df in zip(['train', 'eval'], [train_ds, test_ds]):
         if args.distributed:
@@ -122,15 +103,12 @@ if __name__ == '__main__':
     # parse arguments
     args = init_args()
     if args.distributed:
-        init_dist_env()
+        init_dist_env(args.world_size)
     if args.suppress_warning:
         warnings.filterwarnings("ignore")
     # set number of channels
 
     args.n_channels = 1
-    if args.distributed:
-        args.world_size = int(os.environ['WORLD_SIZE'])
-
     # load some yml files for sampling and strategy configuration
     with open("settings.yml", "r") as f:
         sampling_config = yaml.load(f)
@@ -140,7 +118,7 @@ if __name__ == '__main__':
     else:
         strategy_config = None
     # kick off the main function
-    # kick_off_launcher(args, worker_process)
-    ngpus = torch.cuda.device_count()
-    worker_process(args.local_rank, ngpus, sampling_config, strategy_config, args)
+    kick_off_launcher(args, worker_process)
+    # ngpus = torch.cuda.device_count()
+    # worker_process(args.local_rank, ngpus, sampling_config, strategy_config, args)
     print('Execution Time ', (time.time() - t), ' Seconds')
