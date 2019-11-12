@@ -8,13 +8,13 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 import yaml
 import warnings
 from collagen.core import Module
+import socket
+from contextlib import closing
 
-try:
-    import apex
-    from apex.parallel import DistributedDataParallel as DDP_APEX
-    from apex import amp
-except ImportError:
-    raise ImportError("Please install apex from https://www.github.com/nvidia/apex ")
+import apex
+from apex.parallel import DistributedDataParallel as DDP_APEX
+from apex import amp
+
 
 
 def to_cpu(x: torch.Tensor or torch.cuda.FloatTensor, required_grad=False, use_numpy=True):
@@ -54,12 +54,13 @@ def freeze_modules(modules: torch.nn.Module or Tuple[torch.nn.Module], invert=Fa
             param.requires_grad = requires_grad
 
 
-def init_dist_env():
+def init_dist_env(world_size):
     """Set variables for multiple processes to communicate between themselves"""
     os.environ['MASTER_ADDR'] = '127.0.0.1'
-    os.environ['MASTER_PORT'] = '22222'
-    os.environ['WORLD_SIZE'] = '2'
+    os.environ['MASTER_PORT'] = str(find_free_localhost_port())
+    os.environ['WORLD_SIZE'] = str(world_size)
     os.environ['RANK'] = '0'
+    os.environ['OMP_NUM_THREADS'] = '2'
 
 
 def convert_according_to_args(args, gpu, ngpus, network, optim):
@@ -120,7 +121,7 @@ def convert_to_distributed(args, gpu, ngpus, network, optim):
 def kick_off_launcher(args, worker_process):
     """The main function to create process(es) according to necessity and passed arguments"""
     if args.distributed:
-        init_dist_env()
+        init_dist_env(args.world_size)
     if args.suppress_warning:
         warnings.filterwarnings("ignore")
     # set number of channels
@@ -154,3 +155,10 @@ def first_gpu_or_cpu_in_use(device):
     device_first = isinstance(device, torch.device) and (device == torch.device('cuda:0') or
                                                          device == torch.device('cpu'))
     return ordinal_first or string_first or device_first
+
+
+def find_free_localhost_port():
+    with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
+        s.bind(('127.0.0.1', 0)) # bind to localhost
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) # socket level access ensured by SOL_SOCKET
+        return s.getsockname()[1]
