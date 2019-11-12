@@ -140,7 +140,10 @@ def kick_off_launcher(args, worker_process):
         strategy_config = None
 
     # get the number of gpus
-    ngpus = torch.cuda.device_count()
+    if args.ngpus_per_node is not None:
+        ngpus = args.ngpus_per_node
+    else:
+        ngpus = torch.cuda.device_count()
     if args.distributed:
         # we one process per gpu for distributed setting
         mp.spawn(worker_process, nprocs=ngpus, args=(ngpus, sampling_config, strategy_config, args))
