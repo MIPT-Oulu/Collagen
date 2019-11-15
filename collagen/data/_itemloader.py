@@ -6,7 +6,7 @@ try:  # Handling API difference between pytorch 1.1 and 1.2
 except ImportError:
     from torch.utils.data._utils.collate import default_collate
 
-
+import warnings
 from ._dataset import DataFrameDataset
 
 
@@ -52,37 +52,61 @@ class ItemLoader(object):
         If ``0``, ignores ``timeout`` notion. Must be non-negative. (the default is 0)
     """
 
-    def __init__(self, meta_data: pd.DataFrame or None = None, parse_item_cb: callable or None = None,
-                 root: str or None = None, batch_size: int = 1,
-                 num_workers: int = 0, shuffle: bool = False, pin_memory: bool = False,
-                 collate_fn: callable = default_collate, transform: callable or None = None,
+    def __init__(self, meta_data: pd.DataFrame or None = None,
+                 parse_item_cb: callable or None = None,
+                 root: str or None = None,
+                 batch_size: int = 1,
+                 num_workers: int = 0,
+                 shuffle: bool = False,
+                 pin_memory: bool = False,
+                 collate_fn: callable = default_collate,
+                 transform: callable or None = None,
                  sampler: torch.utils.data.sampler.Sampler or None = None,
-                 batch_sampler=None, drop_last: bool = False, timeout: int = 0, name: str = "loader"):
+                 batch_sampler=None,
+                 drop_last: bool = False,
+                 distributed: bool = False,
+                 timeout: int = 0,
+                 local_rank: int = 0,
+                 world_size: int = 1,
+                 name: str = "loader"):
+
+        if distributed and sampler is not None and \
+                not isinstance(sampler, torch.utils.data.distributed.DistributedSampler):
+            raise ValueError(f'For distributed computing the provided sampler needs to be of '
+                             f'torch.utils.data.distributed.DistributedSampler, but got '
+                             f'{type(sampler)}')
+
         if root is None:
             root = ''
-
+        self.distributed = distributed
         self.__name = name
 
         if meta_data is None:
-            self.__dataset = None
+            raise ValueError(f'meta_data cannot be none, should be pandas.DataFrame type')
         else:
             self.__dataset = DataFrameDataset(root, meta_data=meta_data,
                                               parse_item_cb=parse_item_cb, transform=transform)
-        if self.__dataset is None:
-            self.__data_loader = None
-        else:
-            self.__data_loader = torch.utils.data.DataLoader(dataset=self.__dataset,
-                                                             batch_size=batch_size,
-                                                             shuffle=shuffle,
-                                                             sampler=sampler,
-                                                             batch_sampler=batch_sampler,
-                                                             num_workers=num_workers,
-                                                             collate_fn=collate_fn,
-                                                             pin_memory=pin_memory,
-                                                             drop_last=drop_last,
-                                                             timeout=timeout,
-                                                             worker_init_fn=lambda wid: np.random.seed(np.uint32(
-                                                                 torch.initial_seed() + wid)))
+        if distributed:
+            if sampler is None:
+                sampler = torch.utils.data.distributed.DistributedSampler(self.__dataset, rank=local_rank,
+                                                                          num_replicas=world_size)
+            if shuffle:
+                warnings.warn('Setting shuffle to false for distributed setting')
+            shuffle = sampler is None
+            if not pin_memory:
+                warnings.warn(f'default value of pin_memory for distributed setting should be True')
+
+        self.__data_loader = torch.utils.data.DataLoader(dataset=self.__dataset,
+                                                         batch_size=batch_size,
+                                                         shuffle=shuffle,
+                                                         sampler=sampler,
+                                                         batch_sampler=batch_sampler,
+                                                         num_workers=num_workers,
+                                                         collate_fn=collate_fn,
+                                                         pin_memory=pin_memory,
+                                                         drop_last=drop_last,
+                                                         timeout=timeout,
+                                                         worker_init_fn=self.init_fn)
 
         self.__transform = transform
         self.drop_last: bool = drop_last
@@ -90,6 +114,8 @@ class ItemLoader(object):
         self.__iter_loader = None
         self.parse_item = parse_item_cb
 
+    def init_fn(self, wid):
+        np.random.seed(np.uint32(torch.initial_seed() + wid))
     @property
     def transform(self):
         return self.__transform
