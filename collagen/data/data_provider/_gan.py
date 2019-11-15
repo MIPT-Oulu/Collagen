@@ -1,46 +1,55 @@
-from collagen.data.samplers import ItemLoader, GANFakeSampler, GaussianNoiseSampler, DistributedGANFakeSampler
-from collagen.data import DataProvider, DistributedItemLoader
+from collagen.core import Module
+from collagen.data.samplers import ItemLoader, GANFakeSampler, GaussianNoiseSampler
+from collagen.data import DataProvider
 import torch
+import pandas as pd
 
-def gan_data_provider(g_network, item_loaders, train_ds, classes,
-                      latent_size, transforms, parse_item, args):
+
+def gan_data_provider(g_network: Module,
+                      item_loaders: dict,
+                      train_ds: pd.DataFrame,
+                      classes: list,
+                      latent_size: int,
+                      transform,
+                      parse_item,
+                      distributed=False,
+                      shuffle=True,
+                      pin_memory=False,
+                      local_rank=0,
+                      world_size=1,
+                      batch_size=32,
+                      num_workers=1):
     """
     Default setting of data provider for GAN
 
     """
-    bs = args.batch_size
-    num_threads = args.workers
-    gpu = args.gpu
-    distributed = args.distributed
+
+
     if torch.cuda.is_available():
-        device = torch.device('cuda:{}'.format(gpu))
+        device = torch.device('cuda:{}'.format(local_rank))
     else:
         device = torch.device('cpu')
-    if distributed:
-        item_loaders['real'] = DistributedItemLoader(meta_data=train_ds,
-                                                     transform=transforms,
-                                                     parse_item_cb=parse_item,
-                                                     args=args)
-        item_loaders['fake'] = DistributedGANFakeSampler(g_network=g_network, batch_size=bs,
-                                                         latent_size=latent_size, gpu=gpu)
 
-        item_loaders['noise'] = GaussianNoiseSampler(batch_size=bs,
-                                                     latent_size=latent_size,
-                                                     device=gpu, n_classes=len(classes))
+    item_loaders['real'] = ItemLoader(meta_data=train_ds,
+                                      transform=transform,
+                                      parse_item_cb=parse_item,
+                                      distributed=distributed,
+                                      shuffle=(distributed and shuffle) or (not distributed),
+                                      pin_memory=(not distributed and pin_memory) or distributed,
+                                      local_rank=local_rank,
+                                      world_size=world_size,
+                                      batch_size=batch_size,
+                                      num_workers=num_workers
+                                      )
 
-    else:
-        item_loaders['real'] = ItemLoader(meta_data=train_ds,
-                                          transform=transforms,
-                                          parse_item_cb=parse_item,
-                                          batch_size=bs, num_workers=num_threads,
-                                          shuffle=True)
+    item_loaders['fake'] = GANFakeSampler(g_network=g_network,
+                                          batch_size=batch_size,
+                                          latent_size=latent_size,
+                                          distributed=distributed)
 
-        item_loaders['fake'] = GANFakeSampler(g_network=g_network,
-                                              batch_size=bs,
-                                              latent_size=latent_size)
-
-        item_loaders['noise'] = GaussianNoiseSampler(batch_size=bs,
-                                                     latent_size=latent_size,
-                                                     device=device, n_classes=len(classes))
+    item_loaders['noise'] = GaussianNoiseSampler(batch_size=batch_size,
+                                                 latent_size=latent_size,
+                                                 device=device, n_classes=len(classes),
+                                                 distributed=distributed)
 
     return DataProvider(item_loaders)

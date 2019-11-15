@@ -8,7 +8,6 @@ import torch.nn.functional as F
 from torch import nn
 
 from collagen.core import Module
-from collagen.core.utils._utils import find_free_localhost_port
 from collagen.data.utils import ApplyTransform, Normalize, Compose
 
 
@@ -91,8 +90,3 @@ class SimpleConvNet(Module):
 
     def get_features_by_name(self, name):
         pass
-
-
-
-if __name__ == '__main__':
-    print(find_free_localhost_port())

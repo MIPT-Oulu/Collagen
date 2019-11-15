@@ -82,7 +82,7 @@ class ItemLoader(object):
         self.__name = name
 
         if meta_data is None:
-            raise ValueError(f'meta_data cannot be none, should be pandas.DataFrame type')
+            self.__dataset = None
         else:
             self.__dataset = DataFrameDataset(root, meta_data=meta_data,
                                               parse_item_cb=parse_item_cb, transform=transform)

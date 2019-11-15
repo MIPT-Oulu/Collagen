@@ -23,12 +23,14 @@ def init_args():
     parser.add_argument('--use_apex', default=True, type=bool, help='Whether to use apex library')
     parser.add_argument('--loss_scale', default=None, type=int, help='loss scale for apex amp')
     parser.add_argument('--opt_level', default='O1', type=str, help='Optimization level for amp')
-    parser.add_argument('--shell_launch', default=False, type=bool, help='Shell launched program is not debuggable in'
+    parser.add_argument('--shell_launch', default=True, type=bool, help='Shell launched program is not debuggable in'
                                                                         'PyCharm, set it false to use '
                                                                         'pytorch.multiprocessing which is debuggable')
     parser.add_argument('--local_rank', default=0, type=int, help='rank of the gpu within the node')
     parser.add_argument('--world_size', default=2, type=int, help='world_size = number_of_nodes*gpus_per_node')
     parser.add_argument('--ngpus_per_node', default=2, type=int, help='Number of gpus you want to use')
+    parser.add_argument('--master_addr', default='127.0.0.1', type=str, help='Master Address for backend')
+    parser.add_argument('--master_port', default=None, type=str, help='Master port for backend')
     parser.add_argument('--suppress_warning', default=True, type=bool, help='whether to print warning messages')
     parser.add_argument('--workers', default=1, type=int, metavar='N',
                         help='number of data loading workers, too many cooks spoil the broth')

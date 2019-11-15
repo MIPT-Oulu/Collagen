@@ -47,52 +47,65 @@ def freeze_modules(modules: torch.nn.Module or Tuple[torch.nn.Module], invert=Fa
             param.requires_grad = requires_grad
 
 
-def init_dist_env(world_size, master_addr='127.0.0.1', master_port=None ):
+def init_dist_env(world_size=None, master_addr='127.0.0.1', master_port=None):
     """Set variables for multiple processes to communicate between themselves"""
     os.environ['MASTER_ADDR'] = str(master_addr)
     if master_port is None:
         os.environ['MASTER_PORT'] = str(find_free_host_port(host=master_addr))
     else:
         os.environ['MASTER_PORT'] = str(master_port)
-    os.environ['WORLD_SIZE'] = str(world_size)
-    os.environ['RANK'] = '0'
+    if world_size is not None:
+        os.environ['WORLD_SIZE'] = str(world_size)
+        os.environ['RANK'] = '0'
     os.environ['OMP_NUM_THREADS'] = '2'
 
 
-def convert_according_to_args(args, gpu, ngpus, network, optim):
-    from apex import amp
+def configure_model_optimizer(args, local_rank, network, optim):
     # os.environ['RANK'] = str(gpu)
     if args.distributed:
-        return convert_to_distributed(args, gpu, ngpus, network, optim)
+        return convert_to_apex_ddp(world_size=args.world_size,
+                                   dist_backend=args.dist_backend,
+                                   local_rank=local_rank,
+                                   ngpus=args.ngpus_per_node,
+                                   network=network,
+                                   optim=optim,
+                                   use_apex=args.use_apex,
+                                   opt_level=args.opt_level,
+                                   loss_scale=args.loss_scale,
+                                   suppress_warning=args.suppress_warning,
+                                   shell_launch=args.shell_launch)
     else:
         # for distributed setting, the convert_to_distributed function initialize the amp, but for single gpu
         # process user has to manually initialize the automated mixed precision
         if args.use_apex:
+            from apex import amp
             network, optim = amp.initialize(network, optim,
                                             opt_level=args.opt_level,
                                             loss_scale=args.loss_scale,
                                             verbosity=not args.suppress_warning)
-        return args, network, optim
+        return network, optim
 
 
-def convert_to_apex_ddp(args, gpu, ngpus, network, optim):
-    import apex
-    from apex.parallel import DistributedDataParallel as DDP_APEX
-    from apex import amp
+def convert_to_apex_ddp(world_size, dist_backend, local_rank, ngpus, network, optim, use_apex, opt_level=None,
+                        loss_scale=None, suppress_warning=False, shell_launch=False):
     # rank will be necessary in future for cluster computing, for now we will settle for gpu
-    args.rank = int(os.environ['RANK']) * ngpus + gpu
-    dist.init_process_group(backend=args.dist_backend, world_size=args.world_size, rank=args.rank,
-                            init_method='env://')
-    print('Distributed Init done on GPU:', args.gpu)
+    if shell_launch:
+        # for shell launch init_process_group has to be called before init_dist_env is called
+        pass
+    else:
+        dist.init_process_group(backend=dist_backend, world_size=world_size, rank=local_rank,
+                                init_method='env://')
+    print('Distributed Init done on GPU:', local_rank)
     # we will set the benchmark to true so that the pytorch's build-in auto tuner will find the best algorithm
     # depending on the hardware under the OS
     cudnn.benchmark = True
     # set the current device, remember for different spawned process, args.gpu would be different
-    torch.cuda.set_device(args.gpu)
-    # split the batch size along gpu(s), it is a good practise to use a batch size multiple of the number of gpu(s)
-    args.batch_size = int(args.batch_size / ngpus)
+    torch.cuda.set_device(local_rank)
 
-    if args.use_apex:
+    if use_apex:
+        import apex
+        from apex.parallel import DistributedDataParallel as DDP_APEX
+        from apex import amp
         # if your network does not have any batchnorm layer, don't use syncnb
         if isinstance(network, list):
             for i in range(len(network)):
@@ -101,8 +114,8 @@ def convert_to_apex_ddp(args, gpu, ngpus, network, optim):
             network = apex.parallel.convert_syncbn_model(network)
 
         network, optim = amp.initialize(network, optim,
-                                        opt_level=args.opt_level, loss_scale=args.loss_scale,
-                                        verbosity=not args.suppress_warning)
+                                        opt_level=opt_level, loss_scale=loss_scale,
+                                        verbosity=not suppress_warning)
 
         if isinstance(network, list):
             for i in range(len(network)):
@@ -113,63 +126,20 @@ def convert_to_apex_ddp(args, gpu, ngpus, network, optim):
     else:
         if isinstance(network, list):
             for i in range(len(network)):
-                network[i] = DDP(network[i], device_ids=[gpu])
+                network[i] = DDP(network[i], device_ids=[local_rank])
         elif isinstance(network, Module) or isinstance(network, torch.nn.Module):
-            network = DDP(network, device_ids=[gpu])
-    return args, network, optim
+            network = DDP(network, device_ids=[local_rank])
+    return network, optim
 
 
-def convert_to_distributed(args, gpu, ngpus, network, optim):
-    import apex
-    from apex.parallel import DistributedDataParallel as DDP_APEX
-    from apex import amp
-    # rank will be necessary in future for cluster computing, for now we will settle for gpu
-    args.local_rank = gpu
-    dist.init_process_group(backend=args.dist_backend, rank=args.local_rank, world_size=args.world_size, init_method='env://')
-    print('Distributed Init done on GPU:', args.local_rank)
-    # we will set the benchmark to true so that the pytorch's build-in auto tuner will find the best algorithm
-    # depending on the hardware under the OS
-    cudnn.benchmark = True
-    # set the current device, remember for different spawned process, args.gpu would be different
-    torch.cuda.set_device(args.local_rank)
-    # split the batch size along gpu(s), it is a good practise to use a batch size multiple of the number of gpu(s)
-    args.batch_size = int(args.batch_size / ngpus)
-
-    if args.use_apex:
-        # if your network does not have any batchnorm layer, don't use syncnb
-        if isinstance(network, list):
-            for i in range(len(network)):
-                network[i] = apex.parallel.convert_syncbn_model(network[i])
-        elif isinstance(network, Module) or isinstance(network, torch.nn.Module):
-            network = apex.parallel.convert_syncbn_model(network)
-
-        network, optim = amp.initialize(network, optim,
-                                        opt_level=args.opt_level, loss_scale=args.loss_scale,
-                                        verbosity=not args.suppress_warning)
-
-        if isinstance(network, list):
-            for i in range(len(network)):
-                network[i] = DDP_APEX(network[i], delay_allreduce=True)
-        elif isinstance(network, Module) or isinstance(network, torch.nn.Module):
-            network = DDP_APEX(network, delay_allreduce=True)
-
-    else:
-        if isinstance(network, list):
-            for i in range(len(network)):
-                network[i] = DDP(network[i], device_ids=[gpu])
-        elif isinstance(network, Module) or isinstance(network, torch.nn.Module):
-            network = DDP(network, device_ids=[gpu])
-    return args, network, optim
-
-
-def kick_off_launcher(args, sampling_config: dict, strategy_config: dict, worker_process):
+def kick_off_launcher(args, worker_process):
     """The main function to create process(es) according to necessity and passed arguments"""
-    assert hasattr(args, 'distributed') == True, 'The argument `distributed` is missing'
+    assert hasattr(args, 'distributed'), 'The argument `distributed` is missing'
     if args.distributed:
-        assert hasattr(args, 'world_size') == True, 'The argument `world_size` is missing'
-        init_dist_env(args.world_size)
+        assert hasattr(args, 'world_size'), 'The argument `world_size` is missing'
+        init_dist_env(world_size=args.world_size, master_addr=args.master_addr, master_port=args.master_port)
     # get the number of gpus
-    assert hasattr(args, 'ngpus_per_node') == True, 'The argument `ngpus_per_node` is missing'
+    assert hasattr(args, 'ngpus_per_node'), 'The argument `ngpus_per_node` is missing'
     if args.ngpus_per_node is not None:
         ngpus = args.ngpus_per_node
     else:
@@ -177,13 +147,11 @@ def kick_off_launcher(args, sampling_config: dict, strategy_config: dict, worker
             ngpus = torch.cuda.device_count()
         else:
             ngpus = 0
-    assert ngpus > 1 and args.distributed, 'You need multiple gpus to do distributed computing, ' \
-                                             'set distributed to false'
     if args.distributed:
         # we one process per gpu for distributed setting
-        mp.spawn(worker_process, nprocs=ngpus, args=(ngpus, sampling_config, strategy_config, args))
+        mp.spawn(worker_process, nprocs=ngpus, args=(args,))
     else:
-        worker_process(args.local_rank, ngpus, sampling_config, strategy_config, args)
+        worker_process(args.local_rank, args)
 
 
 def first_gpu_or_cpu_in_use(device):

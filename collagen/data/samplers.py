@@ -7,7 +7,7 @@ except ImportError:
     from torch.utils.data._utils.collate import default_collate
 
 from collagen.core.utils import to_cpu
-from collagen.data import ItemLoader, DistributedItemLoader
+from collagen.data import ItemLoader
 
 
 class MixUpSampler(ItemLoader):
@@ -357,65 +357,25 @@ class FeatureMatchingSampler(ItemLoader):
 
 
 class GANFakeSampler(ItemLoader):
-    def __init__(self, g_network, batch_size, latent_size, name='ganfake'):
+    def __init__(self, g_network, batch_size, latent_size, distributed=False, name='ganfake'):
         super().__init__(meta_data=None, parse_item_cb=None, name=name)
         self.__latent_size = latent_size
         self.batch_size = batch_size
         self.__g_network = g_network
         self.__name = name
+        self.distributed = distributed
 
     def sample(self, k=1):
         samples = []
         for _ in range(k):
             noise = torch.randn(self.batch_size, self.__latent_size)
-            noise_on_device = noise.to(next(self.__g_network.parameters()).device)
+            noise_on_device = noise.to(next(self.__g_network.parameters()).device, non_blocking=self.distributed)
             fake: torch.Tensor = self.__g_network(noise_on_device)
             samples.append(
-                {'name': self.__name, 'data': fake.detach(), 'target': torch.zeros(self.batch_size).to(fake.device),
+                {'name': self.__name, 'data': fake.detach(),
+                 'target': torch.zeros(self.batch_size).to(fake.device, non_blocking=self.distributed),
                  'latent': noise})
 
-        return samples
-
-    def __len__(self):
-        return 1
-
-
-class DistributedGANFakeSampler(ItemLoader):
-    def __init__(self, g_network, batch_size, latent_size, gpu, name='ganfake_dist'):
-        """
-
-        Parameters
-        ----------
-        g_network: Module
-            generator network
-        batch_size: int
-            batch size
-        latent_size: int
-            dimension of the latent space
-        gpu: int
-            current gpu ordinal
-        name: string
-            name of the itemloader
-        """
-        super().__init__(meta_data=None, parse_item_cb=None, name=name)
-        self.__latent_size = latent_size
-        self.batch_size = batch_size
-        self.__g_network = g_network
-        self.__name = name
-        self.gpu = gpu
-
-    def sample(self, k=1):
-        samples = []
-        self.__g_network.eval()
-        for _ in range(k):
-            noise = torch.randn(self.batch_size, self.__latent_size)
-            # non blocking is chosen emperically, it performed better as true for DDP
-            noise_on_device = noise.to(self.gpu, non_blocking=True)
-            fake: torch.Tensor = self.__g_network(noise_on_device).to(self.gpu)
-            samples.append(
-                {'name': self.__name, 'data': fake.detach(), 'target': torch.zeros(self.batch_size).to(self.gpu,
-                                                                                                       non_blocking=True),
-                 'latent': noise})
         return samples
 
     def __len__(self):
@@ -423,13 +383,14 @@ class DistributedGANFakeSampler(ItemLoader):
 
 
 class GaussianNoiseSampler(ItemLoader):
-    def __init__(self, batch_size, latent_size, device, n_classes, name='gaussian_noise'):
+    def __init__(self, batch_size, latent_size, device, n_classes, distributed=False, name='gaussian_noise'):
         super().__init__(meta_data=None, parse_item_cb=None, name=name)
         self.latent_size = latent_size
         self.device = device
         self.batch_size = batch_size
         self.__n_classes = n_classes
         self.__name = name
+        self.distributed = distributed
 
     def set_epoch(self, epoch):
         pass
@@ -437,8 +398,8 @@ class GaussianNoiseSampler(ItemLoader):
     def sample(self, k=1):
         samples = []
         for _ in range(k):
-            noise = torch.randn(self.batch_size, self.latent_size).to(self.device)
-            target = torch.zeros([self.batch_size, self.__n_classes + 1]).to(self.device)
+            noise = torch.randn(self.batch_size, self.latent_size).to(self.device, non_blocking=self.distributed)
+            target = torch.zeros([self.batch_size, self.__n_classes + 1]).to(self.device, non_blocking=self.distributed)
             # target[:, -2] = 1.0
             samples.append({'name': self.__name, 'latent': noise, 'target': target, 'valid': target[:, -1]})
 
