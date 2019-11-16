@@ -516,10 +516,11 @@ class FeatureMatchingSampler(ItemLoader):
         samples = []
         real_imgs_list = super().sample(k)
         for i in range(k):
-            real_imgs = real_imgs_list[i][self.__data_key]
+            dv = next(self.__model.parameters()).device
+            real_imgs = real_imgs_list[i][self.__data_key].to(dv)
             features = self.__model.get_features(real_imgs)
             noise = torch.randn(self.batch_size, self.__latent_size)
-            noise_on_device = noise.to(next(self.__model.parameters()).device)
+            noise_on_device = noise.to(dv)
             samples.append({'name': self.__name, 'real_features': features.detach(), 'real_data': real_imgs, 'latent': noise_on_device})
         return samples
 

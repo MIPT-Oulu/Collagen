@@ -370,7 +370,7 @@ class SSValidityMeter(Meter):
             if self.__sigmoid:
                 output_on_device = output_on_device.sigmoid()
 
-            valid = ((output_on_device > self.__threshold) == target_on_device.byte()).float()
+            valid = ((output_on_device > self.__threshold).byte() == target_on_device.byte()).float()
             fp = valid.sum()
             self.__correct_count += fp
             self.__data_count += n
