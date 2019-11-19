@@ -6,14 +6,6 @@ from torch import Tensor
 
 from collagen.core import Module
 
-try:
-    import apex
-    from apex.parallel import DistributedDataParallel as DDP
-    from apex import amp
-
-except ImportError:
-    raise ImportError("Please install apex from https://www.github.com/nvidia/apex to run this example.")
-
 
 class Session(object):
     """Session class, which implements the basic logic of the training loop.
@@ -29,22 +21,15 @@ class Session(object):
         Optimizer to train teh model
     loss : torch.nn.Module
         Loss used in the session
-    use_apex: bool
-        whether to use apex amp or not, right now we support only O1 optimization
-    distributed: bool
-        whether the training would be distributed or not
 
     """
 
     def __init__(self, module: Module, optimizer: torch.optim.Optimizer,
-                 loss: torch.nn.Module,
-                 use_apex=False, distributed=False):
+                 loss: torch.nn.Module):
 
         self.__module: Module = module
         self.__optimizer: torch.optim.Optimizer = optimizer
         self.__loss: torch.nn.Module = loss
-        self.__use_apex = use_apex
-        self.__distributed = distributed
 
         # Params of ``backward``
         self.__retain_graph: bool or None = None
@@ -167,58 +152,43 @@ class Session(object):
                                  return_out=return_out, callbacks=callbacks)
 
     @staticmethod
-    def transfer_to_device(batch, target, module_device, distributed=False):
-        """
-        transfers data to specified device
-        Parameters
-        ----------
-        batch: Tensor or dict or list of tensor
-            data to be passed through the network
-        target: Tensor or dict or list of tensor
-            target against the batch of data
-        module_device: torch.device or device ordinal (int)
-            the device where the batch and target will be transferred
-        distributed: bool
-            whether training is distributed or not
-
-        Returns
-        -------
-        Tensor, list or dict of tensors
-        """
+    def transfer_to_device(batch, target, module_device):
+        # Transfer input and target into proper device
         if isinstance(batch, tuple) or isinstance(batch, list):
-            batch_on_device = tuple([b.to(module_device, non_blocking=distributed) for b in batch])
+            batch_on_device = tuple([b.to(module_device) for b in batch])
         elif isinstance(batch, Tensor):
-            batch_on_device = batch.to(module_device, non_blocking=distributed)
+            batch_on_device = batch.to(module_device)
         elif isinstance(batch, dict):
             batch_on_device = dict()
             for k in batch:
                 if isinstance(batch[k], Tensor) and not batch[k].is_cuda:
-                    batch_on_device[k] = batch[k].to(module_device, non_blocking=distributed)
+                    batch_on_device[k] = batch[k].to(module_device)
                 elif isinstance(batch[k], np.ndarray):
-                    batch_on_device[k] = torch.tensor(batch[k]).to(module_device, non_blocking=distributed)
+                    batch_on_device[k] = torch.tensor(batch[k]).to(module_device)
                 else:
                     batch_on_device[k] = batch[k]
         else:
             raise ValueError('Not support input type {}'.format(type(batch)))
 
         if isinstance(target, tuple) or isinstance(target, list):
-            target_on_device = tuple([t.to(module_device, non_blocking=distributed) if isinstance(t, Tensor) else t for t in target])
+            target_on_device = tuple([t.to(module_device) if isinstance(t, Tensor) else t for t in target])
         elif isinstance(target, dict):
             target_on_device = dict()
             for k in target:
                 if isinstance(target[k], Tensor) and not target[k].is_cuda:
-                    target_on_device[k] = target[k].to(module_device, non_blocking=distributed)
+                    target_on_device[k] = target[k].to(module_device)
                 elif isinstance(target[k], np.ndarray):
-                    target_on_device[k] = torch.tensor(target[k]).to(module_device, non_blocking=distributed)
+                    target_on_device[k] = torch.tensor(target[k]).to(module_device)
                 else:
                     target_on_device[k] = target[k]
 
         elif isinstance(target, Tensor):
-            target_on_device = target.to(module_device, non_blocking=distributed)
+            target_on_device = target.to(module_device)
         else:
             raise ValueError('Not support target type {}'.format(type(target)))
 
         return batch_on_device, target_on_device
+
 
     def __batch_step(self, batch: torch.Tensor or Tuple[torch.Tensor],
                      target: torch.Tensor or Tuple[torch.Tensor] or dict, with_grad: bool = True,
@@ -273,9 +243,8 @@ class Session(object):
             if self._check_single_element_tuple(target):
                 target = target[0]
 
-            batch_on_device, target_on_device = self.transfer_to_device(batch, target, module_device,
-                                                                        distributed=self.__distributed)
-
+            batch_on_device, target_on_device = self.transfer_to_device(batch, target, module_device)
+    
             # Forward
             for cb in callbacks:
                 cb.on_forward_begin(module=self.__module,
@@ -329,13 +298,9 @@ class Session(object):
                                          target=target_on_device,
                                          output=out)
 
-                if self.__use_apex:
-                    with amp.scale_loss(loss, self.__optimizer) as scaled_loss:
-                        scaled_loss.backward(retain_graph=self.__retain_graph or retain_graph)
-                else:
-                    loss.backward(gradient=self.__gradient,
-                                  retain_graph=self.__retain_graph or retain_graph,
-                                  create_graph=self.__create_graph)
+                loss.backward(gradient=self.__gradient,
+                              retain_graph=self.__retain_graph or retain_graph,
+                              create_graph=self.__create_graph)
 
                 for cb in callbacks:
                     cb.on_backward_end(session=self,

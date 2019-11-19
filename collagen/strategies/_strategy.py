@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 from collagen.core import Callback
 from collagen.core import Trainer, Session, Module
-from collagen.core.utils import wrap_tuple, first_gpu_or_cpu_in_use
+from collagen.core.utils import wrap_tuple
 
 from collagen.data import DataProvider
 
@@ -59,9 +59,7 @@ class Strategy(object):
                  accumulate_grad: bool or None = False,
                  minibatch_accumulate_grad: bool or None = True,
                  n_training_batches: int or None = None,
-                 device: torch.device = torch.device('cpu'),
-                 distributed=False,
-                 use_apex=False):
+                 device: torch.device = torch.device('cpu')):
         self.__data_provider: DataProvider = data_provider
         self.__loss: nn.Module = loss
         self.__optimizer: Optimizer = optimizer
@@ -138,14 +136,10 @@ class Strategy(object):
         self.__model.to(self.__device)
         self.__loss.to(self.__device)
 
-        if first_gpu_or_cpu_in_use(self.__device):
-            self.__default_callbacks_train = (RunningAverageMeter(prefix='train', name='loss'),
-                                              ProgressbarLogger(update_freq=1, name='pbar/train'))
-            self.__default_callbacks_eval = (RunningAverageMeter(prefix='eval', name='loss'),
-                                             ProgressbarLogger(update_freq=1, name='pbar/eval'),)
-        else:
-            self.__default_callbacks_train =()
-            self.__default_callbacks_eval = ()
+        self.__default_callbacks_train = (RunningAverageMeter(prefix='train', name='loss'),
+                                          ProgressbarLogger(update_freq=1, name='pbar/train'))
+        self.__default_callbacks_eval = (RunningAverageMeter(prefix='eval', name='loss'),
+                                         ProgressbarLogger(update_freq=1, name='pbar/eval'),)
 
         self.__train_callbacks = self._auto_add_default_callbacks(self.__default_callbacks_train,
                                                                   self.__train_callbacks)
@@ -158,10 +152,7 @@ class Strategy(object):
                                  optimizer=self.__optimizer,
                                  loss=self.__loss,
                                  train_callbacks=self.__train_callbacks,
-                                 val_callbacks=self.__val_callbacks,
-                                 distributed=distributed,
-                                 use_apex=use_apex)
-        self.__distributed = distributed
+                                 val_callbacks=self.__val_callbacks)
 
     @staticmethod
     def _auto_add_default_callbacks(d_cbs, cbs):
@@ -200,12 +191,9 @@ class Strategy(object):
 
                 self._call_callbacks_by_name('on_epoch_begin', epoch=epoch, stage=stage,
                                              n_epochs=self.__num_batches_by_stage[stage], trainer=self.__trainer)
-                if first_gpu_or_cpu_in_use(self.__device):
-                    progress_bar = tqdm(range(self.__num_batches_by_stage[stage]),
-                                        total=self.__num_batches_by_stage[stage],
-                                        desc=f'Epoch [{epoch}][{stage}]::')
-                else:
-                    progress_bar = range(self.__num_batches_by_stage[stage])
+                progress_bar = tqdm(range(self.__num_batches_by_stage[stage]),
+                                    total=self.__num_batches_by_stage[stage],
+                                    desc=f'{pbar_prefix}Epoch [{epoch}] | {stage}::')
                 for batch_i in progress_bar:
                     self._call_callbacks_by_name('on_sample_begin', epoch=epoch, stage=stage, batch_i=batch_i,
                                                  progress_bar=progress_bar, trainer=self.__trainer)
@@ -232,8 +220,6 @@ class Strategy(object):
                                                  stage=stage,
                                                  batch_i=batch_i,
                                                  trainer=self.__trainer)
-
                 self._call_callbacks_by_name('on_epoch_end', epoch=epoch, stage=stage,
                                              n_epochs=self.__num_batches_by_stage[stage], trainer=self.__trainer)
-
 

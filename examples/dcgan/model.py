@@ -9,6 +9,9 @@ from collagen.core import Module
 class Discriminator(Module):
     def __init__(self, nc=1, ndf=64, n_gpu=1):
         super(Discriminator, self).__init__()
+
+        self.__devices = list(range(n_gpu))
+
         # input is (nc) x 64 x 64
         self._layer1 = nn.Sequential(nn.Conv2d(nc, ndf, 4, 2, 1, bias=False),
                                      nn.LeakyReLU(0.2, inplace=True))  # state size. (ndf) x 32 x 32
@@ -25,9 +28,8 @@ class Discriminator(Module):
                                      nn.BatchNorm2d(ndf * 8),
                                      nn.LeakyReLU(0.2, inplace=True))  # state size. (ndf*4) x 4 x 4
 
-        # self._layer5 = nn.Sequential(nn.Conv2d(ndf * 8, 1, 4, 1, 0, bias=False),
-        #                              nn.Sigmoid())  # state size. 1x1x1
-        self._layer5 = nn.Conv2d(ndf * 8, 1, 4, 1, 0, bias=False)
+        self._layer5 = nn.Sequential(nn.Conv2d(ndf * 8, 1, 4, 1, 0, bias=False),
+                                     nn.Sigmoid())  # state size. 1x1x1
 
         self.main_flow = nn.Sequential(OrderedDict([("conv_block1", self._layer1),
                                                     ("conv_block2", self._layer2),
@@ -39,7 +41,11 @@ class Discriminator(Module):
         self.main_flow.apply(weights_init)
 
     def forward(self, x: torch.tensor):
-        output = self.main_flow(x)
+        if x.is_cuda and len(self.__devices) > 1:
+            output = nn.parallel.data_parallel(self.main_flow, x, self.__devices)
+        else:
+            output = self.main_flow(x)
+
         return output.view(-1, 1).squeeze(1)
 
     def get_features(self):
@@ -52,6 +58,8 @@ class Discriminator(Module):
 class Generator(Module):
     def __init__(self, nc=1, nz=100, ngf=64, n_gpu=1):
         super(Generator, self).__init__()
+
+        self.__devices = list(range(n_gpu))
 
         self._layer1 = nn.Sequential(nn.ConvTranspose2d(nz, ngf * 8, 4, 1, 0, bias=False),
                                      nn.BatchNorm2d(ngf * 8),
@@ -91,7 +99,11 @@ class Generator(Module):
             raise ValueError("Input must have 2 dim but found {}".format(x.shape))
         x = x.view(x.size(0), x.size(1), 1, 1)
 
-        output = self.main_flow(x)
+        if x.is_cuda and len(self.__devices) > 1:
+            output = nn.parallel.data_parallel(self.main_flow, x, device_ids=self._devices)
+        else:
+            output = self.main_flow(x)
+
         return output
 
     def get_features(self):

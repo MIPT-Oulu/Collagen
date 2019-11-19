@@ -25,3 +25,6 @@ eval:
         num_samples: 1
         data_key: "latent"
         target_key: "valid"
+  visualizers:
+    - generation
+    - meters

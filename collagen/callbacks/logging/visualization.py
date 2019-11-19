@@ -211,60 +211,7 @@ class ImageSamplingVisualizer(Callback):
             else:
                 break
         grid_images = make_grid(images[:self.__num_images], nrow=self.__grid_shape[0])
-        self.__writer.add_images(self.__tag, img_tensor=grid_images,  dataformats='CHW')
-
-
-class FakeImageSamplingVisualizer(Callback):
-    def __init__(self, writer, generator_sampler, key_name: str = "data", tag: str = "Generated",
-                 grid_shape: Tuple[int, int] or int = (10, 10), split_channel=True, transform=None,
-                 unbind_imgs_transform=None):
-        """Visualizes synthesized images in TensorboardX
-
-        Parameters
-        ----------
-        writer: TensorboardX SummaryWriter
-            Writes metrics into TensorboardX
-        generator_sampler: ItemLoader
-            Loads item including synthesized image
-        key_name: str
-            Key corresponding to synthesized image in loaded samples from :attr:generator_sampler`
-        tag: str
-            Tag of metric in TensorboardX
-        grid_shape: tuple
-            Shape of synthesized image grip (default: (10, 10))
-        split_channel: bool
-            Whether split synthesized image by channels and concatenate them horizontally
-        transform: function
-            Transforms synthesized image
-        """
-        super().__init__(ctype="visualizer")
-        self.__generator_sampler = generator_sampler
-        self.__split_channel = split_channel
-
-        if len(grid_shape) != 2:
-            raise ValueError("`grid_shape` must have 2 dim, but found {}".format(len(grid_shape)))
-        self.__transform = self._default_transform if transform is None else transform
-        self.__writer = writer
-        self.__key_name = key_name
-        self.__grid_shape = grid_shape
-        self.__num_images = grid_shape[0] * grid_shape[1]
-        self.__num_batches = self.__num_images // self.__generator_sampler.batch_size + 1
-        self.__tag = tag
-        self.__unbind_imgs_transform = self._default_transform_unbind_imgs if unbind_imgs_transform is None else unbind_imgs_transform
-
-    @staticmethod
-    def _default_transform(x):
-        return (x + 1.0) / 2.0
-
-    @staticmethod
-    def _default_transform_unbind_imgs(separate_imgs):
-        concate_img = torch.cat(separate_imgs, dim=-1)
-        return concate_img
-
-    def on_epoch_end(self, epoch, n_epochs, **kwargs):
-        sampled_data = self.__generator_sampler.sample(self.__num_batches)
-        pass
-
+        self.__writer.add_images(self.__tag, img_tensor=grid_images, global_step=epoch, dataformats='CHW')
 
 
 class ImageMaskVisualizer(Callback):

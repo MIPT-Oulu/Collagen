@@ -1,5 +1,6 @@
 import copy
 
+
 class ApplyTransform(object):
     """Applies a callable transform to certain objects in iterable using given indices.
 
@@ -103,5 +104,3 @@ def cast_tensor(x, to='float'):
         return x.long()
     else:
         raise NotImplementedError
-
-

@@ -51,7 +51,6 @@ class DataProvider(object):
 
         return list_samples
 
-
     def __sample(self, itemloader_name: str, k: int):
         """Gets `k` samples from the itemloader specified by `itemloader_name`.
 
@@ -103,6 +102,3 @@ class DataProvider(object):
             return tuple([self.__loaders[s] for s in name])
         else:
             raise ValueError("`{}` not found in list of loader names".format(name))
-    def set_epoch(self, epoch):
-        for loader in self.__loaders:
-            self.__loaders[loader].set_epoch(epoch)

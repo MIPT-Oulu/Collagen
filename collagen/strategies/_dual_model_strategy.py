@@ -31,8 +31,7 @@ class DualModelStrategy(object):
                  accumulate_grad: bool or None = False,
                  minibatch_accumulate_grad: bool or None = True,
                  device: str or None = "cuda",
-                 n_training_batches: int or None = None,
-                 distributed=False):
+                 n_training_batches: int or None = None):
         """Implements a part of the training GAN loop by passing the available batches through the model.
 
         Parameters
@@ -69,7 +68,6 @@ class DualModelStrategy(object):
         self.__data_key_by_stage = dict()
         self.__target_key_by_stage = dict()
         self.__num_batches_by_stage = dict()
-        self.__distributed = distributed
         for stage in self.__stage_names:
             self.__num_batches_by_stage[stage] = -1
             self.__data_key_by_stage[stage] = dict()
