@@ -47,14 +47,14 @@ def pimodel_data_provider(model, train_labeled_data, train_unlabeled_data, val_l
     #                                                      batch_size=bs, num_workers=num_threads,
     #                                                      shuffle=False)
 
-    item_loaders["unlabeled_eval"] = AugmentedGroupSampler(root=root, model=model, name='u', output_type=output_type,
-                                                           meta_data=val_unlabeled_data,
-                                                           n_augmentations=n_augmentations,
-                                                           augmentation=transforms[2],
-                                                           transform=transforms[1],
-                                                           parse_item_cb=parse_item,
-                                                           batch_size=bs, num_workers=num_threads,
-                                                           shuffle=False)
+    # item_loaders["unlabeled_eval"] = AugmentedGroupSampler(root=root, model=model, name='u', output_type=output_type,
+    #                                                        meta_data=val_unlabeled_data,
+    #                                                        n_augmentations=n_augmentations,
+    #                                                        augmentation=transforms[2],
+    #                                                        transform=transforms[1],
+    #                                                        parse_item_cb=parse_item,
+    #                                                        batch_size=bs, num_workers=num_threads,
+    #                                                        shuffle=False)
 
     return DataProvider(item_loaders)
 
