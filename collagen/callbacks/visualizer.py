@@ -122,12 +122,17 @@ class ProgressbarVisualizer(Callback):
             list_metrics_desc = []
             postfix_progress = OrderedDict()
             for cb in strategy.get_callbacks_by_name("minibatch", stage=stage):
-                if cb.ctype == "meter" and cb.current() is not None:
-                    if isinstance(cb.current(), float):
-                        list_metrics_desc.append(str(cb))
-                        postfix_progress[cb.desc] = f'{cb.current():.03f}'
-                    else:
-                        print(f'Callback {cb.desc} has invalid type {type(cb.current())}')
+                if cb.ctype == "meter":
+                    cb_value = cb.current()
+                    if cb_value is not None:
+                        if isinstance(cb_value, float):
+                            list_metrics_desc.append(str(cb))
+                            postfix_progress[cb.desc] = f'{cb_value:.03f}'
+                        elif isinstance(cb_value, np.ndarray) and cb_value.size == 1:
+                            list_metrics_desc.append(str(cb))
+                            postfix_progress[cb.desc] = f'{cb_value.item():.03f}'
+                        else:
+                            print(f'Callback {cb.desc} has invalid type {type(cb_value)}')
             progress_bar.set_postfix(ordered_dict=postfix_progress, refresh=True)
 
 

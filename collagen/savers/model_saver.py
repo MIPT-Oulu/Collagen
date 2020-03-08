@@ -5,6 +5,7 @@ from os import mkdir, remove
 from typing import Tuple
 import numpy as np
 import torch
+import dill as pickle
 from collagen.core import Callback
 from collagen.core.utils import wrap_tuple
 
@@ -96,7 +97,9 @@ class ModelSaver(Callback):
             date_time = datetime.now().strftime("%Y%m%d_%H%M%S")
             model_name = "_".join([self.__prefix, "{0:04d}".format(epoch), date_time, metrics_desc]) + ".pth"
             model_fullname = join(self.__save_dir, model_name)
-            torch.save(self.__model.state_dict(), model_fullname)
+            with open(model_fullname, 'wb') as f:
+                pickle.dump(self.__model.state_dict(), f)
+            # torch.save(self.__model.state_dict(), model_fullname)
             if self.__keep_best_only and isfile(self.__prev_model_path):
                 remove(self.__prev_model_path)
             self.__prev_model_path = model_fullname

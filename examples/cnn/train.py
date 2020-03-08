@@ -89,7 +89,7 @@ if __name__ == "__main__":
                             optimizer=optimizer,
                             train_callbacks=train_cbs,
                             val_callbacks=val_cbs,
-                            device=args.device)
+                            device=device)
 
         strategy.run()
         kfold_train_losses.append(train_cbs[0].current())

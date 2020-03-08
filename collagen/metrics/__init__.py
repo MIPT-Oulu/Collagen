@@ -5,7 +5,7 @@ from matplotlib import figure
 from sklearn.metrics import confusion_matrix
 import numpy as np
 from ._meters import Meter, RunningAverageMeter, AccuracyMeter, AccuracyThresholdMeter, SSAccuracyMeter, SSValidityMeter
-from ._meters import KappaMeter, SSBalancedAccuracyMeter, BalancedAccuracyMeter
+from ._meters import KappaMeter, SSBalancedAccuracyMeter, BalancedAccuracyMeter, MSEMeter
 
 
 def plot_confusion_matrix(correct_labels, predict_labels, labels, normalize=True):

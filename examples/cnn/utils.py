@@ -28,7 +28,7 @@ def init_args():
     parser.add_argument('--snapshots', default='snapshots', help='Where to save the snapshots')
     parser.add_argument('--seed', type=int, default=12345, help='Random seed')
     parser.add_argument('--dataset', type=str, default="mnist", help='Dataset name')
-    parser.add_argument('--device', type=str, default="cuda", help='Use `cuda` or `cpu`')
+    # parser.add_argument('--device', type=str, default="cuda", help='Use `cuda` or `cpu`')
     parser.add_argument('--data_dir', type=str, default="data", help='Data directory')
     parser.add_argument('--log_dir', type=str, default=None, help='Log directory')
     parser.add_argument('--comment', type=str, default="cnn", help='Comment of log')
@@ -49,9 +49,9 @@ def unpack_solt(dc: sld.DataContainer):
 
 
 def init_mnist_transforms(n_channels=1):
-    if nc == 1:
+    if n_channels == 1:
         norm_mean_std = Normalize((0.1307,), (0.3081,))
-    elif nc == 3:
+    elif n_channels == 3:
         norm_mean_std = Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261))
     else:
         raise ValueError("Not support channels of {}".format(nc))
