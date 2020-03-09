@@ -2,6 +2,8 @@ from torch import Tensor
 
 from collagen.core import Module
 
+__all__ = ["GeneratorLoss"]
+
 
 class GeneratorLoss(Module):
     def __init__(self, d_network, d_loss):

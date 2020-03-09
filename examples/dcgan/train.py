@@ -3,14 +3,7 @@ from torch.nn import BCELoss
 from torch import optim
 from tensorboardX import SummaryWriter
 
-from collagen.core import Trainer
-from collagen.losses.gan import GeneratorLoss
-from collagen.callbacks import  TensorboardSynthesisVisualizer
-from collagen.data.data_provider import gan_data_provider
-from collagen.core.utils import auto_detect_device
-from collagen.strategies import GANStrategy
-from collagen.data.utils import get_mnist
-from collagen.logging import MeterLogging
+from collagen import *
 
 from examples.dcgan.utils import init_args, parse_item_mnist_gan, init_mnist_transforms
 from examples.dcgan.model import Discriminator, Generator
@@ -44,8 +37,8 @@ if __name__ == "__main__":
                                       parse_item_mnist_gan, args.bs, args.num_threads, device)
     # Setting up the callbacks
 
-    st_callbacks = (MeterLogging(writer=summary_writer),
-                    TensorboardSynthesisVisualizer(generator_sampler=item_loaders['fake'],
+    st_callbacks = (ScalarMeterLogger(writer=summary_writer),
+                    ImageSamplingVisualizer(generator_sampler=item_loaders['fake'],
                                                    writer=summary_writer,
                                                    grid_shape=(args.grid_shape, args.grid_shape)))
 
@@ -65,6 +58,6 @@ if __name__ == "__main__":
                         d_trainer=d_trainer, g_trainer=g_trainer,
                         n_epochs=args.n_epochs,
                         callbacks=st_callbacks,
-                        device=args.device)
+                        device=device)
 
     dcgan.run()

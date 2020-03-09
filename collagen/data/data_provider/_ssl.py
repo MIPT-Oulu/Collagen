@@ -2,6 +2,8 @@ from collagen.data import ItemLoader, DataProvider
 
 from collagen.data.samplers import AugmentedGroupSampler
 
+__all__ = ["pimodel_data_provider", "mt_data_provider"]
+
 
 def pimodel_data_provider(model, train_labeled_data, train_unlabeled_data, val_labeled_data, val_unlabeled_data,
                           transforms, parse_item, bs, num_threads, item_loaders=dict(), root="", n_augmentations=1,

@@ -1,6 +1,8 @@
 import torch
 from torch import nn
 
+__all__ = ["BCEDiceLoss", "BCEJaccardLoss", "BCEWithLogitsLoss2d", "SoftDiceLoss", "SoftJaccardLoss", "CombinedLoss"]
+
 
 class BCEWithLogitsLoss2d(nn.Module):
     """Computationally stable version of 2D BCE loss.
@@ -38,6 +40,7 @@ class SoftJaccardLoss(nn.Module):
         else:
             score = -torch.log(jaccard)
         return score
+
 
 class SoftDiceLoss(nn.Module):
     """SoftJaccard loss for binary problems.
@@ -89,6 +92,7 @@ class BCEJaccardLoss(torch.nn.Module):
             loss += self.jaccard(logits[use_jaccard], targets[use_jaccard])
 
         return loss
+
 
 class BCEDiceLoss(torch.nn.Module):
     def __init__(self):

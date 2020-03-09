@@ -5,6 +5,8 @@ from torch.nn import functional as F
 
 from collagen.callbacks.lr_scheduling.utils.ramps import sigmoid_rampup
 
+__all__ = ["MTLoss"]
+
 
 class MTLoss(nn.Module):
     def __init__(self, alpha_cls=1.0, consistency=10, consistency_rampup=5, logit_distance_cost=0.01):
