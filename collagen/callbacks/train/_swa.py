@@ -1,5 +1,7 @@
 from collagen.core import Callback
 
+__all__ = ["UpdateSWA"]
+
 
 class UpdateSWA(Callback):
     def __init__(self, swa_model, student_model, start_cycle_epoch, cycle_interval):

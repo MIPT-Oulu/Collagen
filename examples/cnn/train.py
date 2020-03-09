@@ -1,18 +1,11 @@
 import torch
 import numpy as np
 import yaml
-
-from collagen.data import ItemLoader, DataProvider
-from collagen.data import FoldSplit
-from collagen.core.utils import auto_detect_device
-from collagen.strategies import Strategy
-from collagen.metrics import RunningAverageMeter, AccuracyMeter
-from collagen.callbacks import ProgressbarVisualizer
-from collagen.data.utils import get_mnist, get_cifar10
-from collagen.savers import ModelSaver
 import random
-from collagen.logging import MeterLogging
 from tensorboardX import SummaryWriter
+
+from collagen import *
+
 from examples.cnn.utils import init_mnist_transforms, init_args
 from examples.cnn.utils import SimpleConvNet
 
@@ -39,7 +32,6 @@ if __name__ == "__main__":
         n_channels = 1
     else:
         raise ValueError('Not support dataset {}'.format(args.dataset))
-
 
     criterion = torch.nn.CrossEntropyLoss()
 
@@ -76,7 +68,7 @@ if __name__ == "__main__":
 
         val_cbs = (RunningAverageMeter(prefix="eval", name="loss"),
                    AccuracyMeter(prefix="eval", name="acc"),
-                   MeterLogging(writer=summary_writer),
+                   ScalarMeterLogger(writer=summary_writer),
                    ModelSaver(metric_names='eval/loss', save_dir=args.snapshots, conditions='min', model=model))
 
         strategy = Strategy(data_provider=data_provider,

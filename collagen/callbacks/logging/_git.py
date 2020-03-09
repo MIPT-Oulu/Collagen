@@ -1,6 +1,8 @@
 import os
 import subprocess
 
+__all__ = ["git_info"]
+
 
 def _minimal_ext_cmd(cmd):
     # construct minimal environment

@@ -7,7 +7,7 @@ from torch import optim
 import time
 from collagen.callbacks.logging.visualization import ImageSamplingVisualizer, FakeImageSamplingVisualizer
 from collagen.core import Trainer
-from collagen.core.utils import convert_according_to_args, kick_off_launcher
+from collagen.parallel._apex import convert_according_to_args, kick_off_launcher
 from collagen.data.data_provider import gan_data_provider
 from collagen.data.utils.datasets import get_mnist
 from collagen.callbacks import ScalarMeterLogger

@@ -5,6 +5,8 @@ from torch import Tensor
 
 from collagen.core.utils import to_cpu
 
+__all__ = ["get_cifar10", "get_mnist"]
+
 
 def get_mnist(data_folder='.', train=True):
     _db = datasets.MNIST(data_folder, train=train, transform=None, download=True)

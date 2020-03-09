@@ -11,7 +11,7 @@ import yaml
 from sklearn.model_selection import train_test_split
 from torchvision import transforms
 from torch.utils.tensorboard import SummaryWriter
-from collagen.core.utils import kick_off_launcher, convert_according_to_args
+from collagen.parallel._apex import convert_according_to_args, kick_off_launcher
 from collagen.data import FoldSplit, ItemLoader
 from collagen.data import DistributedItemLoader, DataProvider
 from collagen.data.utils.datasets import get_mnist, get_cifar10

@@ -5,6 +5,8 @@ from torch.nn import Module
 from collagen.core import Module, Callback
 from collagen.core.utils import wrap_tuple, freeze_modules
 
+__all__ = ["GANCallback", "DiscriminatorBatchFreezer", "GeneratorBatchFreezer"]
+
 
 class GANCallback(Callback):
     def __init__(self, ctype='gan_cb'):

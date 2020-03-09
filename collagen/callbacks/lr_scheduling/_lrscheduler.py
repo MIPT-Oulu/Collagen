@@ -3,6 +3,9 @@ from torch import optim
 from collagen.callbacks.lr_scheduling.utils import ramps
 from collagen.core import Callback
 
+__all__ = ["CycleRampUpDownScheduler", "LRScheduler", "SimpleLRScheduler", "SingleRampUpDownScheduler",
+           "TemporalBasedScheduler"]
+
 
 class LRScheduler(Callback):
     def __init__(self, name='lr_scheduler'):
@@ -97,7 +100,7 @@ class CycleRampUpDownScheduler(LRScheduler):
                     lr_rampdown_epochs = self.__lr_rampdown_epochs if self.__cycle_rampdown_epochs == 0 else self.__cycle_rampdown_epochs
                     lr *= ramps.cosine_rampdown(
                         (lr_rampdown_epochs - (
-                                    self.__lr_rampdown_epochs - self.__start_cycle_epoch) - self.__cycle_interval) +
+                                self.__lr_rampdown_epochs - self.__start_cycle_epoch) - self.__cycle_interval) +
                         ((epoch - self.__start_cycle_epoch) % self.__cycle_interval), lr_rampdown_epochs)
 
         for param_group in self.__optim.param_groups:
