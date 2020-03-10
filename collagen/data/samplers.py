@@ -1,13 +1,14 @@
 import pandas as pd
 import torch
 from torch import nn as nn
+
 try:  # Handling API difference between pytorch 1.1 and 1.2
     from torch.utils.data.dataloader import default_collate
 except ImportError:
     from torch.utils.data._utils.collate import default_collate
 
 from collagen.core.utils import to_cpu
-from collagen.data import ItemLoader, DistributedItemLoader
+from collagen.data import ItemLoader
 
 
 class MixUpSampler(ItemLoader):
@@ -447,6 +448,7 @@ class GaussianNoiseSampler(ItemLoader):
     def __len__(self):
         return 1
 
+
 class SSGANFakeSampler(ItemLoader):
     def __init__(self, g_network, batch_size, latent_size, n_classes, name='ssgan_fake', use_aux_target=False,
                  same_class_batch=False):
@@ -490,5 +492,3 @@ class SSGANFakeSampler(ItemLoader):
 
     def __len__(self):
         return 1
-
-

@@ -125,9 +125,7 @@ class SSFoldSplit(Splitter):
         for i in range(n_folds):
             u_train, u_test = next(unlabeled_spl_iter)
             l_train, l_test = next(labeled_spl_iter)
-            if equal_unlabeled_target:
-                u_train_target = unlabeled_ds.iloc[u_train][unlabeled_target_col]
-                u_test_target = unlabeled_ds.iloc[u_test][unlabeled_target_col]
+
             l_train_target = labeled_ds.iloc[l_train][target_col]
             l_train_data = labeled_ds.iloc[l_train]
 
@@ -163,6 +161,9 @@ class SSFoldSplit(Splitter):
 
             # Sample unlabeled_train_size of labeled data
             if equal_unlabeled_target:
+                u_train_target = unlabeled_ds.iloc[u_train][unlabeled_target_col]
+                u_test_target = unlabeled_ds.iloc[u_test][unlabeled_target_col]
+
                 filtered_u_train_idx, chosen_u_train = self._sample_unlabeled_data(unlabeled_ds, u_train,
                                                                                    unlabeled_target_col,
                                                                                    u_train_target,

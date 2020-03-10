@@ -1,1 +1,1 @@
-from ._mean_teacher import MTLoss
+from ._mean_teacher import *

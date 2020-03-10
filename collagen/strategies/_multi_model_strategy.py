@@ -13,7 +13,7 @@ import torch.distributed as dist
 
 from collagen.core import Callback
 from collagen.core import Trainer, Session, Module
-from collagen.core.utils import wrap_tuple, first_gpu_or_cpu_in_use
+from collagen.core.utils import wrap_tuple
 
 from collagen.data import DataProvider
 
@@ -34,7 +34,7 @@ class MultiModelStrategy(object):
                  n_epochs: int or None = 10,
                  n_train_batches: int or None = None,
                  trainers: Tuple[Trainer] or Trainer = None,
-                 distributed=False):
+                 distributed=False, use_apex=False):
         """Constructor of MultiModelStrategy
         Parameters
         ----------
@@ -88,6 +88,7 @@ class MultiModelStrategy(object):
         self.__target_key_by_stage = dict()
         self.__num_batches_by_stage = dict()
         self.__distributed = distributed
+        self.__use_apex = use_apex
         for stage in self.__stage_names:
             self.__num_batches_by_stage[stage] = -1
             self.__data_key_by_stage[stage] = dict()
@@ -149,10 +150,14 @@ class MultiModelStrategy(object):
             self.__trainers[name].add_eval_callbacks(self.__default_callbacks_eval[name])
             strategy_callback_tuple += wrap_tuple(trainer.model)
 
-        if first_gpu_or_cpu_in_use(self.__device):
-            self.__default_strategy_callback = (ProgressbarLogger(update_freq=1),)
+        if self.__use_apex:
+            from collagen.parallel._apex import first_gpu_or_cpu_in_use
+            if first_gpu_or_cpu_in_use(self.__device):
+                self.__default_strategy_callback = (ProgressbarLogger(update_freq=1),)
+            else:
+                self.__default_strategy_callback = ()
         else:
-            self.__default_strategy_callback = ()
+            self.__default_strategy_callback = (ProgressbarLogger(update_freq=1),)
 
         self.__callbacks += self.__default_strategy_callback
 

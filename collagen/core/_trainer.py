@@ -9,7 +9,6 @@ from collagen.core._callback import Callback
 from collagen.core.utils import wrap_tuple
 from ._session import Session
 from ..data import DataProvider
-from ..data.utils import cast_tensor
 
 
 class Trainer(object):

@@ -1,37 +1,42 @@
 import argparse
-import torch
-import numpy as np
 
-import pandas as pd
-import torchvision.datasets as datasets
+import solt.core as slc
+import solt.data as sld
+import solt.transforms as slt
+import torch
 import torch.nn.functional as F
 from torch import nn
 
-import solt.data as sld
-import solt.core as slc
-import solt.transforms as slt
-
-from collagen.data.utils import ApplyTransform, Normalize, Compose
 from collagen.core import Module
+from collagen.data.utils import ApplyTransform, Normalize, Compose
 
 
 def init_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--n_epochs', type=int, default=1000, help='Number of epochs')
-    parser.add_argument('--bs', type=int, default=128, help='Batch size')
-    parser.add_argument('--dropout', type=float, default=0.2, help='Dropout rate')
+    parser.add_argument('--n_epochs', type=int, default=10, help='Number of epochs')
+    parser.add_argument('--batch_size', type=int, default=256, help='Batch size')
+    parser.add_argument('--dropout', type=float, default=0.5, help='Dropout rate')
     parser.add_argument('--bw', type=int, default=64, help='Bandwidth of model')
-    parser.add_argument('--wd', type=float, default=1e-4, help='Weight decay')
-    parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
-    parser.add_argument('--num_threads', type=int, default=0, help='Number of threads for data loader')
+    parser.add_argument('--wd', type=float, default=1e-5, help='Weight decay')
+    parser.add_argument('--lr', type=float, default=0.1, help='Learning rate')
     parser.add_argument('--save_data', default='data', help='Where to save downloaded dataset')
     parser.add_argument('--snapshots', default='snapshots', help='Where to save the snapshots')
     parser.add_argument('--seed', type=int, default=12345, help='Random seed')
     parser.add_argument('--dataset', type=str, default="mnist", help='Dataset name')
-    # parser.add_argument('--device', type=str, default="cuda", help='Use `cuda` or `cpu`')
     parser.add_argument('--data_dir', type=str, default="data", help='Data directory')
     parser.add_argument('--log_dir', type=str, default=None, help='Log directory')
     parser.add_argument('--comment', type=str, default="cnn", help='Comment of log')
+    parser.add_argument('--mms', type=bool, default=False, help='Shape of grid of generated images')
+    parser.add_argument('--distributed', type=bool, default=False, help='whether to use DDP')
+    parser.add_argument('--gpu', type=int, default=0, help='Default GPU id')
+    parser.add_argument('--dist_backend', default='nccl', type=str, help='distributed backend')
+    parser.add_argument('--use_apex', default=False, type=bool, help='Whether to use apex library')
+    parser.add_argument('--loss_scale', default=None, type=int, help='loss scale for apex amp')
+    parser.add_argument('--n_channels', default=1, type=int, help='number of input channels')
+    parser.add_argument('--opt_level', default='O2', type=str, help='number of input channels')
+    parser.add_argument('--suppress_warning', default=True, type=bool, help='whether to print warning messages')
+    parser.add_argument('--workers', default=4, type=int, metavar='N',
+                        help='number of data loading workers ')
     args = parser.parse_args()
 
     return args
@@ -48,14 +53,14 @@ def unpack_solt(dc: sld.DataContainer):
     return img, target
 
 
-def init_mnist_transforms(n_channels=1):
+def init_mnist_cifar_transforms(n_channels=1, stage='train'):
     if n_channels == 1:
         norm_mean_std = Normalize((0.1307,), (0.3081,))
     elif n_channels == 3:
         norm_mean_std = Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261))
     else:
-        raise ValueError("Not support channels of {}".format(nc))
-    
+        raise ValueError("Not support channels of {}".format(n_channels))
+
     train_trf = Compose([
         wrap2solt,
         slc.Stream([
@@ -69,6 +74,9 @@ def init_mnist_transforms(n_channels=1):
         ApplyTransform(norm_mean_std)
     ])
 
+    if stage == 'train':
+        return train_trf
+
     test_trf = Compose([
         wrap2solt,
         slt.PadTransform(pad_to=32),
@@ -76,17 +84,17 @@ def init_mnist_transforms(n_channels=1):
         ApplyTransform(norm_mean_std)
     ])
 
-    return train_trf, test_trf
+    return test_trf
 
 
 class SimpleConvNet(Module):
     def __init__(self, bw, drop=0.5, n_cls=10, n_channels=1):
         super(SimpleConvNet, self).__init__()
-        self.n_filters_last = bw*2
+        self.n_filters_last = bw * 2
 
         self.conv1 = self.make_layer(n_channels, bw)
-        self.conv2 = self.make_layer(bw, bw*2)
-        self.conv3 = self.make_layer(bw*2, self.n_filters_last)
+        self.conv2 = self.make_layer(bw, bw * 2)
+        self.conv3 = self.make_layer(bw * 2, self.n_filters_last)
 
         self.classifier = nn.Sequential(nn.Dropout(drop),
                                         nn.Linear(self.n_filters_last, n_cls))
@@ -113,4 +121,3 @@ class SimpleConvNet(Module):
 
     def get_features_by_name(self, name):
         pass
-

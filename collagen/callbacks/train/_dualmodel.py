@@ -5,6 +5,8 @@ from torch.nn import Module
 from collagen.core import Module, Callback
 from collagen.core.utils import wrap_tuple, freeze_modules
 
+__all__ = ["DualModelCallback", "M1BatchFreezer", "M2BatchFreezer", "SetTeacherTrain", "UpdateEMA"]
+
 
 class DualModelCallback(Callback):
     def __init__(self):

@@ -1,1 +1,1 @@
-from ._gan import GeneratorLoss
+from ._gan import *

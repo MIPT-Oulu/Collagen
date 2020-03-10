@@ -7,6 +7,8 @@ ramp length in the same format, and returns a multiplier between
 
 import numpy as np
 
+__all__ = ["sigmoid_rampup", "linear_rampup", "cosine_rampdown"]
+
 
 def sigmoid_rampup(current, rampup_length):
     """Exponential rampup from https://arxiv.org/abs/1610.02242"""

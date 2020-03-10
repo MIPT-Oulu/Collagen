@@ -6,6 +6,8 @@ import tqdm
 from collagen.core import Callback
 from collagen.core.utils import wrap_tuple
 
+__all__ = ["Logger", "BatchLRLogger", "EpochLRLogger", "FakeScalarMeterLogger", "ProgressbarLogger", "ScalarMeterLogger"]
+
 
 class Logger(Callback):
     def __init__(self, name=None):

@@ -6,14 +6,6 @@ from torch import Tensor
 
 from collagen.core import Module
 
-try:
-    import apex
-    from apex.parallel import DistributedDataParallel as DDP
-    from apex import amp
-
-except ImportError:
-    raise ImportError("Please install apex from https://www.github.com/nvidia/apex to run this example.")
-
 
 class Session(object):
     """Session class, which implements the basic logic of the training loop.
@@ -44,6 +36,16 @@ class Session(object):
         self.__optimizer: torch.optim.Optimizer = optimizer
         self.__loss: torch.nn.Module = loss
         self.__use_apex = use_apex
+
+        if self.__use_apex:
+            try:
+                import apex
+                from apex.parallel import DistributedDataParallel as DDP
+                from apex import amp
+
+            except ImportError:
+                raise ImportError("Please install apex from https://www.github.com/nvidia/apex to run this example.")
+
         self.__distributed = distributed
 
         # Params of ``backward``
@@ -202,7 +204,8 @@ class Session(object):
             raise ValueError('Not support input type {}'.format(type(batch)))
 
         if isinstance(target, tuple) or isinstance(target, list):
-            target_on_device = tuple([t.to(module_device, non_blocking=distributed) if isinstance(t, Tensor) else t for t in target])
+            target_on_device = tuple(
+                [t.to(module_device, non_blocking=distributed) if isinstance(t, Tensor) else t for t in target])
         elif isinstance(target, dict):
             target_on_device = dict()
             for k in target:

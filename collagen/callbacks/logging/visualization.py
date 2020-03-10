@@ -16,6 +16,8 @@ from torchvision.utils import make_grid
 from collagen.core import Callback
 from collagen.core.utils import to_cpu
 
+__all__ = ["ConfusionMatrixVisualizer", "ImageMaskVisualizer", "ImageSamplingVisualizer", "FakeImageSamplingVisualizer"]
+
 
 class ConfusionMatrixVisualizer(Callback):
     def __init__(self, writer, labels: list or None = None, tag="confusion_matrix", normalize=True, name='cm',
@@ -140,7 +142,8 @@ class ConfusionMatrixVisualizer(Callback):
 
 class ImageSamplingVisualizer(Callback):
     def __init__(self, writer, generator_sampler, key_name: str = "data", tag: str = "Generated",
-                 grid_shape: Tuple[int, int] or int = (10, 10), split_channel=True, transform=None, unbind_imgs_transform=None):
+                 grid_shape: Tuple[int, int] or int = (10, 10), split_channel=True, transform=None,
+                 unbind_imgs_transform=None):
         """Visualizes synthesized images in TensorboardX
 
         Parameters
@@ -211,7 +214,7 @@ class ImageSamplingVisualizer(Callback):
             else:
                 break
         grid_images = make_grid(images[:self.__num_images], nrow=self.__grid_shape[0])
-        self.__writer.add_images(self.__tag, img_tensor=grid_images,  dataformats='CHW')
+        self.__writer.add_images(self.__tag, img_tensor=grid_images, dataformats='CHW')
 
 
 class FakeImageSamplingVisualizer(Callback):
@@ -266,7 +269,6 @@ class FakeImageSamplingVisualizer(Callback):
         pass
 
 
-
 class ImageMaskVisualizer(Callback):
     """
     Expected behavior:
@@ -279,6 +281,7 @@ class ImageMaskVisualizer(Callback):
     5. ensure support for binary and multi-class semantica segmentation.
 
     """
+
     def __init__(self, writer, log_dir: str = None, comment: str = '', grid_shape: int = (2, 1),
                  mean: float = None, std: float = None):
         super().__init__(ctype="visualizer")
@@ -346,7 +349,6 @@ class ImageMaskVisualizer(Callback):
         self.__summary_writer.add_images(tag='Prediction_worst', img_tensor=torch.sigmoid(self.__pred_worst),
                                          dataformats='NCHW', global_step=epoch)
 
-
     @staticmethod
     def undo_transform(data, mean, std):
         # img is CxHxW tensor
@@ -355,7 +357,7 @@ class ImageMaskVisualizer(Callback):
         if len(data.shape) == 4:
             for im in range(data.size(0)):
                 for c_ind in range(data.size(1)):
-                    data[im, c_ind] = data[im, c_ind]*std[c_ind] + mean[c_ind]
+                    data[im, c_ind] = data[im, c_ind] * std[c_ind] + mean[c_ind]
         else:
             for c_ind in range(data.size(0)):
                 data[c_ind] = data[c_ind] * std[c_ind] + mean[c_ind]
