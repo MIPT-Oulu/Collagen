@@ -2,23 +2,11 @@ import yaml
 from tensorboardX import SummaryWriter
 from torch import optim
 
-from collagen.core import Callback
-from collagen.core import Trainer
-from collagen.core.utils import auto_detect_device
-from collagen.data import SSFoldSplit
-from collagen.data.data_provider import mt_data_provider
-from collagen.data.utils.datasets import get_cifar10, get_mnist
-
-from collagen.losses.ssl import MTLoss
-
-from collagen.strategies import DualModelStrategy
 from examples.mean_teacher.networks import Model01
 from examples.mean_teacher.utils import SSConfusionMatrixVisualizer, cond_accuracy_meter
 from examples.mean_teacher.utils import init_args, parse_item, init_transforms, parse_target, parse_class
 
-from collagen.callbacks import UpdateEMA, SingleRampUpDownScheduler
-from collagen.callbacks import ProgressbarLogger, ScalarMeterLogger, EpochLRLogger
-from collagen.callbacks import RunningAverageMeter, AccuracyMeter, KappaMeter
+from collagen import *
 
 device = auto_detect_device()
 
@@ -37,9 +25,6 @@ if __name__ == "__main__":
     print(args)
     log_dir = args.log_dir
     comment = "MT"
-
-    # Data provider
-    dataset_name = 'cifar10'
 
     if args.dataset == 'cifar10':
         train_ds, classes = get_cifar10(data_folder=args.save_data, train=True)

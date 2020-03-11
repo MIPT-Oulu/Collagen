@@ -16,7 +16,10 @@ def to_cpu(x: torch.Tensor or torch.cuda.FloatTensor, required_grad=False, use_n
             else:
                 x_cpu = x.to('cpu').required_grad_(False)
         elif use_numpy:
-            x_cpu = x.numpy()
+            if x.requires_grad:
+                x_cpu = x.detach().numpy()
+            else:
+                x_cpu = x.numpy()
 
     return x_cpu
 

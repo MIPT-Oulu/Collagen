@@ -24,7 +24,7 @@ class Splitter(object):
 
     def dump(self, filename):
         with open(filename, "wb") as f:
-            pickle.dump(self.__ds_chunks, f)
+            pickle.dump(self.__ds_chunks, f, pickle.HIGHEST_PROTOCOL)
 
     def load(self, filename):
         with open(filename, "rb") as f:
@@ -55,7 +55,7 @@ class FoldSplit(Splitter):
 
     def dump(self, filename):
         with open(filename, "wb") as f:
-            pickle.dump(self.__ds_chunks, f)
+            pickle.dump(self.__ds_chunks, f, pickle.HIGHEST_PROTOCOL)
 
     def fold(self, i):
         return self.__ds_chunks[i]
@@ -80,6 +80,10 @@ class SSFoldSplit(Splitter):
         if equal_target and labeled_train_size_per_class is None:
             raise ValueError("labeled_train_size_per_class must be determined when \
             equal_target is True, but found None")
+
+        if not equal_target and labeled_train_size is None:
+            raise ValueError("labeled_train_size must be determined when \
+            equal_target is False, but found None")
 
         # Master split into Label/Unlabel
         if group_col is None:
@@ -244,7 +248,7 @@ class SSFoldSplit(Splitter):
 
     def dump(self, filename):
         with open(filename, "wb") as f:
-            pickle.dump(self.__ds_chunks, f)
+            pickle.dump(self.__ds_chunks, f, pickle.HIGHEST_PROTOCOL)
 
     def __next__(self):
         return next(self.__folds_iter)

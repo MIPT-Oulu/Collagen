@@ -138,7 +138,7 @@ def parse_item(root, entry, trf, data_key, target_key):
 def init_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--n_epochs', type=int, default=500, help='Number of epochs')
-    parser.add_argument('--dataset', type=str, default="cifar10", help='Dataset name')
+    parser.add_argument('--dataset', type=str, default="mnist", help='Dataset name')
     parser.add_argument('--bs', type=int, default=32, help='Batch size')
     parser.add_argument('--lr', type=float, default=1e-1, help='Max learning rate')
     parser.add_argument('--initial_lr', default=0.0, type=float, help='Initial learning rate when using linear rampup')
