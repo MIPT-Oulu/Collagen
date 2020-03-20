@@ -2,6 +2,7 @@ from datetime import datetime
 from os import mkdir, remove
 from os.path import exists, join, isfile
 from typing import Tuple
+import torch
 
 import numpy as np
 import torch.nn as nn
@@ -102,11 +103,10 @@ class ModelSaver(Callback):
             date_time = datetime.now().strftime("%Y%m%d_%H%M%S")
             model_name = "_".join([self.__prefix, "{0:04d}".format(epoch), date_time, metrics_desc]) + ".pth"
             model_fullname = join(self.__save_dir, model_name)
-            with open(model_fullname, 'wb') as f:
-                pickle.dump(self.__model.state_dict(), f)
+            torch.save(self.__model.state_dict(), model_fullname)
             with open(model_fullname[:-4] + ".log", 'wb') as f:
                 pickle.dump(self.__best_metrics, f)
-            # torch.save(self.__model.state_dict(), model_fullname)
+            
             if self.__keep_best_only and isfile(self.__prev_model_path):
                 remove(self.__prev_model_path)
                 remove(self.__prev_model_path[:-4] + ".log")
