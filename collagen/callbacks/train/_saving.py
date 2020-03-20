@@ -104,9 +104,12 @@ class ModelSaver(Callback):
             model_fullname = join(self.__save_dir, model_name)
             with open(model_fullname, 'wb') as f:
                 pickle.dump(self.__model.state_dict(), f)
+            with open(model_fullname[:-4] + ".log", 'wb') as f:
+                pickle.dump(self.__best_metrics, f)
             # torch.save(self.__model.state_dict(), model_fullname)
             if self.__keep_best_only and isfile(self.__prev_model_path):
                 remove(self.__prev_model_path)
+                remove(self.__prev_model_path[:-4] + ".log")
             self.__prev_model_path = model_fullname
 
     def get_metric_by_name(self, name):
