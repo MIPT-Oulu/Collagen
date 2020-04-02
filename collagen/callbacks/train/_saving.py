@@ -83,6 +83,8 @@ class ModelSaver(Callback):
             cb_name = str(cb)
             if cb.ctype == "meter" and cb_name in self.__best_metrics:
                 cb_value = cb.current()
+                if cb_value is None:
+                    continue
 
                 if self.__mode == "and":
                     if self.__check_cond(value=cb_value, metric_name=cb_name):

@@ -151,14 +151,6 @@ class Trainer(object):
         data_key = wrap_tuple(data_key)
         target_key = wrap_tuple(target_key)
 
-        # TODO: Validate
-        for k in self.__data_provider.get_loader_names():
-            meta = self.__data_provider.get_loader_by_name(k).meta_data
-            print(f"[Trainer] {k} ID: {meta['ID'].tolist()}")
-            # if '9272247' in meta['ID'].tolist():
-                # print(f'Found `9272247` in itemloader `{k}` in Trainer')
-                # print(f'ID {meta["ID"].tolist()}')
-
         for ind, loader_name in enumerate(self.__train_loader_names):
             cur_loader_state = self.__data_provider.state_dict()[loader_name]
             n_iter = len(cur_loader_state["samples"])
