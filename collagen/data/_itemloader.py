@@ -64,26 +64,15 @@ class ItemLoader(object):
 
         self.__name = name
 
-        if meta_data is None:
-            self.__dataset = None
-        else:
-            self.__dataset = DataFrameDataset(root, meta_data=meta_data,
-                                              parse_item_cb=parse_item_cb, transform=transform)
-
-        if self.__dataset is None:
-            self.__data_loader = None
-        else:
-            self.__data_loader = torch.utils.data.DataLoader(dataset=self.__dataset,
-                                                             batch_size=batch_size,
-                                                             shuffle=shuffle,
-                                                             sampler=sampler,
-                                                             batch_sampler=batch_sampler,
-                                                             num_workers=num_workers,
-                                                             collate_fn=collate_fn,
-                                                             pin_memory=pin_memory,
-                                                             drop_last=drop_last,
-                                                             timeout=timeout,
-                                                             worker_init_fn=worker_init_fn)
+        self.__root = root
+        self.__shuffle = shuffle
+        self.__sampler = sampler
+        self.__batch_sampler = batch_sampler
+        self.__num_workers = num_workers
+        self.__collate_fn = collate_fn
+        self.__pin_memory = pin_memory
+        self.__timeout = timeout
+        self.__worker_init_fn = worker_init_fn
 
         self.__transform = transform
         self.drop_last: bool = drop_last
@@ -91,9 +80,42 @@ class ItemLoader(object):
         self.__iter_loader = None
         self.parse_item = parse_item_cb
 
+        self.update_dataset(meta_data)
+
     @staticmethod
     def _worker_init(wid):
         np.random.seed(np.uint32(torch.initial_seed() + wid))
+
+    @property
+    def dataset(self):
+        return self.__dataset
+
+    @property
+    def meta_data(self):
+        return self.__meta_data
+
+    def update_dataset(self, meta_data):
+        self.__meta_data = meta_data
+        if self.__meta_data is None:
+            self.__dataset = None
+        else:
+            self.__dataset = DataFrameDataset(self.__root, meta_data=self.__meta_data,
+                                              parse_item_cb=self.parse_item, transform=self.__transform)
+
+        if self.__dataset is None:
+            self.__data_loader = None
+        else:
+            self.__data_loader = torch.utils.data.DataLoader(dataset=self.__dataset,
+                                                             batch_size=self.batch_size,
+                                                             shuffle=self.__shuffle,
+                                                             sampler=self.__sampler,
+                                                             batch_sampler=self.__batch_sampler,
+                                                             num_workers=self.__num_workers,
+                                                             collate_fn=self.__collate_fn,
+                                                             pin_memory=self.__pin_memory,
+                                                             drop_last=self.drop_last,
+                                                             timeout=self.__timeout,
+                                                             worker_init_fn=self.__worker_init_fn)
 
     @property
     def transform(self):
