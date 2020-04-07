@@ -27,10 +27,10 @@ eval:
         - "logits"
         - "name"
 
-    unlabeled_eval:
-      cate: AugmentedGroupSampler
-      num_samples: 1
-      data_key: "data"
-      target_key:
-        - "name"
-        - "logits"
+#    unlabeled_eval:
+#      cate: AugmentedGroupSampler
+#      num_samples: 1
+#      data_key: "data"
+#      target_key:
+#        - "name"
+#        - "logits"

@@ -69,6 +69,7 @@ class MultiModelStrategy(object):
         # NN models
         self.__model_trainer_names = strategy_config['model_trainer_names']
         self.__model_validator_names = strategy_config['model_validator_names']
+        self.__train_starts_at_epoch = strategy_config['train_starts_at_epoch']
         self.__n_epochs = n_epochs
         self.__data_provider = data_provider
         self.__callbacks = wrap_tuple(callbacks)
@@ -144,10 +145,10 @@ class MultiModelStrategy(object):
         strategy_callback_tuple = ()
         for name, trainer in zip(self.__model_trainer_names, trainers):
             self.__trainers[name] = trainer
-            self.__default_callbacks_train[name] = RunningAverageMeter(prefix=f'train/{name}', name='loss')
-            self.__default_callbacks_eval[name] = RunningAverageMeter(prefix=f'eval/{name}', name='loss')
-            self.__trainers[name].add_train_callbacks(self.__default_callbacks_train[name])
-            self.__trainers[name].add_eval_callbacks(self.__default_callbacks_eval[name])
+            # self.__default_callbacks_train[name] = RunningAverageMeter(prefix=f'train/{name}', name='loss')
+            # self.__default_callbacks_eval[name] = RunningAverageMeter(prefix=f'eval/{name}', name='loss')
+            # self.__trainers[name].add_train_callbacks(self.__default_callbacks_train[name])
+            # self.__trainers[name].add_eval_callbacks(self.__default_callbacks_eval[name])
             strategy_callback_tuple += wrap_tuple(trainer.model)
 
         if self.__use_apex:
@@ -160,6 +161,10 @@ class MultiModelStrategy(object):
             self.__default_strategy_callback = (ProgressbarLogger(update_freq=1),)
 
         self.__callbacks += self.__default_strategy_callback
+
+    @property
+    def data_provider(self):
+        return self.__data_provider
 
     def _call_callbacks_by_name(self, cb_func_name, **kwargs):
         """
@@ -224,9 +229,11 @@ class MultiModelStrategy(object):
                     trainer_names = self.__model_validator_names
                 self._call_callbacks_by_name(cb_func_name='on_epoch_begin', epoch=epoch, stage=stage,
                                              n_epochs=self.__n_epochs)
-                if first_gpu_or_cpu_in_use(self.__device):
+                if not self.__use_apex or (self.__use_apex and first_gpu_or_cpu_in_use(self.__device)):
+                    model_names = [_name for _name in trainer_names if self.__train_starts_at_epoch[_name] <= epoch]
+                    model_names_str = "-".join(model_names)
                     progress_bar = tqdm(range(self.__num_batches_by_stage[stage]), total=self.__num_batches_by_stage[stage],
-                                        desc=f'Epoch [{epoch}][{stage}]::')
+                                        desc=f'Epoch [{epoch}][{stage}]::[{model_names_str}]')
                 else:
                     progress_bar = range(self.__num_batches_by_stage[stage])
                 for batch_i in progress_bar:
@@ -240,6 +247,9 @@ class MultiModelStrategy(object):
 
                     # for scalability data sampling needs to be done every iteration
                     for model_name in trainer_names:
+                        if self.__train_starts_at_epoch[model_name] > epoch and stage == "train":
+                            continue
+
                         self._call_callbacks_by_name(cb_func_name='on_sample_begin',
                                                      progress_bar=progress_bar,
                                                      epoch=epoch,

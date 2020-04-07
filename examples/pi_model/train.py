@@ -1,107 +1,19 @@
-import torch
 import yaml
 from tensorboardX import SummaryWriter
-from torch import optim, Tensor
-from torch.nn import CrossEntropyLoss
-from torch.nn import functional as F
+from torch import optim
 
-from collagen.core import Module
 from collagen.core.utils import auto_detect_device
 from collagen.data import SSFoldSplit
 from collagen.data.data_provider import pimodel_data_provider
 from collagen.data.utils.datasets import get_mnist, get_cifar10
 from collagen.callbacks import RunningAverageMeter, AccuracyMeter, ScalarMeterLogger
 from collagen.strategies import Strategy
+from examples.pi_model.losses import PiModelLoss
 from examples.pi_model.networks import Model01
 from examples.pi_model.utils import SSConfusionMatrixVisualizer, cond_accuracy_meter, parse_class
 from examples.pi_model.utils import init_args, parse_item, init_transforms, parse_target_accuracy_meter
 
 device = auto_detect_device()
-
-
-class PiModelLoss(Module):
-    def __init__(self, alpha=0.5, cons_mode='mse'):
-        super().__init__()
-        self.__cons_mode = cons_mode
-        if cons_mode == 'mse':
-            self.__loss_cons = self.softmax_mse_loss
-        elif cons_mode == 'kl':
-            self.__loss_cons = self.softmax_kl_loss
-        self.__loss_cls = CrossEntropyLoss(reduction='sum')
-        self.__alpha = alpha
-        self.__losses = {'loss_cls': None, 'loss_cons': None}
-
-        self.__n_minibatches = 2.0
-
-    @staticmethod
-    def softmax_kl_loss(input_logits, target_logits):
-        """Takes softmax on both sides and returns KL divergence
-
-        Note:
-        - Returns the sum over all examples. Divide by the batch size afterwards
-          if you want the mean.
-        - Sends gradients to inputs but not the targets.
-        """
-        assert input_logits.size() == target_logits.size()
-        input_log_softmax = F.log_softmax(input_logits, dim=1)
-        target_softmax = F.softmax(target_logits, dim=1)
-        n_classes = target_logits.shape[1]
-        return F.kl_div(input_log_softmax, target_softmax, reduction='sum') / n_classes
-
-    @staticmethod
-    def softmax_mse_loss(input_logits, target_logits):
-        """Takes softmax on both sides and returns MSE loss
-
-        Note:
-        - Returns the sum over all examples. Divide by the batch size afterwards
-          if you want the mean.
-        - Sends gradients to inputs but not the targets.
-        """
-        assert input_logits.size() == target_logits.size()
-        input_softmax = F.softmax(input_logits, dim=1)
-        target_softmax = F.softmax(target_logits, dim=1)
-        n_classes = input_logits.size()[1]
-        return F.mse_loss(input_softmax, target_softmax, reduction='sum') / n_classes
-
-    def forward(self, pred: Tensor, target: Tensor):
-        n_minibatch_size = pred.shape[0]
-        if target['name'] == 'u':
-            aug_logit = target['logits']
-
-            loss_cons = self.__loss_cons(aug_logit, pred)
-
-            self.__losses['loss_cons'] = self.__alpha * loss_cons / (self.__n_minibatches * n_minibatch_size)
-            self.__losses['loss_cls'] = None
-            self.__losses['loss'] = self.__losses['loss_cons']
-            _loss = self.__losses['loss']
-
-        elif target['name'] == 'l':
-            aug_logit = target['logits']
-            target_cls = target['target'].type(torch.int64)
-
-            loss_cls = self.__loss_cls(pred, target_cls)
-            loss_cons = self.__loss_cons(aug_logit, pred)
-            self.__losses['loss_cons'] = self.__alpha * loss_cons / (self.__n_minibatches * n_minibatch_size)
-            self.__losses['loss_cls'] = loss_cls / (self.__n_minibatches * n_minibatch_size)
-            self.__losses['loss'] = self.__losses['loss_cls'] + self.__losses['loss_cons']
-            _loss = self.__losses['loss']
-        else:
-            raise ValueError("Not support target name {}".format(target['name']))
-
-        return _loss
-
-    def get_loss_by_name(self, name):
-        if name in self.__losses:
-            return self.__losses[name]
-        else:
-            return None
-
-    def get_features(self):
-        pass
-
-    def get_features_by_name(self, name: str):
-        pass
-
 
 if __name__ == "__main__":
     args = init_args()

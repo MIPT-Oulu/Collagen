@@ -144,6 +144,7 @@ class Trainer(object):
 
         """
 
+        #TODO: Check default of minibatch_accumulate_grad
         minibatch_accumulate_grad = True if minibatch_accumulate_grad is None else minibatch_accumulate_grad
         accumulate_grad = False if accumulate_grad is None else accumulate_grad
 
