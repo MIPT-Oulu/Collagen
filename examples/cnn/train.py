@@ -40,14 +40,12 @@ if __name__ == "__main__":
     comment = args.comment
     summary_writer = SummaryWriter(log_dir=log_dir, comment=comment)
 
-    kfold_train_losses = []
-    kfold_val_losses = []
-    kfold_val_accuracies = []
-
     splitter = FoldSplit(train_ds, n_folds=5, target_col="target")
 
     with open("settings.yml", "r") as f:
         sampling_config = yaml.load(f)
+    with open("strategy.yml", "r") as f:
+        strategy_config = yaml.load(f)
 
     for fold_id, (df_train, df_val) in enumerate(splitter):
         item_loaders = dict()
@@ -71,23 +69,18 @@ if __name__ == "__main__":
                    ScalarMeterLogger(writer=summary_writer),
                    ModelSaver(metric_names='eval/loss', save_dir=args.snapshots, conditions='min', model=model))
 
+        session = Session(data_provider=data_provider,
+                          train_loader_names=tuple(sampling_config['train']['data_provider']['mymodel'].keys()),
+                          val_loader_names=tuple(sampling_config['eval']['data_provider']['mymodel'].keys()),
+                          module=model, loss=criterion, optimizer=optimizer,
+                          train_callbacks=train_cbs,
+                          val_callbacks=val_cbs)
+
         strategy = Strategy(data_provider=data_provider,
-                            train_loader_names=tuple(sampling_config['train']['data_provider'].keys()),
-                            val_loader_names=tuple(sampling_config['eval']['data_provider'].keys()),
                             data_sampling_config=sampling_config,
-                            loss=criterion,
-                            model=model,
+                            strategy_config=strategy_config,
+                            sessions=session,
                             n_epochs=args.n_epochs,
-                            optimizer=optimizer,
-                            train_callbacks=train_cbs,
-                            val_callbacks=val_cbs,
                             device=device)
 
         strategy.run()
-        kfold_train_losses.append(train_cbs[0].current())
-        kfold_val_losses.append(val_cbs[0].current())
-        kfold_val_accuracies.append(val_cbs[1].current())
-
-    print("k-fold training loss: {}".format(np.asarray(kfold_train_losses).mean()))
-    print("k-fold validation loss: {}".format(np.asarray(kfold_val_losses).mean()))
-    print("k-fold validation accuracy: {}".format(np.asarray(kfold_val_accuracies).mean()))

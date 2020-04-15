@@ -25,7 +25,7 @@ def to_cpu(x: torch.Tensor or torch.cuda.FloatTensor, required_grad=False, use_n
 
 
 def wrap_tuple(x):
-    if not isinstance(x, tuple):
+    if not isinstance(x, tuple) and not isinstance(x, list):
         return (x,)
     else:
         return x

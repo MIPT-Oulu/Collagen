@@ -1,377 +1,339 @@
-from typing import Tuple, Any, List
-
-import numpy as np
-import torch
-from torch import Tensor
+try:
+    from torch.optim import Optimizer
+except ImportError:
+    from torch.optim.optimizer import Optimizer
+from typing import Tuple
 
 from collagen.core import Module
+from collagen.core._callback import Callback
+from collagen.core.utils import wrap_tuple
+from ._stepper import Stepper
+from ..data import DataProvider
 
 
 class Session(object):
-    """Session class, which implements the basic logic of the training loop.
-
-    Current implementation allows to easily set-up gradient accumulation
-    and other strategies.
+    """
+    Implements a part of the training loop by passing the available batches through the model.
 
     Parameters
     ----------
+    data_provider : DataProvider
+        Data provider. Controlled outside and samples mini-batches.
+    train_loader_names : str or Tuple[str] or None
+        Name of the training loader, which is a part of DataProvider.
+    val_loader_names : str or Tuple[str] or None
+        Name of the val loader, which is a part of DataProvider.
     module : Module
         Instantiated collagen module with trainable parameters.
     optimizer : torch.Optimizer
         Optimizer to train teh model
     loss : torch.nn.Module
-        Loss used in the session
+        Loss used in the stepper
+    train_callbacks : Tuple[Callback] or Callback or None
+        Includes both metrics and callbacks. The callbacks can be schedulers,
+        which allow to adjust the stepper parameters during training (can be useful for implementing super-convergence
+        and stochastic weight averaging). On the other had the callbacks can also be meters batch-wise, which track
+        losses / metrics during training.
+    val_callbacks : Tuple[Callback] or Callback
+        Includes both metrics and callbacks. Validation callbacks can be checkpointers, loggers,
+        learning rate schedulers (E.g. reduce on plateau-like things). On the other hand,
+         the callbacks can also be meters batch-wise, which compute metrics.
     use_apex: bool
         whether to use apex amp or not, right now we support only O1 optimization
     distributed: bool
         whether the training would be distributed or not
-
     """
 
-    def __init__(self, module: Module, optimizer: torch.optim.Optimizer,
-                 loss: torch.nn.Module,
+    def __init__(self, data_provider: DataProvider,
+                 train_loader_names: str or Tuple[str] or None,
+                 module: Module,
+                 optimizer: Optimizer or None,
+                 loss: Module,
+                 val_loader_names: str or Tuple[str] = None,
+                 train_callbacks: Tuple[Callback] or Callback or None = None,
+                 val_callbacks: Tuple[Callback] or Callback or None = None,
                  use_apex=False, distributed=False):
 
-        self.__module: Module = module
-        self.__optimizer: torch.optim.Optimizer = optimizer
-        self.__loss: torch.nn.Module = loss
+        if train_callbacks is None:
+            train_callbacks = ()
+        if val_callbacks is None:
+            val_callbacks = ()
         self.__use_apex = use_apex
+        self.__module = module
+        self.__optimizer = optimizer
+        self.__loss = loss
 
-        if self.__use_apex:
-            try:
-                import apex
-                from apex.parallel import DistributedDataParallel as DDP
-                from apex import amp
+        self.__data_provider: DataProvider = data_provider
+        self.__stepper: Stepper = Stepper(module=module, optimizer=optimizer, loss=loss, use_apex=use_apex,
+                                          distributed=distributed)
 
-            except ImportError:
-                raise ImportError("Please install apex from https://www.github.com/nvidia/apex to run this example.")
+        self.__train_loader_names: str or Tuple[str] = train_loader_names
+        if isinstance(self.__train_loader_names, str):
+            self.__train_loader_names = (self.__train_loader_names,)
 
-        self.__distributed = distributed
+        self.__val_loader_names: str or Tuple[str] = val_loader_names
+        if isinstance(self.__val_loader_names, str):
+            self.__val_loader_names = (self.__val_loader_names,)
 
-        # Params of ``backward``
-        self.__retain_graph: bool or None = None
-        self.__create_graph: bool = False
-        self.__gradient = None
+        self.__train_callbacks: Tuple[Callback] or Callback = train_callbacks
+        self.__val_callbacks: Tuple[Callback] or Callback = val_callbacks
+
+        if not isinstance(val_callbacks, tuple):
+            self.__val_callbacks: Tuple[Callback] or Callback = (val_callbacks,)
+
+        if not isinstance(train_callbacks, tuple):
+            self.__train_callbacks: Tuple[Callback] = (train_callbacks,)
+
+        self.__train_batches_count = 0
+        self.__eval_batches_count = 0
+
+    def set_epoch(self, epoch):
+        self.__data_provider.set_epoch(epoch)
+
+    def add_train_callbacks(self, cbs):
+        self.__train_callbacks += wrap_tuple(cbs)
+
+    def add_eval_callbacks(self, cbs):
+        self.__val_callbacks += wrap_tuple(cbs)
 
     @property
-    def loss(self):
-        return self.__loss
-
-    @loss.setter
-    def loss(self, new_loss: torch.nn.Module):
-        self.__loss: torch.nn.Module = new_loss
-
-    def _check_single_element_tuple(self, x):
-        return isinstance(x, tuple) and len(x) == 1
-
-    def optimizer_params(self, param_name):
-        """Returns the value of optimizer parameter for every group of trainable parameters.
-        """
-        return [(group['name'], group[param_name]) for group in self.__optimizer.param_groups]
-
-    def set_optimizer_param(self, param_name: str, new_value: Tuple[str, float] or float):
-        """Sets a parameter of the optimizer for a particular group of trainable parameters or all groups.
-
-        Parameters
-        ----------
-        param_name : str
-            Name of the optimizer's parameters, e.g. `lr`, `weight_decay` `momentum` etc.
-        new_value : Tuple[str, float] or float
-            Value of the new parameter. If Tuple, then the first value int specifies the parameters group,
-            and the second specifies the actual value.
-
-        """
-        for group in self.__optimizer.param_groups:
-            if isinstance(new_value, float):
-                group[param_name] = new_value[1]
-            else:
-                if new_value[0] == group['name']:
-                    group[param_name] = new_value[1]
-
-    def set_backward_param(self, gradient=None, retain_graph=None, create_graph=False):
-        self.__gradient = gradient
-        self.__retain_graph = retain_graph
-        self.__create_graph = create_graph
-
-    def add_param_group(self, group_name: str):
-        """Adds parameter group to the optimizer.
-
-        Parameters
-        ----------
-        group_name : str
-            Name of the group, which needs to be added from model.
-
-        """
-        self.__optimizer.add_param_group(self.__module.parameters(group_name))
-
-    def train_step(self, batch: torch.Tensor or Tuple[torch.Tensor],
-                   target: torch.Tensor or Tuple[torch.Tensor], retain_graph: bool = False,
-                   accumulate_grad: bool = False, return_out=False, with_step: bool = True,
-                   callbacks: Tuple[callable] or List[callable] or None = None) -> float:
-        """
-        Performs one training iteration using the given mini-batch.
-
-        Parameters
-        ----------
-        batch : torch.Tensor or Tuple[torch.Tensor]
-            Mini-batch
-        target : torch.Tensor or Tuple[torch.Tensor]
-            One or multiple targets
-        accumulate_grad : bool
-            Whether to zero grad before computing the new gradients.
-            False by default, but if True, then the gradients can be accumulated.
-            Useful if the batch size are too small because of the input size.
-        return_out : bool
-            Whether to return output
-        callbacks : Tuple[callable] or List[callable] or None
-            Callbacks to be used during the training.
-        Returns
-        -------
-        out : float
-            Value of the loss
-
-        """
-
-        if not accumulate_grad and self.__optimizer is not None:
-            self.__optimizer.zero_grad()
-
-        return self.__batch_step(batch=batch, target=target, with_grad=True,
-                                 with_backward=True, with_step=with_step, retain_graph=retain_graph,
-                                 return_out=return_out, callbacks=callbacks)
-
-    def eval_step(self, batch: torch.Tensor or Tuple[torch.Tensor],
-                  target: torch.Tensor or Tuple[torch.Tensor],
-                  return_out=False, retain_graph: bool = False,
-                  callbacks: Tuple[callable] or List[callable] or None = None) -> Tuple[float,
-                                                                                        torch.Tensor or tuple] or float:
-        """
-        Performs evaluation of the given mini-batch. If needed, also returns the results.
-
-        Parameters
-        ----------
-        batch : torch.Tensor or Tuple[torch.Tensor]
-            Mini-batch
-        target : torch.Tensor or Tuple[torch.Tensor]
-            One or multiple targets
-        return_out : bool
-            Whether to return the output of the network
-        callbacks : Tuple[callable] or List [callable] or None
-            Callbacks to be used during the training.
-        Returns
-        -------
-        out : Tuple[float, torch.Tensor or tuple] or float
-            Result of the evaluation
-        """
-
-        return self.__batch_step(batch, target, with_grad=False,
-                                 with_backward=False, with_step=False,
-                                 eval_mode=True, retain_graph=retain_graph,
-                                 return_out=return_out, callbacks=callbacks)
+    def model(self):
+        return self.__module
 
     @staticmethod
-    def transfer_to_device(batch, target, module_device, distributed=False):
-        """
-        transfers data to specified device
-        Parameters
-        ----------
-        batch: Tensor or dict or list of tensor
-            data to be passed through the network
-        target: Tensor or dict or list of tensor
-            target against the batch of data
-        module_device: torch.device or device ordinal (int)
-            the device where the batch and target will be transferred
-        distributed: bool
-            whether training is distributed or not
+    def check_first_minibatch(loader_i, minibatch_i):
+        return loader_i == 0 and minibatch_i == 0
 
-        Returns
-        -------
-        Tensor, list or dict of tensors
-        """
-        if isinstance(batch, tuple) or isinstance(batch, list):
-            batch_on_device = tuple([b.to(module_device, non_blocking=distributed) for b in batch])
-        elif isinstance(batch, Tensor):
-            batch_on_device = batch.to(module_device, non_blocking=distributed)
-        elif isinstance(batch, dict):
-            batch_on_device = dict()
-            for k in batch:
-                if isinstance(batch[k], Tensor) and not batch[k].is_cuda:
-                    batch_on_device[k] = batch[k].to(module_device, non_blocking=distributed)
-                elif isinstance(batch[k], np.ndarray):
-                    batch_on_device[k] = torch.tensor(batch[k]).to(module_device, non_blocking=distributed)
+    @staticmethod
+    def check_last_minibatch(n_loaders, loader_i, n_minibatches, minibatch_i):
+        return loader_i >= n_loaders - 1 and minibatch_i >= n_minibatches - 1
+
+    def _parse_data(self, batch, keys):
+        parsed_data = {}
+        if isinstance(keys, str):
+            parsed_data = batch[keys]
+        elif isinstance(keys, list) or isinstance(keys, tuple):
+            for key_i in keys:
+                if key_i in batch:
+                    parsed_data[key_i] = batch[key_i]
                 else:
-                    batch_on_device[k] = batch[k]
+                    raise ValueError('Not found key {} in sampled batch'.format(key_i))
         else:
-            raise ValueError('Not support input type {}'.format(type(batch)))
+            raise ValueError('Not support keys type {}'.format(type(keys)))
+        return parsed_data
 
-        if isinstance(target, tuple) or isinstance(target, list):
-            target_on_device = tuple(
-                [t.to(module_device, non_blocking=distributed) if isinstance(t, Tensor) else t for t in target])
-        elif isinstance(target, dict):
-            target_on_device = dict()
-            for k in target:
-                if isinstance(target[k], Tensor) and not target[k].is_cuda:
-                    target_on_device[k] = target[k].to(module_device, non_blocking=distributed)
-                elif isinstance(target[k], np.ndarray):
-                    target_on_device[k] = torch.tensor(target[k]).to(module_device, non_blocking=distributed)
-                else:
-                    target_on_device[k] = target[k]
-
-        elif isinstance(target, Tensor):
-            target_on_device = target.to(module_device, non_blocking=distributed)
-        else:
-            raise ValueError('Not support target type {}'.format(type(target)))
-
-        return batch_on_device, target_on_device
-
-    def __batch_step(self, batch: torch.Tensor or Tuple[torch.Tensor],
-                     target: torch.Tensor or Tuple[torch.Tensor] or dict, with_grad: bool = True,
-                     with_backward: bool = True, eval_mode: bool = False, with_step: bool = True,
-                     return_out: bool = False, retain_graph: bool = False,
-                     callbacks: Tuple[callable] or List[callable] or None = None) -> Tuple[float, Any] or float:
+    def train(self, data_key: Tuple[str] or str = 'img', target_key: Tuple[str] or str = 'target',
+              minibatch_accumulate_grad: bool = True, accumulate_grad=False, cast_target=None):
         """
-        Private method, which handles the logic for training and evaluation for 1 mini-batch.
+        Runs stepper in train mode as many iterations as given in the train loader.
+
+        This method does not return anything a stores everything in the callbacks.
 
         Parameters
         ----------
-        batch : torch.Tensor
-            Mini-batch
-        target : torch.Tensor or Tuple[torch.Tensor]
-            One or multiple targets
-        with_grad : bool
-            Whether to evaluate the given batch with gradient
-        with_step : bool
-            Whether to evaluate if optimizer step (default: True)
-        with_backward : bool
-            Whether to perform a backward pass
-        eval_mode : bool
-            Whether to switch the trained module to the evaluation mode
-        return_out : bool
-            Whether to return the output
-        callbacks : Tuple[callable] or List [callable] or None
-            Callbacks to be used during the batch step.
+        data_key : Tuple[str] or str
+            Key of the dictionary, which corresponds to the data. Sometimes (e.g. in Siamese modelzoo),
+            we need two items thus we might need multiple keys.
+        target_key : Tuple[str] or str
+            Key of the dictionary, which corresponds to the target. In case of modelzoo with e.g. multiple
+            heads and heterogeneous outputs, it could be useful to use multiple keys.
+        accumulate_grad : bool
+            Whether to accumulate gradient.
+        cast_target : None or str
+            Performs type casting for target
 
-        Returns
-        -------
-            out : Tuple[float, torch.Tensor or tuple] or float
-                Loss value and possibly the output of the model.
         """
 
-        module_device = next(self.__module.parameters()).device
-        if callbacks is None:
-            callbacks = ()
-        if eval_mode:
-            with_backward = False
-            with_grad = False
-            self.__module.train(False)
+        #TODO: Check default of minibatch_accumulate_grad
+        minibatch_accumulate_grad = True if minibatch_accumulate_grad is None else minibatch_accumulate_grad
+        accumulate_grad = False if accumulate_grad is None else accumulate_grad
+
+        data_key = wrap_tuple(data_key)
+        target_key = wrap_tuple(target_key)
+
+        for ind, loader_name in enumerate(self.__train_loader_names):
+            cur_loader_state = self.__data_provider.state_dict()[loader_name]
+            n_iter = len(cur_loader_state["samples"])
+
+            i = 0
+            for i in range(n_iter - 1):
+                batch = cur_loader_state["samples"][i]
+                input_data = self._parse_data(batch, data_key[ind])
+                target = self._parse_data(batch, target_key[ind])
+
+                for cb in self.__train_callbacks:
+                    cb.on_minibatch_begin(loader_name=loader_name,
+                                          batches_count=self.__train_batches_count,
+                                          batch=batch,
+                                          input=input_data,
+                                          target=target,
+                                          data_key=data_key[ind],
+                                          target_key=target_key[ind],
+                                          stepper=self.__stepper)
+
+                first_minibatch = self.check_first_minibatch(loader_i=ind, minibatch_i=i)
+                last_minibatch = self.check_last_minibatch(n_loaders=len(self.__train_loader_names), loader_i=ind,
+                                                           n_minibatches=n_iter, minibatch_i=i)
+                no_zero_grad = accumulate_grad or (not first_minibatch and minibatch_accumulate_grad)
+                with_step = last_minibatch or not minibatch_accumulate_grad
+                loss, train_result = self.__stepper.train_step(input_data,
+                                                               target, retain_graph=minibatch_accumulate_grad,
+                                                               accumulate_grad=no_zero_grad,
+                                                               with_step=with_step,
+                                                               return_out=True, callbacks=self.__train_callbacks)
+                self.__train_batches_count += 1
+
+                for cb in self.__train_callbacks:
+                    cb.on_minibatch_end(loader_name=loader_name,
+                                        batches_count=self.__train_batches_count,
+                                        loss=loss,
+                                        input=input_data,
+                                        output=train_result,
+                                        target=target,
+                                        data_key=data_key[ind],
+                                        target_key=target_key[ind],
+                                        stepper=self.__stepper)
+
+            batch = cur_loader_state["samples"][i]
+            input_data = self._parse_data(batch, data_key[ind])
+            target = self._parse_data(batch, target_key[ind])
+
+            for cb in self.__train_callbacks:
+                cb.on_minibatch_begin(loader_name=loader_name,
+                                      batches_count=self.__train_batches_count,
+                                      batch=batch,
+                                      input=input_data,
+                                      target=target,
+                                      data_key=data_key[ind],
+                                      target_key=target_key[ind],
+                                      stepper=self.__stepper)
+
+            first_minibatch = self.check_first_minibatch(loader_i=ind, minibatch_i=i)
+            last_minibatch = self.check_last_minibatch(n_loaders=len(self.__train_loader_names), loader_i=ind,
+                                                       n_minibatches=n_iter, minibatch_i=i)
+            no_zero_grad = accumulate_grad or (not first_minibatch and minibatch_accumulate_grad)
+            with_step = last_minibatch or not minibatch_accumulate_grad
+            loss, train_result = self.__stepper.train_step(input_data, target, return_out=True,
+                                                           accumulate_grad=no_zero_grad,
+                                                           with_step=with_step,
+                                                           callbacks=self.__train_callbacks)
+            self.__train_batches_count += 1
+            for cb in self.__train_callbacks:
+                cb.on_minibatch_end(loader_name=loader_name,
+                                    batches_count=self.__train_batches_count,
+                                    loss=loss,
+                                    input=input_data,
+                                    output=train_result,
+                                    target=target,
+                                    data_key=data_key[ind],
+                                    target_key=target_key[ind],
+                                    stepper=self.__stepper)
+
+        # for ind, loader_name in enumerate(self.__train_loader_names):
+        #     cur_loader_state = self.__data_provider.state_dict()[loader_name]
+        #     del cur_loader_state['samples']
+
+    def eval(self, data_key: Tuple[str] or str = 'img', minibatch_accumulate_grad=None, accumulate_grad=None,
+             target_key: Tuple[str] or str = 'target', cast_target=None):
+        """
+        Runs stepper in `eval` mode as many iterations as given in the validation / test loader.
+
+        This method does not return anything a stores everything in the callbacks.
+        The callbacks here are called before the minibatch and after minibatch
+
+        Parameters
+        ----------
+        data_key : Tuple[str] or str
+            Key of the dictionary, which corresponds to the data. Sometimes (e.g. in Siamese modelzoo),
+            we need two items thus we might need multiple keys.
+        target_key : Tuple[str] or str
+            Key of the dictionary, which corresponds to the target. In case of modelzoo with e.g. multiple
+            heads and heterogeneous outputs, it could be useful to use multiple keys.
+        cast_target : None or str
+            Performs type casting for target
+
+        """
+
+        minibatch_accumulate_grad = None
+        accumulate_grad = None
+
+        data_key = wrap_tuple(data_key)
+        target_key = wrap_tuple(target_key)
+
+        for ind, loader_name in enumerate(self.__val_loader_names):
+            cur_loader_state = self.__data_provider.state_dict()[loader_name]
+            n_iter = len(cur_loader_state["samples"])
+
+            i = 0
+            for i in range(n_iter - 1):
+                batch = cur_loader_state["samples"][i]
+                input_data = self._parse_data(batch, data_key[ind])
+                target = self._parse_data(batch, target_key[ind])
+
+                for cb in self.__val_callbacks:
+                    cb.on_minibatch_begin(loader_name=loader_name,
+                                          batches_count=self.__eval_batches_count,
+                                          batch=batch,
+                                          input=input_data,
+                                          target=target,
+                                          data_key=data_key[ind],
+                                          target_key=target_key[ind],
+                                          stepper=self.__stepper)
+
+                loss, eval_result = self.__stepper.eval_step(input_data,
+                                                             target,
+                                                             return_out=True,
+                                                             callbacks=self.__val_callbacks)
+                self.__eval_batches_count += 1
+
+                for cb in self.__val_callbacks:
+                    cb.on_minibatch_end(loader_name=loader_name,
+                                        batches_count=self.__eval_batches_count,
+                                        loss=loss,
+                                        input=input_data,
+                                        output=eval_result,
+                                        target=target,
+                                        data_key=data_key[ind],
+                                        target_key=target_key[ind],
+                                        stepper=self.__stepper)
+
+            batch = cur_loader_state["samples"][i]
+            input_data = self._parse_data(batch, data_key[ind])
+            target = self._parse_data(batch, target_key[ind])
+
+            for cb in self.__val_callbacks:
+                cb.on_minibatch_begin(loader_name=loader_name,
+                                      batches_count=self.__eval_batches_count,
+                                      batch=batch,
+                                      input=input_data,
+                                      target=target,
+                                      data_key=data_key[ind],
+                                      target_key=target_key[ind],
+                                      stepper=self.__stepper)
+
+            loss, eval_result = self.__stepper.eval_step(input_data,
+                                                         target,
+                                                         return_out=True,
+                                                         callbacks=self.__val_callbacks)
+            self.__eval_batches_count += 1
+
+            for cb in self.__val_callbacks:
+                cb.on_minibatch_end(loader_name=loader_name,
+                                    batches_count=self.__eval_batches_count,
+                                    loss=loss,
+                                    input=input_data,
+                                    output=eval_result,
+                                    target=target,
+                                    data_key=data_key[ind],
+                                    target_key=target_key[ind],
+                                    stepper=self.__stepper)
+
+    def get_callbacks_by_stage(self, stage):
+        if stage == "train" or "train" in stage:
+            return self.__train_callbacks
+        elif stage == "eval" or "eval" in stage:
+            return self.__val_callbacks
+        elif stage is None:
+            return self.__train_callbacks + self.__val_callbacks
         else:
-            self.__module.train(True)
-
-        if with_backward:
-            if not with_grad:
-                raise ValueError
-
-        with torch.set_grad_enabled(with_grad):
-            if self._check_single_element_tuple(batch):
-                batch = batch[0]
-            if self._check_single_element_tuple(target):
-                target = target[0]
-
-            batch_on_device, target_on_device = self.transfer_to_device(batch, target, module_device,
-                                                                        distributed=self.__distributed)
-
-            # Forward
-            for cb in callbacks:
-                cb.on_forward_begin(module=self.__module,
-                                    input=batch_on_device,
-                                    target=target_on_device,
-                                    optimizer=self.__optimizer,
-                                    criterion=self.__loss)
-
-            if isinstance(batch_on_device, list) or isinstance(batch_on_device, tuple):
-                out = [self.__module(_batch) for _batch in batch_on_device]
-            elif isinstance(batch_on_device, dict):
-                out = {}
-                for k in batch_on_device:
-                    if isinstance(batch_on_device[k], Tensor):
-                        out[k] = self.__module(batch_on_device[k])
-            elif isinstance(batch_on_device, Tensor):
-                out = self.__module(batch_on_device)
-            else:
-                raise ValueError('Not support batch type {}'.format(type(batch_on_device)))
-
-            for cb in callbacks:
-                cb.on_forward_end(module=self.__module,
-                                  input=batch_on_device,
-                                  target=target_on_device,
-                                  output=out,
-                                  optimizer=self.__optimizer,
-                                  criterion=self.__loss)
-
-            # Compute loss
-            for cb in callbacks:
-                cb.on_loss_begin(session=self,
-                                 input=batch_on_device,
-                                 target=target_on_device,
-                                 output=out)
-
-            loss = self.__loss(out, target_on_device)
-
-            for cb in callbacks:
-                cb.on_loss_end(session=self,
-                               loss=loss,
-                               input=batch_on_device,
-                               target=target_on_device,
-                               output=out)
-
-            if with_backward:
-                # Backward
-                for cb in callbacks:
-                    cb.on_backward_begin(session=self,
-                                         loss=loss,
-                                         input=batch_on_device,
-                                         target=target_on_device,
-                                         output=out)
-
-                if self.__use_apex:
-                    with amp.scale_loss(loss, self.__optimizer) as scaled_loss:
-                        scaled_loss.backward(retain_graph=self.__retain_graph or retain_graph)
-                else:
-                    loss.backward(gradient=self.__gradient,
-                                  retain_graph=self.__retain_graph or retain_graph,
-                                  create_graph=self.__create_graph)
-
-                for cb in callbacks:
-                    cb.on_backward_end(session=self,
-                                       loss=loss,
-                                       input=batch_on_device,
-                                       target=target_on_device,
-                                       output=out,
-                                       optimizer=self.__optimizer,
-                                       criterion=self.__loss)
-
-                if with_step:
-                    # Optimizer step
-                    for cb in callbacks:
-                        cb.on_optimizer_step_begin(module=self.__module,
-                                                   loss=loss,
-                                                   input=batch_on_device,
-                                                   target=target_on_device,
-                                                   output=out,
-                                                   optimizer=self.__optimizer,
-                                                   criterion=self.__loss)
-
-                    self.__optimizer.step()
-
-                    for cb in callbacks:
-                        cb.on_optimizer_step_end(module=self.__module,
-                                                 loss=loss,
-                                                 input=batch_on_device,
-                                                 target=target_on_device,
-                                                 output=out,
-                                                 optimizer=self.__optimizer,
-                                                 criterion=self.__loss)
-
-            if not return_out:
-                return loss.item()
-            else:
-                return loss.item(), out
+            raise ValueError("stage must be `train`, `eval`, tuple of both or None, but found {}".format(stage))

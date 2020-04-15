@@ -85,9 +85,9 @@ class RunningAverageMeter(Meter):
         self.__value = 0
         self.__count = 0
 
-    def on_minibatch_end(self, loss, session, **kwargs):
-        if hasattr(session.loss, 'get_loss_by_name'):
-            loss_value = to_cpu(session.loss.get_loss_by_name(self.name))
+    def on_minibatch_end(self, loss, stepper, **kwargs):
+        if hasattr(stepper.loss, 'get_loss_by_name'):
+            loss_value = to_cpu(stepper.loss.get_loss_by_name(self.name))
         else:
             loss_value = to_cpu(loss)
         if loss_value is not None:
