@@ -1,17 +1,12 @@
 import argparse
-import torch
-import numpy as np
 
-import pandas as pd
-import torchvision.datasets as datasets
 import torch.nn.functional as F
 from torch import nn
+import numpy as np
 
-import solt.data as sld
-import solt.core as slc
+import solt
 import solt.transforms as slt
 
-from collagen.data.utils import ApplyTransform, Normalize, Compose
 from collagen.core import Module
 
 
@@ -28,7 +23,6 @@ def init_args():
     parser.add_argument('--snapshots', default='snapshots', help='Where to save the snapshots')
     parser.add_argument('--seed', type=int, default=12345, help='Random seed')
     parser.add_argument('--dataset', type=str, default="mnist", help='Dataset name')
-    # parser.add_argument('--device', type=str, default="cuda", help='Use `cuda` or `cpu`')
     parser.add_argument('--data_dir', type=str, default="data", help='Data directory')
     parser.add_argument('--log_dir', type=str, default=None, help='Log directory')
     parser.add_argument('--comment', type=str, default="cnn", help='Comment of log')
@@ -37,56 +31,47 @@ def init_args():
     return args
 
 
-def wrap2solt(inp):
-    img, label = inp
-    return sld.DataContainer((img, label), 'IL')
+def parse_item_mnist(root, entry, trf, data_key, target_key):
+    img = entry[data_key]
 
+    if len(img.shape) == 2:
+        img = np.expand_dims(img, -1)
 
-def unpack_solt(dc: sld.DataContainer):
-    img, target = dc.data
-    img, target = torch.from_numpy(img).permute(2, 0, 1).float(), target
-    return img, target
-
-
-def init_mnist_transforms(n_channels=1):
-    if n_channels == 1:
-        norm_mean_std = Normalize((0.1307,), (0.3081,))
-    elif n_channels == 3:
-        norm_mean_std = Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261))
+    if img.shape[-1] == 1:
+        stats = {'mean': (0.1307,), 'std': (0.3081,)}
+    elif img.shape[-1] == 3:
+        stats = {'mean': (0.4914, 0.4822, 0.4465), 'std': (0.247, 0.243, 0.261)}
     else:
-        raise ValueError("Not support channels of {}".format(nc))
-    
-    train_trf = Compose([
-        wrap2solt,
-        slc.Stream([
-            slt.RandomScale(range_x=(0.9, 1.1), same=False, p=0.5),
-            slt.RandomShear(range_x=(-0.05, 0.05), p=0.5),
-            slt.RandomRotate(rotation_range=(-5, 5), p=0.5),
-            slt.PadTransform(pad_to=34),
-            slt.CropTransform(crop_size=32, crop_mode='r')
-        ]),
-        unpack_solt,
-        ApplyTransform(norm_mean_std)
+        raise ValueError("Not support channels of {}".format(img.shape[-1]))
+
+    trf_data = trf({'image': img}, normalize=True, **stats)
+    return {data_key: trf_data['image'], target_key: entry[target_key]}
+
+
+def init_mnist_transforms():
+    train_trf = solt.Stream([
+        slt.Scale(range_x=(0.9, 1.1), same=False, p=0.5),
+        slt.Shear(range_x=(-0.05, 0.05), p=0.5),
+        slt.Rotate((-5, 5), p=0.5),
+        slt.Pad(pad_to=(32, 32))
     ])
 
-    test_trf = Compose([
-        wrap2solt,
-        slt.PadTransform(pad_to=32),
-        unpack_solt,
-        ApplyTransform(norm_mean_std)
-    ])
+    test_trf = solt.Stream([slt.Pad(pad_to=(32, 32))])
 
     return train_trf, test_trf
 
 
 class SimpleConvNet(Module):
     def __init__(self, bw, drop=0.5, n_cls=10, n_channels=1):
-        super(SimpleConvNet, self).__init__()
-        self.n_filters_last = bw*2
+        super().__init__()
+        self.n_filters_last = bw * 2
 
         self.conv1 = self.make_layer(n_channels, bw)
-        self.conv2 = self.make_layer(bw, bw*2)
-        self.conv3 = self.make_layer(bw*2, self.n_filters_last)
+        self.conv2 = self.make_layer(bw, bw)
+        self.conv3 = self.make_layer(bw, bw * 2)
+        self.conv4 = self.make_layer(bw * 2, self.n_filters_last)
+
+        self.pool = nn.MaxPool2d(2, 2)
 
         self.classifier = nn.Sequential(nn.Dropout(drop),
                                         nn.Linear(self.n_filters_last, n_cls))
@@ -98,19 +83,16 @@ class SimpleConvNet(Module):
                              nn.ReLU(True))
 
     def forward(self, x):
-        x = F.max_pool2d(self.conv1(x), 2)  # 16x16
-        x = F.max_pool2d(self.conv2(x), 2)  # 8x8
-        x = F.max_pool2d(self.conv3(x), 2)  # 4x4
+        x = self.conv1(x)
+        x = self.conv2(x)
+        x = self.pool(x)  # 16x16
+        x = self.conv3(x)
+        x = self.pool(x)  # 8x8
+        x = self.conv4(x)
+        x = self.pool(x)  # 4x4
 
         x = F.adaptive_avg_pool2d(x, 1)
 
         x = x.view(x.size(0), -1)
 
         return self.classifier(x)
-
-    def get_features(self):
-        pass
-
-    def get_features_by_name(self, name):
-        pass
-
