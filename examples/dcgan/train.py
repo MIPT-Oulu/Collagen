@@ -14,7 +14,8 @@ from collagen.core import Session
 from collagen.strategies import Strategy
 from collagen.core.utils import auto_detect_device
 from collagen.data import get_mnist, gan_data_provider
-from collagen.callbacks import ScalarMeterLogger, ImageSamplingVisualizer, RunningAverageMeter
+from collagen.callbacks import ScalarMeterLogger, ImageSamplingVisualizer, RunningAverageMeter, \
+    BatchProcFreezer, SamplingFreezer
 from collagen.losses import GeneratorLoss
 
 from examples.dcgan.utils import parse_item_mnist_gan, init_mnist_transforms
@@ -51,7 +52,8 @@ def main(cfg):
                                       parse_item_mnist_gan, cfg.bs, cfg.num_threads, device)
 
     # Setting up the callbacks
-    st_callbacks = (ScalarMeterLogger(writer=summary_writer),
+    st_callbacks = (SamplingFreezer([d_network, g_network]),
+                    ScalarMeterLogger(writer=summary_writer),
                     ImageSamplingVisualizer(generator_sampler=item_loaders['fake'],
                                             transform=lambda x: (x+1.0)/2.0,
                                             writer=summary_writer,
@@ -61,13 +63,15 @@ def main(cfg):
     d_session = Session(data_provider=data_provider,
                         train_loader_names=cfg.sampling.train.data_provider.D.keys(),
                         val_loader_names=None,
-                        train_callbacks=RunningAverageMeter(prefix="train/D", name="loss"),
+                        train_callbacks=(BatchProcFreezer(modules=g_network),
+                                         RunningAverageMeter(prefix="train/D", name="loss")),
                         module=d_network, optimizer=d_optim, loss=d_crit)
 
     g_session = Session(data_provider=data_provider,
                         train_loader_names=cfg.sampling.train.data_provider.G.keys(),
                         val_loader_names=cfg.sampling.eval.data_provider.G.keys(),
-                        train_callbacks=RunningAverageMeter(prefix="train/G", name="loss"),
+                        train_callbacks=(BatchProcFreezer(modules=d_network),
+                                         RunningAverageMeter(prefix="train/G", name="loss")),
                         val_callbacks=RunningAverageMeter(prefix="eval/G", name="loss"),
                         module=g_network, optimizer=g_optim, loss=g_crit)
 
