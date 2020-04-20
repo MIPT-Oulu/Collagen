@@ -5,37 +5,40 @@ from collagen.core import Module
 
 
 class Discriminator(Module):
-    def __init__(self, nc=1, ndf=64, n_gpu=1):
+    def __init__(self, nc=1, ndf=64, n_gpu=1, drop=0.2):
         super(Discriminator, self).__init__()
 
         self.__devices = list(range(n_gpu))
 
-        # input is (nc) x 64 x 64
+        # input is (nc) x 32 x 32
         self._layer1 = nn.Sequential(nn.Conv2d(nc, ndf, 4, 2, 1, bias=False),
-                                     nn.LeakyReLU(0.2, inplace=True))  # state size. (ndf) x 32 x 32
+                                     nn.LeakyReLU(0.2, inplace=True))  # state size. (ndf) x 16 x 16
 
         self._layer2 = nn.Sequential(nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False),
                                      nn.BatchNorm2d(ndf * 2),
-                                     nn.LeakyReLU(0.2, inplace=True))  # state size. (ndf*2) x 16 x 16
+                                     nn.LeakyReLU(0.2, inplace=True))  # state size. (ndf*2) x 8 x 8
 
         self._layer3 = nn.Sequential(nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1, bias=False),
                                      nn.BatchNorm2d(ndf * 4),
-                                     nn.LeakyReLU(0.2, inplace=True))  # state size. (ndf*4) x 8 x 8
+                                     nn.LeakyReLU(0.2, inplace=True))  # state size. (ndf*4) x 4 x 4
 
         self._layer4 = nn.Sequential(nn.Conv2d(ndf * 4, 1, 4, 1, 0, bias=False),
                                      nn.Sigmoid())  # state size. 1x1x1
 
+        self._drop = nn.Dropout(drop)
+
         self.main_flow = nn.Sequential(OrderedDict([("conv_block1", self._layer1),
                                                     ("conv_block2", self._layer2),
                                                     ("conv_block3", self._layer3),
-                                                    ("conv_block4", self._layer4)
-                                                    ]))
+                                                    ("dropout", self._drop),
+                                                    ("conv_block4", self._layer4)]))
+
 
         self.main_flow.apply(weights_init)
 
     def forward(self, x: torch.tensor):
-        output = self.main_flow(x)
-        return output.view(-1, 1).squeeze(1)
+        x = self.main_flow(x)
+        return x.view(-1, 1).squeeze(1)
 
 
 class Generator(Module):
@@ -44,24 +47,24 @@ class Generator(Module):
 
         self.__devices = list(range(n_gpu))
 
-        self._layer1 = nn.Sequential(nn.ConvTranspose2d(nz, ngf * 8, 4, 1, 0, bias=False),
-                                     nn.BatchNorm2d(ngf * 8),
-                                     nn.ReLU(True))  # state size. (ngf*8) x 4 x 4
-
-        self._layer2 = nn.Sequential(nn.ConvTranspose2d(ngf * 8, ngf * 4, 4, 2, 1, bias=False),
+        self._layer1 = nn.Sequential(nn.ConvTranspose2d(nz, ngf * 4, 4, 1, 0, bias=False),
                                      nn.BatchNorm2d(ngf * 4),
+                                     nn.ReLU(True))  # state size. (ngf*4) x 4 x 4
+
+        self._layer2 = nn.Sequential(nn.ConvTranspose2d(ngf * 4, ngf * 2, 4, 2, 1, bias=False),
+                                     nn.BatchNorm2d(ngf * 2),
                                      nn.ReLU(True))  # state size. (ngf*2) x 8 x 8
 
-        self._layer3 = nn.Sequential(nn.ConvTranspose2d(ngf * 4, ngf * 2, 4, 2, 1, bias=False),
-                                     nn.BatchNorm2d(ngf * 2),
-                                     nn.ReLU(True))  # state size. (ngf*2) x 16 x 16
+        self._layer3 = nn.Sequential(nn.ConvTranspose2d(ngf * 2, ngf, 4, 2, 1, bias=False),
+                                     nn.BatchNorm2d(ngf),
+                                     nn.ReLU(True))  # state size. (ngf) x 16 x 16
 
-        self._layer4 = nn.Sequential(nn.ConvTranspose2d(ngf * 2, ngf, 4, 2, 1, bias=False),
+        self._layer4 = nn.Sequential(nn.ConvTranspose2d(ngf, ngf, 4, 2, 1, bias=False),
                                      nn.BatchNorm2d(ngf),
                                      nn.ReLU(True))  # state size. (ngf) x 32 x 32
 
         self._layer5 = nn.Sequential(nn.Conv2d(ngf, nc, 3, 1, 1, bias=False),
-                                     nn.Tanh())  # state size. (ngf) x 64 x 64
+                                     nn.Tanh())  # state size. (nc) x 32 x 32
 
         self.main_flow = nn.Sequential(OrderedDict([("conv_block1", self._layer1),
                                                     ("conv_block2", self._layer2),

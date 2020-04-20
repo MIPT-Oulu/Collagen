@@ -180,7 +180,7 @@ class ImageSamplingVisualizer(Callback):
 
     @staticmethod
     def _default_transform(x):
-        return (x + 1.0) / 2.0
+        return x
 
     @staticmethod
     def _default_transform_unbind_imgs(separate_imgs):
