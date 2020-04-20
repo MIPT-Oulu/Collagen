@@ -3,13 +3,13 @@ sampling:
     data_provider:
       mymodel:
         loader_train:
-          num_samples: 1
+          batches_per_iter: 1
           data_key: "data"
           target_key: "target"
   eval:
     data_provider:
       mymodel:
         loader_eval:
-          num_samples: 1
+          batches_per_iter: 1
           data_key: "data"
           target_key: "target"

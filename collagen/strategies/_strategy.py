@@ -118,7 +118,7 @@ class Strategy(object):
                     continue
 
                 for loader_name in data_loader_names:
-                    n_samples_dict[loader_name] = data_loader_names[loader_name]['num_samples']
+                    n_samples_dict[loader_name] = data_loader_names[loader_name]['batches_per_iter']
                     n_batches = len(self.__data_provider.get_loader_by_name(loader_name))
                     data_keys.append(data_loader_names[loader_name]['data_key'])
                     target_keys.append(data_loader_names[loader_name]['target_key'])

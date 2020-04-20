@@ -21,7 +21,7 @@ device = auto_detect_device()
 
 
 @hydra.main(config_path='configs/config.yaml')
-def main_process(cfg):
+def main(cfg):
     torch.manual_seed(cfg.seed)
     np.random.seed(cfg.seed)
     random.seed(cfg.seed)
@@ -86,4 +86,4 @@ def main_process(cfg):
 
 
 if __name__ == "__main__":
-    main_process()
+    main()
