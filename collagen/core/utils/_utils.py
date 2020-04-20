@@ -25,10 +25,10 @@ def to_cpu(x: torch.Tensor or torch.cuda.FloatTensor, required_grad=False, use_n
 
 
 def wrap_tuple(x):
-    if not isinstance(x, tuple) and not isinstance(x, list):
-        return (x,)
-    else:
+    if hasattr(x, '__len__') and not isinstance(x, str):
         return x
+    else:
+        return (x,)
 
 
 def auto_detect_device():

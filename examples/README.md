@@ -13,3 +13,9 @@
 - [ ] VAE
 - [ ] VAE-SSL
 - [ ] VAE-GAN
+
+
+# Dependencies
+
+- SOLT (> 0.1.9)
+- Hydra

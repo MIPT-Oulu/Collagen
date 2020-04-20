@@ -1,7 +1,8 @@
+import os
 import torch
 import numpy as np
-import yaml
 import random
+import hydra
 
 from torch.utils.tensorboard import SummaryWriter
 
@@ -14,52 +15,49 @@ from collagen.core.utils import auto_detect_device
 from collagen.data import get_mnist, get_cifar10, FoldSplit, DataProvider, ItemLoader
 from collagen.callbacks import RunningAverageMeter, AccuracyMeter, ScalarMeterLogger, ModelSaver
 
-from examples.cnn.utils import init_mnist_transforms, init_args, parse_item_mnist, SimpleConvNet
+from examples.cnn.utils import my_transforms, parse_item, SimpleConvNet
 
 device = auto_detect_device()
 
-if __name__ == "__main__":
-    args = init_args()
 
-    torch.manual_seed(args.seed)
-    np.random.seed(args.seed)
-    random.seed(args.seed)
+@hydra.main(config_path='configs/config.yaml')
+def main_process(cfg):
+    torch.manual_seed(cfg.args.seed)
+    np.random.seed(cfg.args.seed)
+    random.seed(cfg.args.seed)
 
-    if args.dataset == 'cifar10':
-        train_ds, classes = get_cifar10(data_folder=args.save_data, train=True)
+    data_dir = os.path.join(os.environ['PWD'], cfg.args.data_dir)
+
+    if cfg.args.dataset == 'cifar10':
+        train_ds, classes = get_cifar10(data_folder=data_dir, train=True)
         n_channels = 3
-    elif args.dataset == 'mnist':
-        train_ds, classes = get_mnist(data_folder=args.save_data, train=True)
+    elif cfg.args.dataset == 'mnist':
+        train_ds, classes = get_mnist(data_folder=data_dir, train=True)
         n_channels = 1
     else:
-        raise ValueError('Not support dataset {}'.format(args.dataset))
+        raise ValueError('Not support dataset {}'.format(cfg.args.dataset))
 
     criterion = torch.nn.CrossEntropyLoss()
 
     # Tensorboard visualization
-    log_dir = args.log_dir
-    comment = args.comment
+    log_dir = cfg.args.log_dir
+    comment = cfg.args.comment
     summary_writer = SummaryWriter(log_dir=log_dir, comment=comment)
 
     splitter = FoldSplit(train_ds, n_folds=5, target_col="target")
-
-    with open("settings.yml", "r") as f:
-        sampling_config = yaml.load(f, Loader=yaml.FullLoader)
-    with open("strategy.yml", "r") as f:
-        strategy_config = yaml.load(f, Loader=yaml.FullLoader)
 
     for fold_id, (df_train, df_val) in enumerate(splitter):
         item_loaders = dict()
 
         for stage, df in zip(['train', 'eval'], [df_train, df_val]):
             item_loaders[f'loader_{stage}'] = ItemLoader(meta_data=df,
-                                                        transform=init_mnist_transforms()[0],
-                                                        parse_item_cb=parse_item_mnist,
-                                                        batch_size=args.bs, num_workers=args.num_threads,
-                                                        shuffle=True if stage == "train" else False)
+                                                         transform=my_transforms()[stage],
+                                                         parse_item_cb=parse_item,
+                                                         batch_size=cfg.args.bs, num_workers=cfg.args.num_threads,
+                                                         shuffle=True if stage == "train" else False)
 
-        model = SimpleConvNet(bw=args.bw, drop=args.dropout, n_cls=len(classes), n_channels=n_channels)
-        optimizer = torch.optim.Adam(params=model.parameters(), lr=args.lr, weight_decay=args.wd)
+        model = SimpleConvNet(bw=cfg.args.bw, drop=cfg.args.dropout, n_cls=len(classes), n_channels=n_channels)
+        optimizer = torch.optim.Adam(params=model.parameters(), lr=cfg.args.lr, weight_decay=cfg.args.wd)
         data_provider = DataProvider(item_loaders)
 
         train_cbs = (RunningAverageMeter(prefix="train", name="loss"),
@@ -68,20 +66,24 @@ if __name__ == "__main__":
         val_cbs = (RunningAverageMeter(prefix="eval", name="loss"),
                    AccuracyMeter(prefix="eval", name="acc"),
                    ScalarMeterLogger(writer=summary_writer),
-                   ModelSaver(metric_names='eval/loss', save_dir=args.snapshots, conditions='min', model=model))
+                   ModelSaver(metric_names='eval/loss', save_dir=cfg.args.snapshots, conditions='min', model=model))
 
         session = Session(data_provider=data_provider,
-                          train_loader_names=tuple(sampling_config['train']['data_provider']['mymodel'].keys()),
-                          val_loader_names=tuple(sampling_config['eval']['data_provider']['mymodel'].keys()),
+                          train_loader_names=cfg.sampling.train.data_provider.mymodel.keys(),
+                          val_loader_names=cfg.sampling.eval.data_provider.mymodel.keys(),
                           module=model, loss=criterion, optimizer=optimizer,
                           train_callbacks=train_cbs,
                           val_callbacks=val_cbs)
 
         strategy = Strategy(data_provider=data_provider,
-                            data_sampling_config=sampling_config,
-                            strategy_config=strategy_config,
+                            data_sampling_config=cfg.sampling,
+                            strategy_config=cfg.strategy,
                             sessions=session,
-                            n_epochs=args.n_epochs,
+                            n_epochs=cfg.args.n_epochs,
                             device=device)
 
         strategy.run()
+
+
+if __name__ == "__main__":
+    main_process()

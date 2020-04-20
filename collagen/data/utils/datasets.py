@@ -10,8 +10,6 @@ __all__ = ["get_cifar10", "get_mnist"]
 
 def get_mnist(data_folder='.', train=True):
     _db = datasets.MNIST(data_folder, train=train, transform=None, download=True)
-    # list_rows = [{"data": to_cpu(item) if isinstance(item, Tensor) else np.array(item),
-    #               "target": to_cpu(target)[0] if isinstance(target, Tensor) else target} for item, target in _db]
 
     list_rows = []
     for item, cls in _db:

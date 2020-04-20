@@ -1,0 +1,14 @@
+args:
+  n_epochs: 100
+  bs: 128
+  dropout: 0.5
+  bw: 64
+  wd: 1e-4
+  lr: 1e-4
+  num_threads: 4
+  snapshots: snapshots
+  seed: 12345
+  dataset: mnist
+  data_dir: ./data
+  log_dir: ''
+  comment: cnn_example
