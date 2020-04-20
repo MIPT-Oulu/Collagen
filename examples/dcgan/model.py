@@ -22,35 +22,20 @@ class Discriminator(Module):
                                      nn.BatchNorm2d(ndf * 4),
                                      nn.LeakyReLU(0.2, inplace=True))  # state size. (ndf*4) x 8 x 8
 
-        self._layer4 = nn.Sequential(nn.Conv2d(ndf * 4, ndf * 8, 4, 2, 1, bias=False),
-                                     nn.BatchNorm2d(ndf * 8),
-                                     nn.LeakyReLU(0.2, inplace=True))  # state size. (ndf*4) x 4 x 4
-
-        self._layer5 = nn.Sequential(nn.Conv2d(ndf * 8, 1, 4, 1, 0, bias=False),
+        self._layer4 = nn.Sequential(nn.Conv2d(ndf * 4, 1, 4, 1, 0, bias=False),
                                      nn.Sigmoid())  # state size. 1x1x1
 
         self.main_flow = nn.Sequential(OrderedDict([("conv_block1", self._layer1),
                                                     ("conv_block2", self._layer2),
                                                     ("conv_block3", self._layer3),
-                                                    ("conv_block4", self._layer4),
-                                                    ("conv_final", self._layer5)
+                                                    ("conv_block4", self._layer4)
                                                     ]))
 
         self.main_flow.apply(weights_init)
 
     def forward(self, x: torch.tensor):
-        if x.is_cuda and len(self.__devices) > 1:
-            output = nn.parallel.data_parallel(self.main_flow, x, self.__devices)
-        else:
-            output = self.main_flow(x)
-
+        output = self.main_flow(x)
         return output.view(-1, 1).squeeze(1)
-
-    def get_features(self):
-        pass
-
-    def get_features_by_name(self, name):
-        pass
 
 
 class Generator(Module):
@@ -75,20 +60,14 @@ class Generator(Module):
                                      nn.BatchNorm2d(ngf),
                                      nn.ReLU(True))  # state size. (ngf) x 32 x 32
 
-        self._layer5 = nn.Sequential(nn.ConvTranspose2d(ngf, ngf // 2, 4, 2, 1, bias=False),
-                                     nn.BatchNorm2d(ngf // 2),
-                                     nn.ReLU(True))  # state size. (ngf) x 64 x 64
-
-        self._layer6 = nn.Sequential(nn.Conv2d(ngf // 2, nc, 3, 1, 1, bias=False),
+        self._layer5 = nn.Sequential(nn.Conv2d(ngf, nc, 3, 1, 1, bias=False),
                                      nn.Tanh())  # state size. (ngf) x 64 x 64
 
         self.main_flow = nn.Sequential(OrderedDict([("conv_block1", self._layer1),
                                                     ("conv_block2", self._layer2),
                                                     ("conv_block3", self._layer3),
                                                     ("conv_block4", self._layer4),
-                                                    ("conv_block5", self._layer5),
-                                                    ("conv_final", self._layer6)
-                                                    ]))
+                                                    ("conv_final", self._layer5)]))
 
         self.main_flow.apply(weights_init)
 
@@ -103,12 +82,6 @@ class Generator(Module):
             output = self.main_flow(x)
 
         return output
-
-    def get_features(self):
-        pass
-
-    def get_features_by_name(self, name):
-        pass
 
 
 def weights_init(m):
