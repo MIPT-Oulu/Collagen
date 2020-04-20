@@ -22,26 +22,26 @@ device = auto_detect_device()
 
 @hydra.main(config_path='configs/config.yaml')
 def main_process(cfg):
-    torch.manual_seed(cfg.args.seed)
-    np.random.seed(cfg.args.seed)
-    random.seed(cfg.args.seed)
+    torch.manual_seed(cfg.seed)
+    np.random.seed(cfg.seed)
+    random.seed(cfg.seed)
 
-    data_dir = os.path.join(os.environ['PWD'], cfg.args.data_dir)
+    data_dir = os.path.join(os.environ['PWD'], cfg.data_dir)
 
-    if cfg.args.dataset == 'cifar10':
+    if cfg.dataset == 'cifar10':
         train_ds, classes = get_cifar10(data_folder=data_dir, train=True)
         n_channels = 3
-    elif cfg.args.dataset == 'mnist':
+    elif cfg.dataset == 'mnist':
         train_ds, classes = get_mnist(data_folder=data_dir, train=True)
         n_channels = 1
     else:
-        raise ValueError('Not support dataset {}'.format(cfg.args.dataset))
+        raise ValueError('Not support dataset {}'.format(cfg.dataset))
 
     criterion = torch.nn.CrossEntropyLoss()
 
     # Tensorboard visualization
-    log_dir = cfg.args.log_dir
-    comment = cfg.args.comment
+    log_dir = cfg.log_dir
+    comment = cfg.comment
     summary_writer = SummaryWriter(log_dir=log_dir, comment=comment)
 
     splitter = FoldSplit(train_ds, n_folds=5, target_col="target")
@@ -53,11 +53,11 @@ def main_process(cfg):
             item_loaders[f'loader_{stage}'] = ItemLoader(meta_data=df,
                                                          transform=my_transforms()[stage],
                                                          parse_item_cb=parse_item,
-                                                         batch_size=cfg.args.bs, num_workers=cfg.args.num_threads,
+                                                         batch_size=cfg.bs, num_workers=cfg.num_threads,
                                                          shuffle=True if stage == "train" else False)
 
-        model = SimpleConvNet(bw=cfg.args.bw, drop=cfg.args.dropout, n_cls=len(classes), n_channels=n_channels)
-        optimizer = torch.optim.Adam(params=model.parameters(), lr=cfg.args.lr, weight_decay=cfg.args.wd)
+        model = SimpleConvNet(bw=cfg.bw, drop=cfg.dropout, n_cls=len(classes), n_channels=n_channels)
+        optimizer = torch.optim.Adam(params=model.parameters(), lr=cfg.lr, weight_decay=cfg.wd)
         data_provider = DataProvider(item_loaders)
 
         train_cbs = (RunningAverageMeter(prefix="train", name="loss"),
@@ -66,7 +66,7 @@ def main_process(cfg):
         val_cbs = (RunningAverageMeter(prefix="eval", name="loss"),
                    AccuracyMeter(prefix="eval", name="acc"),
                    ScalarMeterLogger(writer=summary_writer),
-                   ModelSaver(metric_names='eval/loss', save_dir=cfg.args.snapshots, conditions='min', model=model))
+                   ModelSaver(metric_names='eval/loss', save_dir=cfg.snapshots, conditions='min', model=model))
 
         session = Session(data_provider=data_provider,
                           train_loader_names=cfg.sampling.train.data_provider.mymodel.keys(),
@@ -79,7 +79,7 @@ def main_process(cfg):
                             data_sampling_config=cfg.sampling,
                             strategy_config=cfg.strategy,
                             sessions=session,
-                            n_epochs=cfg.args.n_epochs,
+                            n_epochs=cfg.n_epochs,
                             device=device)
 
         strategy.run()
