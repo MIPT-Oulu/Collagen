@@ -17,7 +17,6 @@ strategy:
     - G
 
   eval_model_names:
-    - D
     - G
 
   accumulate_grad:
