@@ -8,16 +8,10 @@ strategy:
     - train
     - eval
 
-  model_names:
-    - mymodel
-
-  train_model_names:
-    - mymodel
-
-  eval_model_names:
-    - mymodel
-
   accumulate_grad:
+    mymodel: False
+
+  accumulate_grad_in_iter:
     mymodel: False
 
   train_starts_at_epoch:

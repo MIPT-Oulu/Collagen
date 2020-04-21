@@ -1,7 +1,6 @@
-from typing import Tuple
-
+from typing import Tuple, Dict
 import torch
-import torch.nn as nn
+
 
 try:
     from torch.optim import Optimizer
@@ -9,14 +8,11 @@ except ImportError:
     from torch.optim.optimizer import Optimizer
 
 from tqdm import tqdm
-import torch.distributed as dist
 
 from collagen.core import Callback
-from collagen.core import Session, Stepper, Module
+from collagen.core import Session
 from collagen.core.utils import wrap_tuple
-
 from collagen.data import DataProvider
-
 from collagen.callbacks.logging.loggers import ProgressbarLogger
 
 
@@ -32,7 +28,7 @@ class Strategy(object):
                  callbacks: Tuple[Callback] or Callback = None,
                  n_epochs: int or None = 10,
                  n_train_batches: int or None = None,
-                 sessions: Tuple[Session] or Session = None,
+                 sessions: Dict[str, Session] or Session = None,
                  distributed=False, use_apex=False):
         """Constructor of Strategy
         Parameters
@@ -49,8 +45,8 @@ class Strategy(object):
             Number of epochs to be trained.
         n_train_batches: int
             Number of training batches. Can be figured out from batch size and total data size
-        sessions: Tuple[Session]
-            Tuple of Session object. Strategy will iterate through this tuple and execute them with proper
+        sessions: Dict[str, Session]
+            Dict of Session objects. Strategy will iterate through this dict by name and execute them with proper
             callbacks and strategy configuration.
         Raises
         -------
@@ -66,8 +62,11 @@ class Strategy(object):
         self.__stage_names = wrap_tuple(strategy_config['stage_names'])
         # self.__train_model_names contains the name of trainable models. A trainable model may contain multiple
         # NN models
-        self.__train_model_names = wrap_tuple(strategy_config['model_names'])
-        self.__eval_model_names = wrap_tuple(strategy_config['eval_model_names'])
+
+        # TODO: Is it necessary to be a set instead of tuple?
+        self.__model_names_by_stage = dict()
+        self.__model_names_by_stage['train'] = wrap_tuple(data_sampling_config.train.data_provider.keys())
+        self.__model_names_by_stage['eval'] = wrap_tuple(data_sampling_config.eval.data_provider.keys())
         self.__train_starts_at_epoch = strategy_config['train_starts_at_epoch']
         self.__n_epochs = n_epochs
         self.__data_provider = data_provider
@@ -75,6 +74,7 @@ class Strategy(object):
         # self.__accumulate_grad is retrieved from strategy config yml file. It contains boolean value for each stepper
         # in the sessionss tuple. This is a mandatory field in the yml file
         self.__accumulate_grad = strategy_config['accumulate_grad']
+        self.__accumulate_grad_in_iter = strategy_config['accumulate_grad_in_iter']
         self.__data_sampling_config = data_sampling_config
 
         sessions = wrap_tuple(sessions)
@@ -97,10 +97,7 @@ class Strategy(object):
             self.__num_samples_by_stage[stage] = dict()
             self.__target_key_by_stage[stage] = dict()
 
-            if stage == 'train':
-                model_names = self.__train_model_names
-            else:
-                model_names = self.__eval_model_names
+            model_names = self.__model_names_by_stage[stage]
 
             # iterate through each trainable model stepper
             for model_name in model_names:
@@ -138,15 +135,8 @@ class Strategy(object):
         self.__sessions = dict()
 
         # save the sessions into dictionary according to model stepper name for easy access
-        for name, session in zip(self.__train_model_names, sessions):
-            self.__sessions[name] = session
-
-        self.__default_callbacks_train = dict()
-        self.__default_callbacks_eval = dict()
-        strategy_callback_tuple = ()
-        for name, session in zip(self.__train_model_names, sessions):
-            self.__sessions[name] = session
-            strategy_callback_tuple += wrap_tuple(session.model)
+        for name in self.__model_names_by_stage['train']:
+            self.__sessions[name] = sessions[name]
 
         if self.__use_apex:
             from collagen.parallel._apex import first_gpu_or_cpu_in_use
@@ -178,7 +168,7 @@ class Strategy(object):
             argument for the callback function
         """
 
-        for model_name in self.__train_model_names:
+        for model_name in self.__model_names_by_stage[kwargs['stage']]:
             for cb in getattr(self.__sessions[model_name], f'get_callbacks_by_stage')(kwargs['stage']):
                 if hasattr(cb, cb_func_name):
                     getattr(cb, cb_func_name)(strategy=self, **kwargs)
@@ -196,19 +186,19 @@ class Strategy(object):
         stage: str
             name of the learning stage where the call back function name would be searched.
         """
-        if name in self.__train_model_names:
+        if name in self.__model_names_by_stage[stage]:
             return self.__sessions[name].get_callbacks_by_stage(stage)
         else:
             if name == 'minibatch':
                 cbs = ()
-                for name in self.__train_model_names:
+                for name in self.__model_names_by_stage[stage]:
                     cbs += self.__sessions[name].get_callbacks_by_stage(stage)
                 return cbs
             elif name == 'batch':
                 return self.__callbacks
             else:  # return all
                 cbs = ()
-                for name in self.__train_model_names:
+                for name in self.__model_names_by_stage[stage]:
                     cbs += self.__sessions[name].get_callbacks_by_stage(stage)
                 return cbs + self.__callbacks
 
@@ -220,10 +210,8 @@ class Strategy(object):
         for epoch in range(self.__n_epochs):
             self.__data_provider.set_epoch(epoch)
             for stage in self.__stage_names:
-                if stage == 'train':
-                    model_names = self.__train_model_names
-                else:
-                    model_names = self.__eval_model_names
+
+                model_names = self.__model_names_by_stage[stage]
                 self._call_callbacks_by_name(cb_func_name='on_epoch_begin', epoch=epoch, stage=stage,
                                              n_epochs=self.__n_epochs)
                 if not self.__use_apex or (self.__use_apex and first_gpu_or_cpu_in_use(self.__device)):
@@ -269,7 +257,8 @@ class Strategy(object):
                                                                     self.__data_key_by_stage[stage][model_name],
                                                                     target_key=
                                                                     self.__target_key_by_stage[stage][model_name],
-                                                                    accumulate_grad=self.__accumulate_grad[model_name])
+                                                                    accumulate_grad=self.__accumulate_grad[model_name],
+                                                                    accumulate_grad_in_iter=self.__accumulate_grad_in_iter[model_name])
 
                     self._call_callbacks_by_name(cb_func_name='on_batch_end',
                                                  progress_bar=progress_bar,

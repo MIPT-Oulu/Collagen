@@ -8,18 +8,11 @@ strategy:
     - train
     - eval
 
-  model_names:
-    - D
-    - G
-
-  train_model_names:
-    - D
-    - G
-
-  eval_model_names:
-    - G
-
   accumulate_grad:
+    D: False
+    G: False
+
+  accumulate_grad_in_iter:
     D: False
     G: False
 

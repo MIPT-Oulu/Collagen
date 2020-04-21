@@ -4,7 +4,7 @@ except ImportError:
     from torch.optim.optimizer import Optimizer
 from typing import Tuple
 
-from collagen.core import Module
+import torch.nn as nn
 from collagen.core._callback import Callback
 from collagen.core.utils import wrap_tuple
 from ._stepper import Stepper
@@ -46,9 +46,9 @@ class Session(object):
 
     def __init__(self, data_provider: DataProvider,
                  train_loader_names: str or Tuple[str] or None,
-                 module: Module,
+                 module: nn.Module,
                  optimizer: Optimizer or None,
-                 loss: Module,
+                 loss: nn.Module,
                  val_loader_names: str or Tuple[str] = None,
                  train_callbacks: Tuple[Callback] or Callback or None = None,
                  val_callbacks: Tuple[Callback] or Callback or None = None,
@@ -123,7 +123,7 @@ class Session(object):
         return parsed_data
 
     def train(self, data_key: Tuple[str] or str = 'img', target_key: Tuple[str] or str = 'target',
-              minibatch_accumulate_grad: bool = True, accumulate_grad=False, cast_target=None):
+              accumulate_grad_in_iter: bool = True, accumulate_grad=False, cast_target=None):
         """
         Runs stepper in train mode as many iterations as given in the train loader.
 
@@ -144,8 +144,8 @@ class Session(object):
 
         """
 
-        #TODO: Check default of minibatch_accumulate_grad
-        minibatch_accumulate_grad = True if minibatch_accumulate_grad is None else minibatch_accumulate_grad
+        #TODO: Check default of accumulate_grad_in_iter
+        accumulate_grad_in_iter = True if accumulate_grad_in_iter is None else accumulate_grad_in_iter
         accumulate_grad = False if accumulate_grad is None else accumulate_grad
 
         data_key = wrap_tuple(data_key)
@@ -174,10 +174,10 @@ class Session(object):
                 first_minibatch = self.check_first_minibatch(loader_i=ind, minibatch_i=i)
                 last_minibatch = self.check_last_minibatch(n_loaders=len(self.__train_loader_names), loader_i=ind,
                                                            n_minibatches=n_iter, minibatch_i=i)
-                no_zero_grad = accumulate_grad or (not first_minibatch and minibatch_accumulate_grad)
-                with_step = last_minibatch or not minibatch_accumulate_grad
+                no_zero_grad = accumulate_grad or (not first_minibatch and accumulate_grad_in_iter)
+                with_step = last_minibatch or not accumulate_grad_in_iter
                 loss, train_result = self.__stepper.train_step(input_data,
-                                                               target, retain_graph=minibatch_accumulate_grad,
+                                                               target, retain_graph=accumulate_grad_in_iter,
                                                                accumulate_grad=no_zero_grad,
                                                                with_step=with_step,
                                                                return_out=True, callbacks=self.__train_callbacks)
@@ -211,8 +211,8 @@ class Session(object):
             first_minibatch = self.check_first_minibatch(loader_i=ind, minibatch_i=i)
             last_minibatch = self.check_last_minibatch(n_loaders=len(self.__train_loader_names), loader_i=ind,
                                                        n_minibatches=n_iter, minibatch_i=i)
-            no_zero_grad = accumulate_grad or (not first_minibatch and minibatch_accumulate_grad)
-            with_step = last_minibatch or not minibatch_accumulate_grad
+            no_zero_grad = accumulate_grad or (not first_minibatch and accumulate_grad_in_iter)
+            with_step = last_minibatch or not accumulate_grad_in_iter
             loss, train_result = self.__stepper.train_step(input_data, target, return_out=True,
                                                            accumulate_grad=no_zero_grad,
                                                            with_step=with_step,
@@ -233,7 +233,7 @@ class Session(object):
         #     cur_loader_state = self.__data_provider.state_dict()[loader_name]
         #     del cur_loader_state['samples']
 
-    def eval(self, data_key: Tuple[str] or str = 'img', minibatch_accumulate_grad=None, accumulate_grad=None,
+    def eval(self, data_key: Tuple[str] or str = 'img', accumulate_grad_in_iter=None, accumulate_grad=None,
              target_key: Tuple[str] or str = 'target', cast_target=None):
         """
         Runs stepper in `eval` mode as many iterations as given in the validation / test loader.
@@ -254,7 +254,7 @@ class Session(object):
 
         """
 
-        minibatch_accumulate_grad = None
+        accumulate_grad_in_iter = None
         accumulate_grad = None
 
         data_key = wrap_tuple(data_key)

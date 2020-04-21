@@ -75,11 +75,13 @@ def main(cfg):
                         val_callbacks=RunningAverageMeter(prefix="eval/G", name="loss"),
                         module=g_network, optimizer=g_optim, loss=g_crit)
 
+    sessions = {'D': d_session, 'G': g_session}
+
     # Strategy
     dcgan = Strategy(data_provider=data_provider,
                      data_sampling_config=cfg.sampling,
                      strategy_config=cfg.strategy,
-                     sessions=(d_session, g_session),
+                     sessions=sessions,
                      n_epochs=cfg.n_epochs,
                      callbacks=st_callbacks,
                      device=device)

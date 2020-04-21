@@ -68,12 +68,13 @@ def main(cfg):
                    ScalarMeterLogger(writer=summary_writer),
                    ModelSaver(metric_names='eval/loss', save_dir=cfg.snapshots, conditions='min', model=model))
 
-        session = Session(data_provider=data_provider,
-                          train_loader_names=cfg.sampling.train.data_provider.mymodel.keys(),
-                          val_loader_names=cfg.sampling.eval.data_provider.mymodel.keys(),
-                          module=model, loss=criterion, optimizer=optimizer,
-                          train_callbacks=train_cbs,
-                          val_callbacks=val_cbs)
+        session = dict()
+        session['mymodel'] = Session(data_provider=data_provider,
+                                     train_loader_names=cfg.sampling.train.data_provider.mymodel.keys(),
+                                     val_loader_names=cfg.sampling.eval.data_provider.mymodel.keys(),
+                                     module=model, loss=criterion, optimizer=optimizer,
+                                     train_callbacks=train_cbs,
+                                     val_callbacks=val_cbs)
 
         strategy = Strategy(data_provider=data_provider,
                             data_sampling_config=cfg.sampling,
