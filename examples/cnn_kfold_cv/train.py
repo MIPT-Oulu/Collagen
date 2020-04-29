@@ -12,10 +12,10 @@ from torch.utils.tensorboard import SummaryWriter
 from collagen.core import Session
 from collagen.strategies import Strategy
 from collagen.core.utils import auto_detect_device
-from collagen.data import get_mnist, get_cifar10, FoldSplit, DataProvider, ItemLoader
+from collagen.data import get_mnist, FoldSplit, DataProvider, ItemLoader
 from collagen.callbacks import RunningAverageMeter, AccuracyMeter, ScalarMeterLogger, ModelSaver
 
-from examples.cnn.utils import my_transforms, parse_item, SimpleConvNet
+from examples.cnn_kfold_cv.utils import my_transforms, parse_item, SimpleConvNet
 
 device = auto_detect_device()
 
@@ -28,14 +28,9 @@ def main(cfg):
 
     data_dir = os.path.join(os.environ['PWD'], cfg.data_dir)
 
-    if cfg.dataset == 'cifar10':
-        train_ds, classes = get_cifar10(data_folder=data_dir, train=True)
-        n_channels = 3
-    elif cfg.dataset == 'mnist':
-        train_ds, classes = get_mnist(data_folder=data_dir, train=True)
-        n_channels = 1
-    else:
-        raise ValueError('Not support dataset {}'.format(cfg.dataset))
+    train_ds, classes = get_mnist(data_folder=data_dir, train=True)
+    n_classes = len(classes)
+    n_channels = 1
 
     criterion = torch.nn.CrossEntropyLoss()
 
@@ -56,17 +51,18 @@ def main(cfg):
                                                          batch_size=cfg.bs, num_workers=cfg.num_threads,
                                                          shuffle=True if stage == "train" else False)
 
-        model = SimpleConvNet(bw=cfg.bw, drop=cfg.dropout, n_cls=len(classes), n_channels=n_channels)
+        model = SimpleConvNet(bw=cfg.bw, drop_rate=cfg.dropout, n_classes=n_classes)
         optimizer = torch.optim.Adam(params=model.parameters(), lr=cfg.lr, weight_decay=cfg.wd)
         data_provider = DataProvider(item_loaders)
 
-        train_cbs = (RunningAverageMeter(prefix="train", name="loss"),
-                     AccuracyMeter(prefix="train", name="acc"))
+        train_cbs = (RunningAverageMeter(name="loss"),
+                     AccuracyMeter(name="acc"))
 
-        val_cbs = (RunningAverageMeter(prefix="eval", name="loss"),
-                   AccuracyMeter(prefix="eval", name="acc"),
+        val_cbs = (RunningAverageMeter(name="loss"),
+                   AccuracyMeter(name="acc"),
                    ScalarMeterLogger(writer=summary_writer),
-                   ModelSaver(metric_names='eval/loss', save_dir=cfg.snapshots, conditions='min', model=model))
+                   ModelSaver(metric_names='loss', save_dir=cfg.snapshots, conditions='min', model=model),
+                   ModelSaver(metric_names='acc', save_dir=cfg.snapshots, conditions='max', model=model))
 
         session = dict()
         session['mymodel'] = Session(data_provider=data_provider,

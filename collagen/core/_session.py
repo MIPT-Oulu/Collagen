@@ -44,12 +44,13 @@ class Session(object):
         whether the training would be distributed or not
     """
 
-    def __init__(self, data_provider: DataProvider,
-                 train_loader_names: str or Tuple[str] or None,
+    def __init__(self,
                  module: nn.Module,
                  optimizer: Optimizer or None,
                  loss: nn.Module,
+                 train_loader_names: str or Tuple[str] or None,
                  val_loader_names: str or Tuple[str] = None,
+                 data_provider: DataProvider = None,
                  train_callbacks: Tuple[Callback] or Callback or None = None,
                  val_callbacks: Tuple[Callback] or Callback or None = None,
                  use_apex=False, distributed=False):
@@ -97,6 +98,14 @@ class Session(object):
         self.__val_callbacks += wrap_tuple(cbs)
 
     @property
+    def data_provider(self):
+        return self.__data_provider
+
+    @property
+    def optimizer(self):
+        return self.__optimizer
+
+    @property
     def model(self):
         return self.__module
 
@@ -112,7 +121,7 @@ class Session(object):
         parsed_data = {}
         if isinstance(keys, str):
             parsed_data = batch[keys]
-        elif isinstance(keys, list) or isinstance(keys, tuple):
+        elif hasattr(keys, "__len__") and not isinstance(keys, str):
             for key_i in keys:
                 if key_i in batch:
                     parsed_data[key_i] = batch[key_i]

@@ -135,17 +135,25 @@ class Strategy(object):
         self.__sessions = dict()
 
         # save the sessions into dictionary according to model stepper name for easy access
+        optimizers = dict()
         for name in self.__model_names_by_stage['train']:
             self.__sessions[name] = sessions[name]
+            if self.__sessions[name].data_provider is None:
+                self.__sessions[name].__data_provider = data_provider
+
+            if len(sessions) == 1:
+                optimizers = self.__sessions[name].optimizer
+            else:
+                optimizers[name] = self.__sessions[name].optimizer
 
         if self.__use_apex:
             from collagen.parallel._apex import first_gpu_or_cpu_in_use
             if first_gpu_or_cpu_in_use(self.__device):
-                self.__default_strategy_callback = (ProgressbarLogger(update_freq=1),)
+                self.__default_strategy_callback = (ProgressbarLogger(update_freq=1, optimizers=optimizers),)
             else:
                 self.__default_strategy_callback = ()
         else:
-            self.__default_strategy_callback = (ProgressbarLogger(update_freq=1),)
+            self.__default_strategy_callback = (ProgressbarLogger(update_freq=1, optimizers=optimizers),)
 
         self.__callbacks += self.__default_strategy_callback
 

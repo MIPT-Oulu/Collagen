@@ -1,6 +1,7 @@
 from abc import abstractmethod
 from collections import OrderedDict
-
+from torch.optim.optimizer import Optimizer
+import numpy as np
 import tqdm
 
 from collagen.core import Callback
@@ -115,7 +116,7 @@ class EpochLRLogger(Logger):
 
 
 class ProgressbarLogger(Logger):
-    def __init__(self, update_freq=1, name='progressbar_logger'):
+    def __init__(self, update_freq=1, optimizers=None, name='progressbar_logger', format_metric=None, format_lr=None):
         """Visualizes progressbar after a specific number of batches
 
         Parameters
@@ -126,6 +127,9 @@ class ProgressbarLogger(Logger):
         super().__init__(name=name)
         self.__count = 0
         self.__update_freq = update_freq
+        self.__optim = optimizers
+        self.__format_metric = format_metric if format_metric is not None else self._default_format_metric
+        self.__format_lr = format_lr if format_lr is not None else self._default_format_lr
         if not isinstance(self.__update_freq, int) or self.__update_freq < 1:
             raise ValueError(
                 "`update_freq` must be `int` and greater than 0, but found {} {}".format(type(self.__update_freq),
@@ -137,18 +141,39 @@ class ProgressbarLogger(Logger):
     def on_epoch_end(self, *args, **kwargs):
         pass
 
+    @staticmethod
+    def _default_format_lr(x):
+        return f"{x:0.1e}"
+
+    @staticmethod
+    def _default_format_metric(x):
+        return f"{x:.03f}"
+
     def on_batch_end(self, strategy, epoch: int, progress_bar: tqdm, stage: str or None, **kwargs):
         self.__count += 1
         if self._check_freq():
             list_metrics_desc = []
             postfix_progress = OrderedDict()
+            if self.__optim is not None:
+                if isinstance(self.__optim, Optimizer):
+                    postfix_progress['lr'] = self.__format_lr(self.__optim.param_groups[0]['lr'])
+                elif isinstance(self.__optim, dict):
+                    for opt_name in self.__optim:
+                        postfix_progress[opt_name] = self.__format_lr(self.__optim[opt_name].param_groups[0]['lr'])
+                elif isinstance(self.__optim, list) or isinstance(self.__optim, tuple):
+                    for opt_i, opt in self.__optim:
+                        postfix_progress[f'lr_{opt_i}'] = self.__format_lr(opt.param_groups[0]['lr'])
+                else:
+                    raise TypeError(f'Not support optimizers type {type(self.__optim)}.')
+
             for cb in strategy.get_callbacks_by_name("minibatch", stage=stage):
                 if cb.ctype == "meter" and cb.current() is not None:
                     list_metrics_desc.append(str(cb))
                     cb_cur = cb.current()
                     if not isinstance(cb_cur, dict):
-                        postfix_progress[cb.desc] = f'{cb_cur:.03f}'
+                        if isinstance(cb_cur, np.ndarray):
+                            cb_cur = cb_cur.item()
+                        postfix_progress[cb.desc] = self.__format_metric(cb_cur)
                     else:
-                        postfix_progress[cb.desc] = '|'.join([f'{cls}:{cb_cur[cls]:.03f}' for cls in cb_cur])
-
+                        postfix_progress[cb.desc] = '|'.join([f'{cls}:{self.__format_metric(cb_cur[cls])}' for cls in cb_cur])
             progress_bar.set_postfix(ordered_dict=postfix_progress, refresh=True)

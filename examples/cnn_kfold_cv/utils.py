@@ -1,11 +1,8 @@
-import torch.nn.functional as F
-from torch import nn
 import numpy as np
-
+import torch.nn as nn
+import torch.nn.functional as F
 import solt
 import solt.transforms as slt
-
-from collagen.core import Module
 
 
 def parse_item(root, entry, trf, data_key, target_key):
@@ -38,8 +35,8 @@ def my_transforms():
     return {'train': train_trf, 'eval': test_trf}
 
 
-class SimpleConvNet(Module):
-    def __init__(self, bw, drop=0.5, n_cls=10, n_channels=1):
+class SimpleConvNet(nn.Module):
+    def __init__(self, bw, drop_rate=0.2, n_classes=10, n_channels=1):
         super().__init__()
         self.n_filters_last = bw * 2
 
@@ -50,8 +47,8 @@ class SimpleConvNet(Module):
 
         self.pool = nn.MaxPool2d(2, 2)
 
-        self.classifier = nn.Sequential(nn.Dropout(drop),
-                                        nn.Linear(self.n_filters_last, n_cls))
+        self.classifier = nn.Sequential(nn.Dropout(drop_rate),
+                                        nn.Linear(self.n_filters_last, n_classes))
 
     @staticmethod
     def make_layer(inp, out):
