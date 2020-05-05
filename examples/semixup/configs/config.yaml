@@ -9,10 +9,10 @@ strategy:
     - eval
 
   accumulate_grad:
-    efficientnet: False
+    mymodel: False
 
   accumulate_grad_in_iter:
-    efficientnet: False
+    mymodel: True
 
   train_starts_at_epoch:
-    efficientnet: 0
+    mymodel: 0

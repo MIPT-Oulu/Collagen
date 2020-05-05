@@ -16,7 +16,7 @@ class SemixupLoss(Module):
         self._loss_cls = CrossEntropyLoss(reduction='sum')
 
         self._in_manifold_coef = in_manifold_coef
-        self._losses = {'loss_cls': None, 'loss_cons': None}
+        self._losses = {'loss_cls': None, 'loss_in_mnf': None}
 
         self._n_minibatches = 1.0
         self._ic_coef = ic_coef
@@ -57,21 +57,6 @@ class SemixupLoss(Module):
         n_classes = input_logits.size()[1]
         return F.mse_loss(input_softmax, target_softmax, reduction='sum') / n_classes
 
-    @staticmethod
-    def mse_loss(input_logits, target_logits):
-        """Returns MSE loss
-
-        Note:
-        - Returns the sum over all examples. Divide by the batch size afterwards
-          if you want the mean.
-        - Sends gradients to inputs but not the targets.
-        """
-        assert input_logits.size() == target_logits.size()
-        input_logits = input_logits.view(input_logits.shape[0], -1)
-        target_logits = target_logits.view(target_logits.shape[0], -1)
-        n_features = input_logits.size()[1]
-        return F.mse_loss(input_logits, target_logits, reduction='sum') / n_features
-
     def forward(self, pred: Tensor, target: Tensor or dict):
         n_minibatch_size = pred.shape[0]
         if target['name'] == 'u_mixup':
@@ -82,50 +67,38 @@ class SemixupLoss(Module):
             else:
                 raise ValueError('Not support augmented logits with shape {}'.format(target['logits_mixup'].shape))
 
-            loss_cons_aug_mixup = self._loss_cons(mixup_logits, target['logits_aug'])
-
             loss_cons_aug = self._loss_cons(target['logits_aug'], target['logits'])
-
+            loss_cons_aug_mixup = self._loss_cons(mixup_logits, target['logits_aug'])
             loss_cons_mixup = self._loss_cons(target['logits'], mixup_logits)
 
-            device = loss_ic.device
-            self._losses['loss'] = torch.tensor([0], dtype=torch.float32).to(device)
-
-            self._losses['loss_cons'] = self._in_manifold_coef * loss_cons_aug / (
+            self._losses['loss_in_mnf'] = self._in_manifold_coef * loss_cons_aug / (
                     self._n_minibatches * n_minibatch_size)
-            self._losses['loss'] += self._losses['loss_cons']
-
             self._losses['loss_ic'] = self._ic_coef * loss_ic / (self._n_minibatches * n_minibatch_size)
-            self._losses['loss'] += self._losses['loss_ic']
-
-            self._losses['loss_in_manifold'] = self._in_out_manifold_coef * loss_cons_mixup / (
+            self._losses['loss_inout_mnf'] = self._in_out_manifold_coef * (loss_cons_aug_mixup + loss_cons_mixup) / (
                     self._n_minibatches * n_minibatch_size)
-            self._losses['loss_in_out_manifold'] = self._in_out_manifold_coef * loss_cons_aug_mixup / (
-                    self._n_minibatches * n_minibatch_size)
-            self._losses['loss'] += self._losses['loss_in_manifold'] + self._losses['loss_in_out_manifold']
-
+            self._losses['loss'] = self._losses['loss_inout_mnf'] + self._losses['loss_in_mnf'] + self._losses['loss_ic']
             self._losses['loss_cls'] = None
         elif target['name'] == 'l_mixup':
             target_cls1 = target['target'].type(torch.int64)
             target_cls2 = target['target_bg'].type(torch.int64)
             alpha = target['alpha']
 
-            loss_cls = alpha * self._loss_cls(pred, target_cls1) + (1 - alpha) * self._loss_cls(pred, target_cls2)
+            # DEBUG
+            # loss_cls = alpha * self._loss_cls(pred, target_cls1) + (1 - alpha) * self._loss_cls(pred, target_cls2)
+            loss_cls = self._loss_cls(pred, target_cls1)
 
-            self._losses['loss_in_out_manifold'] = None
-            self._losses['loss_cons'] = None
+            self._losses['loss_inout_mnf'] = None
+            self._losses['loss_in_mnf'] = None
             self._losses['loss_ic'] = None
-            self._losses['loss_in_manifold'] = None
             self._losses['loss_cls'] = loss_cls / (self._n_minibatches * n_minibatch_size)
             self._losses['loss'] = self._losses['loss_cls']
         elif target['name'] == 'l_norm':
             target_cls = target['target'].type(torch.int64)
             loss_cls = self._loss_cls(pred, target_cls)
 
-            self._losses['loss_in_out_manifold'] = None
-            self._losses['loss_cons'] = None
+            self._losses['loss_inout_mnf'] = None
+            self._losses['loss_in_mnf'] = None
             self._losses['loss_ic'] = None
-            self._losses['loss_in_manifold'] = None
             self._losses['loss_cls'] = loss_cls / (self._n_minibatches * n_minibatch_size)
             self._losses['loss'] = self._losses['loss_cls']
         else:

@@ -101,6 +101,10 @@ class Session(object):
     def data_provider(self):
         return self.__data_provider
 
+    @data_provider.setter
+    def data_provider(self, dp):
+        self.__data_provider = dp
+
     @property
     def optimizer(self):
         return self.__optimizer

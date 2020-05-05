@@ -22,6 +22,10 @@ from examples.cnn_cifar10.model import ResNet
 device = auto_detect_device()
 
 
+from trains import Task
+task = Task.init(project_name="my project", task_name="my task")
+
+
 @hydra.main(config_path='configs/config.yaml')
 def main(cfg):
     torch.manual_seed(cfg.seed)

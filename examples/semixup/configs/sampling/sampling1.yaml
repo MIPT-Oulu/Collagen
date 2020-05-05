@@ -1,7 +1,7 @@
 sampling:
   train:
     data_provider:
-      efficientnet:
+      mymodel:
         unlabeled_train:
           batches_per_iter: 1
           data_key: "mixup_data"
@@ -13,19 +13,23 @@ sampling:
             - "name"
         labeled_train:
           batches_per_iter: 1
-          data_key: "mixup_data"
+          data_key: "data"
           target_key:
-            - "logits_mixup"
             - "target"
-            - "target_bg"
-            - "alpha"
             - "name"
+#          batches_per_iter: 1
+#          data_key: "mixup_data"
+#          target_key:
+#            - "logits_mixup"
+#            - "target"
+#            - "target_bg"
+#            - "alpha"
+#            - "name"
 
   eval:
     data_provider:
-      efficientnet:
+      mymodel:
         labeled_eval:
-          cate: ItemLoader
           batches_per_iter: 1
           data_key: "data"
           target_key:

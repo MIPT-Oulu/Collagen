@@ -25,7 +25,7 @@ class Strategy(object):
                  data_sampling_config: dict,
                  device: torch.device,
                  strategy_config: dict = None,
-                 callbacks: Tuple[Callback] or Callback = None,
+                 callbacks: Tuple[Callback] or Callback or None = None,
                  n_epochs: int or None = 10,
                  n_train_batches: int or None = None,
                  sessions: Dict[str, Session] or Session = None,
@@ -139,7 +139,7 @@ class Strategy(object):
         for name in self.__model_names_by_stage['train']:
             self.__sessions[name] = sessions[name]
             if self.__sessions[name].data_provider is None:
-                self.__sessions[name].__data_provider = data_provider
+                self.__sessions[name].data_provider = self.__data_provider
 
             if len(sessions) == 1:
                 optimizers = self.__sessions[name].optimizer

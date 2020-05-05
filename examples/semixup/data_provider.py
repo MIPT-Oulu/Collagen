@@ -96,10 +96,13 @@ def semixup_data_provider(model, alpha, n_classes, train_labeled_data, train_unl
     """
     Default setting of data provider for Semixup
     """
-    item_loaders["labeled_train"] = MixUpSampler(meta_data=train_labeled_data, name='l_mixup', alpha=alpha, model=model,
-                                                 transform=transforms['train'], parse_item_cb=parse_item, batch_size=bs,
-                                                 data_rearrange=data_rearrange,
-                                                 num_workers=num_workers, root=root, shuffle=True)
+    # item_loaders["labeled_train"] = MixUpSampler(meta_data=train_labeled_data, name='l_mixup', alpha=alpha, model=model,
+    #                                              transform=transforms['train'], parse_item_cb=parse_item, batch_size=bs,
+    #                                              data_rearrange=data_rearrange,
+    #                                              num_workers=num_workers, root=root, shuffle=True)
+    item_loaders["labeled_train"] = ItemLoader(meta_data=train_labeled_data, name='l_norm', transform=transforms['train'],
+                                              parse_item_cb=parse_item, batch_size=bs, num_workers=num_workers,
+                                              root=root, shuffle=True)
 
     item_loaders["unlabeled_train"] = SemixupSampler(meta_data=train_unlabeled_data, name='u_mixup', alpha=alpha,
                                                      model=model, min_lambda=0.55,

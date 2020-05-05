@@ -1,6 +1,6 @@
 from abc import abstractmethod
 from collections import OrderedDict
-from torch.optim.optimizer import Optimizer
+import torch.optim as optim
 import numpy as np
 import tqdm
 
@@ -149,20 +149,26 @@ class ProgressbarLogger(Logger):
     def _default_format_metric(x):
         return f"{x:.03f}"
 
+    @staticmethod
+    def check_optims(opt):
+        return not isinstance(opt, optim.Adam)
+
     def on_batch_end(self, strategy, epoch: int, progress_bar: tqdm, stage: str or None, **kwargs):
         self.__count += 1
         if self._check_freq():
             list_metrics_desc = []
             postfix_progress = OrderedDict()
             if self.__optim is not None:
-                if isinstance(self.__optim, Optimizer):
+                if isinstance(self.__optim, optim.Optimizer) and self.check_optims(self.__optim):
                     postfix_progress['lr'] = self.__format_lr(self.__optim.param_groups[0]['lr'])
                 elif isinstance(self.__optim, dict):
                     for opt_name in self.__optim:
-                        postfix_progress[opt_name] = self.__format_lr(self.__optim[opt_name].param_groups[0]['lr'])
+                        if self.check_optims(self.__optim[opt_name]):
+                            postfix_progress[f'lr{opt_name}'] = self.__format_lr(self.__optim[opt_name].param_groups[0]['lr'])
                 elif isinstance(self.__optim, list) or isinstance(self.__optim, tuple):
                     for opt_i, opt in self.__optim:
-                        postfix_progress[f'lr_{opt_i}'] = self.__format_lr(opt.param_groups[0]['lr'])
+                        if self.check_optims(opt):
+                            postfix_progress[f'lr{opt_i}'] = self.__format_lr(opt.param_groups[0]['lr'])
                 else:
                     raise TypeError(f'Not support optimizers type {type(self.__optim)}.')
 

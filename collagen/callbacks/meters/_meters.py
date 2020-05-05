@@ -1,4 +1,5 @@
 import numpy as np
+import warnings
 import torch
 from sklearn.metrics import balanced_accuracy_score, accuracy_score
 from sklearn.metrics import cohen_kappa_score, mean_squared_error, roc_auc_score, average_precision_score
@@ -128,7 +129,9 @@ class _ClassBasedMeter(Meter):
             target = to_cpu(target, use_numpy=True)
             output = to_cpu(output, use_numpy=True)
 
-            if len(target.shape) == 2:
+            if isinstance(target, list):
+                target_cls_list = target
+            elif isinstance(target, np.ndarray) and len(target.shape) == 2:
                 target_cls_list = np.argmax(target, axis=-1).tolist()
             elif len(target.shape) == 1:
                 target_cls_list = target.tolist()
@@ -180,8 +183,10 @@ class AccuracyMeter(_ClassBasedMeter):
 
     def current(self):
         if len(super().predictions) > 0:
-            self.__metric = accuracy_score(y_true=super().labels, y_pred=super().predictions, normalize=self.__normalize,
-                                           sample_weight=self.__sample_weight)
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore')
+                self.__metric = accuracy_score(y_true=super().labels, y_pred=super().predictions,
+                                               normalize=self.__normalize, sample_weight=self.__sample_weight)
         else:
             self.__metric = None
         return self.__metric
@@ -195,7 +200,9 @@ class BalancedAccuracyMeter(_ClassBasedMeter):
 
     def current(self):
         if len(super().labels) > 0:
-            self.__metric = balanced_accuracy_score(y_true=super().labels, y_pred=super().predictions)
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore')
+                self.__metric = balanced_accuracy_score(y_true=super().labels, y_pred=super().predictions)
         else:
             self.__metric = None
         return self.__metric
@@ -215,7 +222,9 @@ class KappaMeter(_ClassBasedMeter):
         elif len(super().labels) == 0:
             self.__metric = None
         else:
-            self.__metric = cohen_kappa_score(super().labels, super().predictions, weights=self.__weight_type)
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore')
+                self.__metric = cohen_kappa_score(super().labels, super().predictions, weights=self.__weight_type)
         return self.__metric
 
 
@@ -234,27 +243,29 @@ class AUCAPMeter(_ClassBasedMeter):
         elif len(super().labels) == 0:
             self.__metric = None
         else:
-            if self.__return_metrics.lower() == "auc":
-                try:
-                    self.__auc = roc_auc_score(super().labels, super().predictions)
-                except ValueError:
-                    self.__auc = None
-                ret = self.__auc
-            elif self.__return_metrics.lower() == "ap":
-                try:
-                    self.__ap = average_precision_score(super().labels, super().predictions)
-                except:
-                    self.__ap = None
-                ret = self.__ap
-            else:
-                try:
-                    self.__auc = roc_auc_score(super().labels, super().predictions)
-                    self.__ap = average_precision_score(super().labels, super().predictions)
-                except ValueError:
-                    self.__auc = None
-                    self.__ap = None
-                ret = {"auc": self.__auc, "ap": self.__ap}
-            self.__metric = ret
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore')
+                if self.__return_metrics.lower() == "auc":
+                    try:
+                        self.__auc = roc_auc_score(super().labels, super().predictions)
+                    except ValueError:
+                        self.__auc = None
+                    ret = self.__auc
+                elif self.__return_metrics.lower() == "ap":
+                    try:
+                        self.__ap = average_precision_score(super().labels, super().predictions)
+                    except:
+                        self.__ap = None
+                    ret = self.__ap
+                else:
+                    try:
+                        self.__auc = roc_auc_score(super().labels, super().predictions)
+                        self.__ap = average_precision_score(super().labels, super().predictions)
+                    except ValueError:
+                        self.__auc = None
+                        self.__ap = None
+                    ret = {"auc": self.__auc, "ap": self.__ap}
+                self.__metric = ret
         return self.__metric
 
 

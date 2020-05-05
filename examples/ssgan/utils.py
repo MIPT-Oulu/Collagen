@@ -181,7 +181,7 @@ def init_args():
     parser.add_argument('--g_net_features', type=int, default=64, help='Number of features (Generator)')
     parser.add_argument('--d_net_features', type=int, default=64, help='Number of featuresGenerator)')
     parser.add_argument('--latent_size', type=int, default=100, help='Latent space size')
-    parser.add_argument('--num_threads', type=int, default=0, help='Number of threads for data loader')
+    parser.add_argument('--num_workers', type=int, default=0, help='Number of threads for data loader')
     parser.add_argument('--save_data', default='data', help='Where to save downloaded dataset')
     parser.add_argument('--seed', type=int, default=12345, help='Random seed')
     parser.add_argument('--n_classes', type=int, default=10, help='Num of classes')

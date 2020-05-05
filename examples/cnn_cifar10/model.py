@@ -1,4 +1,3 @@
-import torch
 from torch import nn as nn
 
 
@@ -44,7 +43,7 @@ class ResNet(nn.Module):
         self.drop = nn.Dropout(drop_rate)
 
         self.avgpool = nn.AvgPool2d(4)
-        self.maxpool = nn.MaxPool2d(4)
+
         self.linear = nn.Linear(c[3], n_classes, bias=True)
 
 
@@ -60,11 +59,5 @@ class ResNet(nn.Module):
         o = self.avgpool(o).view(o.shape[0], -1)
         o = self.drop(o)
         out = self.linear(o)
-
-        # o1 = self.avgpool(o)
-        # o2 = self.maxpool(o)
-        # o12 = torch.cat((o1, o2), dim=1).view(o1.shape[0], -1)
-        # o12 = self.drop(o12)
-        # out = self.linear(o12)
 
         return out

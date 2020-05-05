@@ -1,4 +1,3 @@
-from torch import nn
 import torch
 import solt
 import solt.transforms as slt
@@ -17,21 +16,24 @@ def parse_item(root, entry, trf, data_key, target_key):
 
 def my_transforms():
     train_trf = solt.Stream([
-        slt.Scale(range_x=(0.9, 1.1), range_y=(0.9, 1.1), same=True, p=0.5),
-        slt.Translate(range_x=(-0.05, 0.05), range_y=(-0.05, 0.05), p=0.5),
+        # slt.Scale(range_x=(0.9, 1.1), range_y=(0.9, 1.1), same=True, p=0.5),
+        # slt.Translate(range_x=(-0.05, 0.05), range_y=(-0.05, 0.05), p=0.5),
+        # slt.GammaCorrection(gamma_range=0.1, p=0.5),
+        slt.Pad(pad_to=(36, 36)),
         slt.Rotate((-5, 5), p=0.5),
-        slt.GammaCorrection(gamma_range=0.1, p=0.5),
-        slt.Noise(gain_range=0.1, p=0.8)
+        slt.Crop((32, 32)),
+        # slt.Noise(gain_range=0.1, p=0.8),
+        slt.CutOut((8, 8))
     ])
 
     test_trf = solt.Stream([])
 
     custom_trf = solt.Stream([
-        slt.Scale(range_x=(0.9, 1.1), range_y=(0.9, 1.1), same=True, p=0.5),
-        slt.Translate(range_x=(-0.05, 0.05), range_y=(-0.05, 0.05), p=0.5),
+        slt.Pad(pad_to=(36, 36)),
         slt.Rotate((-5, 5), p=0.5),
-        slt.GammaCorrection(gamma_range=0.1, p=0.5),
-        slt.Noise(gain_range=0.1, p=0.8)
+        slt.Crop((32, 32)),
+        # slt.Noise(gain_range=0.1, p=0.8),
+        slt.CutOut((8, 8))
     ])
 
     return {'train': train_trf, 'eval': test_trf, 'transforms': custom_trf}
