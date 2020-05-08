@@ -51,7 +51,7 @@ def main(cfg):
                                                          batch_size=cfg.bs, num_workers=cfg.num_threads,
                                                          shuffle=True if stage == "train" else False)
 
-        model = SimpleConvNet(bw=cfg.bw, drop_rate=cfg.dropout, n_classes=n_classes)
+        model = SimpleConvNet(bw=cfg.bw, drop_rate=cfg.dropout, n_classes=n_classes).to(device)
         optimizer = torch.optim.Adam(params=model.parameters(), lr=cfg.lr, weight_decay=cfg.wd)
         data_provider = DataProvider(item_loaders)
 

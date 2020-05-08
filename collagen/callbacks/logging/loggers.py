@@ -169,8 +169,6 @@ class ProgressbarLogger(Logger):
                     for opt_i, opt in self.__optim:
                         if self.check_optims(opt):
                             postfix_progress[f'lr{opt_i}'] = self.__format_lr(opt.param_groups[0]['lr'])
-                else:
-                    raise TypeError(f'Not support optimizers type {type(self.__optim)}.')
 
             for cb in strategy.get_callbacks_by_name("minibatch", stage=stage):
                 if cb.ctype == "meter" and cb.current() is not None:

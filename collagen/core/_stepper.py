@@ -2,9 +2,8 @@ from typing import Tuple, Any, List
 
 import numpy as np
 import torch
-from torch import Tensor
-
 from collagen.core import Module
+from torch import Tensor
 
 
 class Stepper(object):
@@ -171,7 +170,7 @@ class Stepper(object):
     @staticmethod
     def transfer_to_device(batch, target, module_device, distributed=False):
         """
-        transfers data to specified device
+        Transfers data to specified device
         Parameters
         ----------
         batch: Tensor or dict or list of tensor
@@ -223,6 +222,30 @@ class Stepper(object):
 
         return batch_on_device, target_on_device
 
+    def __default_forward(self, batch_on_device):
+        """Forward a tensor, list of tensors, or dict of tensors through defined model.
+        If `batch_on_device` is a nested tuple or list, forward its sub tuple or list instead of one by one.
+
+        Parameters
+        ----------
+        batch_on_device: torch.Tensor or Tuple[torch.Tensor] or Tuple[Tuple[torch.Tensor] or Dict[torch.Tensor]
+
+        Returns
+        -------
+        out: forwarded output of tensor, tuple of tensors, or dictionary of tensors
+        """
+        if isinstance(batch_on_device, list) or isinstance(batch_on_device, tuple):
+            out = [self.__module(_batch) for _batch in batch_on_device]
+        elif isinstance(batch_on_device, dict):
+            out = {}
+            for k in batch_on_device:
+                out[k] = self.__module(batch_on_device[k])
+        elif isinstance(batch_on_device, torch.Tensor):
+            out = self.__module(batch_on_device)
+        else:
+            raise ValueError('Not support batch type {}'.format(type(batch_on_device)))
+        return out
+
     def __batch_step(self, batch: torch.Tensor or Tuple[torch.Tensor],
                      target: torch.Tensor or Tuple[torch.Tensor] or dict, with_grad: bool = True,
                      with_backward: bool = True, eval_mode: bool = False, with_step: bool = True,
@@ -252,7 +275,7 @@ class Stepper(object):
 
         Returns
         -------
-            out : Tuple[float, torch.Tensor or tuple] or float
+        out : Tuple[float, torch.Tensor or tuple] or float
                 Loss value and possibly the output of the model.
         """
 
@@ -287,17 +310,7 @@ class Stepper(object):
                                     optimizer=self.__optimizer,
                                     criterion=self.__loss)
 
-            if isinstance(batch_on_device, list) or isinstance(batch_on_device, tuple):
-                out = [self.__module(_batch) for _batch in batch_on_device]
-            elif isinstance(batch_on_device, dict):
-                out = {}
-                for k in batch_on_device:
-                    if isinstance(batch_on_device[k], Tensor):
-                        out[k] = self.__module(batch_on_device[k])
-            elif isinstance(batch_on_device, Tensor):
-                out = self.__module(batch_on_device)
-            else:
-                raise ValueError('Not support batch type {}'.format(type(batch_on_device)))
+            out = self.__default_forward(batch_on_device)
 
             for cb in callbacks:
                 cb.on_forward_end(module=self.__module,

@@ -38,7 +38,7 @@ def my_transforms():
 class SimpleConvNet(nn.Module):
     def __init__(self, bw, drop_rate=0.2, n_classes=10, n_channels=1):
         super().__init__()
-        self.n_filters_last = bw * 2
+        self.n_filters_last = bw * 4
 
         self.conv1 = self.make_layer(n_channels, bw)
         self.conv2 = self.make_layer(bw, bw)

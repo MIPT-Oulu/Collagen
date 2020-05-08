@@ -133,12 +133,14 @@ class _ClassBasedMeter(Meter):
                 target_cls_list = target
             elif isinstance(target, np.ndarray) and len(target.shape) == 2:
                 target_cls_list = np.argmax(target, axis=-1).tolist()
-            elif len(target.shape) == 1:
+            elif isinstance(target, np.ndarray) and len(target.shape) == 1:
                 target_cls_list = target.tolist()
             else:
                 raise ValueError(f'Not support {len(target.shape)}-dim target tensor.')
 
-            if len(output.shape) == 2:
+            if isinstance(output, list):
+                output_cls_list = output
+            elif len(output.shape) == 2:
                 output_topk = np.argsort(output, axis=-1)[:, -self.__topk:]
                 output_cls_list = []
                 for i in range(output_topk.shape[0]):
