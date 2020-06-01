@@ -27,7 +27,7 @@ def parse_output(output):
     elif isinstance(output, dict):
         return output['x_mix']
     else:
-        raise ValueError('Not support output type {}'.format(type(output)))
+        raise ValueError('Not support x type {}'.format(type(output)))
 
 
 def parse_output_cls(y):
@@ -185,7 +185,7 @@ def init_args():
     parser.add_argument('--n_depths', type=int, default=28, help='Depth of Wide-ResNet')
     parser.add_argument('--w_factor', type=int, default=2, help='widen factor of Wide-ResNet')
     parser.add_argument('--dropout_rate', type=float, default=0.25, help='Dropout rate of Wide-ResNet')
-    parser.add_argument('--num_threads', type=int, default=0, help='Number of threads for data loader')
+    parser.add_argument('--num_workers', type=int, default=0, help='Number of threads for data loader')
     parser.add_argument('--save_data', default='data', help='Where to save downloaded dataset')
     parser.add_argument('--seed', type=int, default=12345, help='Random seed')
     parser.add_argument('--n_classes', type=int, default=10, help='Num of classes')

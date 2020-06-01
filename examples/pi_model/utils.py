@@ -141,7 +141,7 @@ def init_args():
     parser.add_argument('--wd', type=float, default=1e-4, help='Weight decay')
     parser.add_argument('--beta1', type=float, default=0.5, help='Weight decay')
     parser.add_argument('--n_features', type=int, default=128, help='Number of features')
-    parser.add_argument('--num_threads', type=int, default=0, help='Number of threads for data loader')
+    parser.add_argument('--num_workers', type=int, default=0, help='Number of threads for data loader')
     parser.add_argument('--save_data', default='data', help='Where to save downloaded dataset')
     parser.add_argument('--seed', type=int, default=12345, help='Random seed')
     parser.add_argument('--n_classes', type=int, default=10, help='Num of classes')

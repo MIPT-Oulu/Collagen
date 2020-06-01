@@ -1,0 +1,14 @@
+n_epochs: 500
+bs: 128
+dropout: 0.0
+arch_name: resnet18
+momentum: 0.9
+n_features: 64
+wd: 5e-4
+lr: 1e-4
+num_workers: 4
+snapshots: snapshots
+seed: 12345
+data_dir: ./data
+log_dir: ''
+comment: cnn_cifar10
