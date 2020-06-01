@@ -1,0 +1,19 @@
+n_epochs: 500
+bs: 256
+dropout: 0.35
+bw: 64
+wd: 5e-4
+lr: 1e-4
+momentum: 0.9
+num_workers: 4
+snapshots: snapshots
+seed: 12345
+dataset: cifar10
+data_dir: ./data
+log_dir: ''
+comment: cnn_example
+arch_name: efficientnet-b0
+alpha: 0.75
+pretrained_model: ''
+#  '/home/hoang/workspace/collagen-dev/examples/semixup/outputs/2020-04-28/16-45-45/snapshots/model_0023_20200428_173525_eval.acc_0.806.pth'
+#'/home/hoang/workspace/collagen-dev/examples/semixup/outputs/2020-04-27/21-41-06/snapshots/model_0021_20200427_223602_eval.acc_0.859.pth' # '/home/hoang/workspace/collagen-dev/examples/semixup/outputs/2020-04-27/13-34-58/snapshots/model_0002_20200427_134356_eval.acc_0.841.pth' #/home/hoang/workspace/collagen-dev/examples/semixup/outputs/2020-04-24/15-24-31/snapshots/model_0097_20200424_172958_eval.loss_0.979.pth

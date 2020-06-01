@@ -13,3 +13,15 @@
 - [ ] VAE
 - [ ] VAE-SSL
 - [ ] VAE-GAN
+
+
+# Dependencies
+
+- SOLT (>= 0.1.9)
+- Hydra (>=0.11.3)
+
+# Create default configurations
+
+```shell script
+python -c "from collagen.core.utils import create_default_config; create_default_config(<root_dir>, <model_name>)"
+``` 

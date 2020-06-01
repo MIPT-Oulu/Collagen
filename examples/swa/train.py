@@ -83,13 +83,13 @@ if __name__ == "__main__":
     stra_cbs = (ScalarMeterLogger(writer=summary_writer), ProgressbarLogger())
 
     # Trainers
-    st_train_cbs = (CycleRampUpDownScheduler(optimizer=st_optim, initial_lr=args.initial_lr, lr_rampup=args.lr_rampup,
-                                             lr=args.lr, lr_rampdown_epochs=args.lr_rampdown_epochs,
+    st_train_cbs = (CycleRampUpDownScheduler(optimizer=st_optim, initial_lr=args.initial_lr, rampup_epochs=args.lr_rampup,
+                                             lr=args.lr, rampdown_epochs=args.lr_rampdown_epochs,
                                              start_cycle_epoch=args.start_cycle_epoch,
                                              cycle_interval=args.cycle_interval,
                                              cycle_rampdown_epochs=args.cycle_rampdown_epochs),
-                    # SingleRampUpDownScheduler(optimizer=st_optim, initial_lr=args.initial_lr, lr_rampup=args.lr_rampup,
-                    #                           lr=args.lr, lr_rampdown_epochs=args.lr_rampdown_epochs),
+                    # SingleRampUpDownScheduler(optimizer=st_optim, initial_lr=args.initial_lr, rampup_epochs=args.rampup_epochs,
+                    #                           lr=args.lr, rampdown_epochs=args.rampdown_epochs),
                     RunningAverageMeter(prefix='train/S', name='loss_cls'),
                     RunningAverageMeter(prefix='train/S', name='loss_s_t_cons'),
                     RunningAverageMeter(prefix='train/S', name='loss_aug_cons'),

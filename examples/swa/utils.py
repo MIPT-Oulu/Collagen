@@ -140,8 +140,8 @@ def init_args():
     parser.add_argument('--bs', type=int, default=32, help='Batch size')
     parser.add_argument('--lr', type=float, default=1e-1, help='Max learning rate')
     parser.add_argument('--initial_lr', default=0.0, type=float, help='Initial learning rate when using linear rampup')
-    parser.add_argument('--lr_rampup', default=20, type=int, help='Length of learning rate rampup in the beginning')
-    parser.add_argument('--lr_rampdown_epochs', default=80, type=int,
+    parser.add_argument('--rampup_epochs', default=20, type=int, help='Length of learning rate rampup in the beginning')
+    parser.add_argument('--rampdown_epochs', default=80, type=int,
                         help='Length of learning rate cosine rampdown (>= length of training)')
     parser.add_argument('--start_cycle_epoch', default=80, type=int, help='Epoch to start cycle')
     parser.add_argument('--cycle_rampdown_epochs', default=0, type=int, help='Length of epoch cycle to ramp down')
@@ -150,7 +150,7 @@ def init_args():
     parser.add_argument('--wd', type=float, default=1e-4, help='Weight decay')
     parser.add_argument('--beta1', type=float, default=0.5, help='Weight decay')
     parser.add_argument('--n_features', type=int, default=128, help='Number of features')
-    parser.add_argument('--num_threads', type=int, default=0, help='Number of threads for data loader')
+    parser.add_argument('--num_workers', type=int, default=0, help='Number of threads for data loader')
     parser.add_argument('--save_data', default='data', help='Where to save downloaded dataset')
     parser.add_argument('--seed', type=int, default=12345, help='Random seed')
     parser.add_argument('--n_classes', type=int, default=10, help='Num of classes')

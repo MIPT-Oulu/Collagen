@@ -15,6 +15,9 @@ class DataProvider(object):
         self.__state_dict = {}
 
         for itemloader_name in self.__loaders:
+            # Auto set name for itemloader
+            if not self.__loaders[itemloader_name].name or self.__loaders[itemloader_name].name is None:
+                self.__loaders[itemloader_name].name = itemloader_name
             itemloader_len = len(self.__loaders[itemloader_name])
             self.__state_dict[itemloader_name] = {"total": itemloader_len,
                                                   "samples": None,

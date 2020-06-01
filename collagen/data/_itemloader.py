@@ -10,6 +10,10 @@ import torch.nn as nn
 from ._dataset import DataFrameDataset
 from torch.utils.data.sampler import Sampler
 
+__all__ = ["ItemLoader", "MixUpSampler", "FeatureMatchingSampler", "AugmentedGroupSampler", "GaussianNoiseSampler",
+           "GANFakeSampler", "SSGANFakeSampler"]
+
+
 class ItemLoader(object):
     """Combines DataFrameDataset and DataLoader, and provides single- or multi-process iterators over the dataset.
         
@@ -57,7 +61,7 @@ class ItemLoader(object):
                  num_workers: int = 0, shuffle: bool = False, pin_memory: bool = False,
                  collate_fn: callable = default_collate, transform: callable or None = None,
                  sampler: Sampler or None = None,
-                 batch_sampler=None, drop_last: bool = False, timeout: int = 0, name: str = "loader",
+                 batch_sampler=None, drop_last: bool = False, timeout: int = 0, name: str = "",
                  worker_init_fn=None):
         if root is None:
             root = ''
@@ -81,6 +85,14 @@ class ItemLoader(object):
         self.parse_item = parse_item_cb
 
         self.update_dataset(meta_data)
+
+    @property
+    def name(self):
+        return self.__name
+
+    @name.setter
+    def name(self, input):
+        self.__name = input
 
     @staticmethod
     def _worker_init(wid):

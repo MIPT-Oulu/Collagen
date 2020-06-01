@@ -1,0 +1,18 @@
+defaults:
+  - args: args1
+  - sampling: sampling1
+
+strategy:
+  # Support 'train' or 'eval' stages only
+  stage_names:
+    - train
+    - eval
+
+  accumulate_grad:
+    mymodel: False
+
+  accumulate_grad_in_iter:
+    mymodel: False
+
+  train_starts_at_epoch:
+    mymodel: 0

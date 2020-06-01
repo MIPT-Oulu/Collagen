@@ -1,6 +1,7 @@
 import numpy as np
+import warnings
 import torch
-from sklearn.metrics import balanced_accuracy_score
+from sklearn.metrics import balanced_accuracy_score, accuracy_score
 from sklearn.metrics import cohen_kappa_score, mean_squared_error, roc_auc_score, average_precision_score
 
 from collagen.core import Callback
@@ -8,8 +9,7 @@ from collagen.core.utils import to_cpu
 
 __all__ = ["AccuracyMeter", "AccuracyThresholdMeter", "BalancedAccuracyMeter", "ConfusionMeter",
            "ItemWiseBinaryJaccardDiceMeter",
-           "JaccardDiceMeter", "KappaMeter", "Meter", "MultilabelDiceMeter", "RunningAverageMeter", "SSAccuracyMeter",
-           "SSBalancedAccuracyMeter", "SSValidityMeter", "AUCAPMeter"]
+           "JaccardDiceMeter", "KappaMeter", "Meter", "MultilabelDiceMeter", "RunningAverageMeter", "AUCAPMeter"]
 
 
 class Meter(Callback):
@@ -85,9 +85,9 @@ class RunningAverageMeter(Meter):
         self.__value = 0
         self.__count = 0
 
-    def on_minibatch_end(self, loss, session, **kwargs):
-        if hasattr(session.loss, 'get_loss_by_name'):
-            loss_value = to_cpu(session.loss.get_loss_by_name(self.name))
+    def on_minibatch_end(self, loss, stepper, **kwargs):
+        if hasattr(stepper.loss, 'get_loss_by_name'):
+            loss_value = to_cpu(stepper.loss.get_loss_by_name(self.name))
         else:
             loss_value = to_cpu(loss)
         if loss_value is not None:
@@ -103,47 +103,172 @@ class RunningAverageMeter(Meter):
         return self.__value / self.__count
 
 
-class AccuracyMeter(Meter):
-    def __init__(self, name: str = "categorical_accuracy", prefix="", parse_target=None, parse_output=None, cond=None):
+class _ClassBasedMeter(Meter):
+    def __init__(self, name: str = 'class_based_meter', prefix="", parse_target=None, parse_output=None, cond=None,
+                 topk=1):
         super().__init__(name=name, prefix=prefix)
-        self.__data_count = 0.0
-        self.__correct_count = 0.0
-        self.__accuracy = None
-        self.__parse_target = Meter.default_parse_target if parse_target is None else parse_target
-        self.__parse_output = Meter.default_parse_output if parse_output is None else parse_output
-        self.__cond = Meter.default_cond if cond is None else cond
+        self.__parse_target = parse_target if parse_target is not None else Meter.default_parse_target
+        self.__parse_output = parse_output if parse_output is not None else Meter.default_parse_output
+        self.__cond = cond if cond is not None else Meter.default_cond
+        self.__topk = topk
+        self.__labels = []
+        self.__preds = []
+        self.__metric = None
 
-    def on_epoch_begin(self, epoch, *args, **kwargs):
-        self.__data_count = 0.0
-        self.__correct_count = 0.0
+    def _reset(self):
+        self.__labels = []
+        self.__preds = []
+
+    def on_epoch_begin(self, *args, **kwargs):
+        self._reset()
 
     def on_minibatch_end(self, target, output, device=None, **kwargs):
         if self.__cond(target, output):
             target = self.__parse_target(target)
             output = self.__parse_output(output)
-            n = target.shape[0]
-            output = output.float().argmax(dim=-1).view(n, -1)
-            target = target.view(n, -1)
+            target = to_cpu(target, use_numpy=True)
+            output = to_cpu(output, use_numpy=True)
 
-            if device is None:
-                device = output.device
-                target_on_device = target.to(device)
-                output_on_device = output
+            if isinstance(target, list):
+                target_cls_list = target
+            elif isinstance(target, np.ndarray) and len(target.shape) == 2:
+                target_cls_list = np.argmax(target, axis=-1).tolist()
+            elif isinstance(target, np.ndarray) and len(target.shape) == 1:
+                target_cls_list = target.tolist()
             else:
-                target_on_device = target.to(device)
-                output_on_device = output.to(device)
-            self.__correct_count += (output_on_device.to(torch.int64) == target_on_device.to(torch.int64)).float().sum()
-            self.__data_count += n
+                raise ValueError(f'Not support {len(target.shape)}-dim target tensor.')
+
+            if isinstance(output, list):
+                output_cls_list = output
+            elif len(output.shape) == 2:
+                output_topk = np.argsort(output, axis=-1)[:, -self.__topk:]
+                output_cls_list = []
+                for i in range(output_topk.shape[0]):
+                    if target_cls_list[i] in output_topk[i, :]:
+                        output_cls_list.append(target_cls_list[i])
+                    else:
+                        output_cls_list.append(output_topk[i, 0])
+            elif len(output.shape) == 1:
+                output_cls_list = output.tolist()
+            else:
+                raise ValueError(f'Not support {len(output.shape)}-dim x tensor.')
+
+            self.__labels += target_cls_list
+            self.__preds += output_cls_list
 
     def on_epoch_end(self, epoch, n_epochs, *args, **kwargs):
-        self.__accuracy = self.current()
+        self.__metric = self.current()
 
     def current(self):
-        if self.__data_count > 0:
-            acc = self.__correct_count / self.__data_count
-            return to_cpu(acc, use_numpy=True)
+        raise NotImplementedError(f'Function current() not implemented yet!')
+
+    @property
+    def metric(self):
+        return self.__metric
+
+    @property
+    def labels(self):
+        return self.__labels
+
+    @property
+    def predictions(self):
+        return self.__preds
+
+
+class AccuracyMeter(_ClassBasedMeter):
+    def __init__(self, name: str = "categorical_accuracy", prefix="", parse_target=None, parse_output=None, cond=None,
+                 topk=1, normalize=True, sample_weight=None):
+        super().__init__(name=name, prefix=prefix, parse_target=parse_target, parse_output=parse_output, cond=cond,
+                         topk=topk)
+        self.__normalize = normalize
+        self.__sample_weight = sample_weight
+
+    def current(self):
+        if len(super().predictions) > 0:
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore')
+                self.__metric = accuracy_score(y_true=super().labels, y_pred=super().predictions,
+                                               normalize=self.__normalize, sample_weight=self.__sample_weight)
         else:
-            return None
+            self.__metric = None
+        return self.__metric
+
+
+class BalancedAccuracyMeter(_ClassBasedMeter):
+    def __init__(self, name: str = "balanced_categorical_accuracy", prefix="", parse_target=None, parse_output=None,
+                 cond=None, topk=1):
+        super().__init__(name=name, prefix=prefix, parse_target=parse_target, parse_output=parse_output, cond=cond,
+                         topk=topk)
+
+    def current(self):
+        if len(super().labels) > 0:
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore')
+                self.__metric = balanced_accuracy_score(y_true=super().labels, y_pred=super().predictions)
+        else:
+            self.__metric = None
+        return self.__metric
+
+
+class KappaMeter(_ClassBasedMeter):
+    def __init__(self, name: str = "kappa", prefix="", weight_type="quadratic",
+                 parse_target=None, parse_output=None, cond=None, topk=1):
+        super().__init__(name=name, prefix=prefix, parse_target=parse_target, parse_output=parse_output, cond=cond,
+                         topk=topk)
+        self.__weight_type = weight_type
+
+    def current(self):
+        if len(super().labels) != len(super().predictions):
+            raise ValueError("Predicts and corrects must match, but got {} vs {}".format(len(super().labels),
+                                                                                         len(super().predictions)))
+        elif len(super().labels) == 0:
+            self.__metric = None
+        else:
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore')
+                self.__metric = cohen_kappa_score(super().labels, super().predictions, weights=self.__weight_type)
+        return self.__metric
+
+
+class AUCAPMeter(_ClassBasedMeter):
+    def __init__(self, name: str = "auc_ap", prefix="", parse_target=None, parse_output=None, cond=None,
+                 return_metrics=""):
+        super().__init__(name=name, prefix=prefix, parse_target=parse_target, parse_output=parse_output, cond=cond,
+                         topk=1)
+        self.__return_metrics = return_metrics
+
+
+    def current(self):
+        if len(super().labels) != len(super().predictions):
+            raise ValueError("Predicts and corrects must match, but got {} vs {}".format(len(super().labels),
+                                                                                         len(super().predictions)))
+        elif len(super().labels) == 0:
+            self.__metric = None
+        else:
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore')
+                if self.__return_metrics.lower() == "auc":
+                    try:
+                        self.__auc = roc_auc_score(super().labels, super().predictions)
+                    except ValueError:
+                        self.__auc = None
+                    ret = self.__auc
+                elif self.__return_metrics.lower() == "ap":
+                    try:
+                        self.__ap = average_precision_score(super().labels, super().predictions)
+                    except:
+                        self.__ap = None
+                    ret = self.__ap
+                else:
+                    try:
+                        self.__auc = roc_auc_score(super().labels, super().predictions)
+                        self.__ap = average_precision_score(super().labels, super().predictions)
+                    except ValueError:
+                        self.__auc = None
+                        self.__ap = None
+                    ret = {"auc": self.__auc, "ap": self.__ap}
+                self.__metric = ret
+        return self.__metric
 
 
 class AccuracyThresholdMeter(Meter):
@@ -199,374 +324,6 @@ class AccuracyThresholdMeter(Meter):
             return to_cpu(acc, use_numpy=True)
         else:
             return None
-
-
-class SSAccuracyMeter(Meter):
-    def __init__(self, name: str = "ssl_accuracy", sigmoid: bool = False, prefix="",
-                 cond=None, parse_target=None, parse_output=None):
-        super().__init__(name=name, prefix=prefix)
-        self.__sigmoid: bool = sigmoid
-        self.__data_count = 0.0
-        self.__correct_count = 0.0
-        self.__accuracy = None
-        self.__cond = Meter.default_cond if cond is None else cond
-        self.__parse_target = Meter.default_parse_target if parse_target is None else parse_target
-        self.__parse_output = Meter.default_parse_output if parse_output is None else parse_output
-
-    def on_epoch_begin(self, epoch, *args, **kwargs):
-        self.__data_count = 0.0
-        self.__correct_count = 0.0
-
-    def _calc_metric(self, target, output, device=None, **kwargs):
-        if self.__cond(target, output):
-            target_cls, target_valid = self.__parse_target(target)
-            output_cls, _ = self.__parse_output(output)
-
-            if device is None:
-                device = output.device
-                target_on_device = target_cls.to(device)
-                target_valid_on_device = target_valid.to(device)
-                output_on_device = output_cls
-            else:
-                target_on_device = target_cls.to(device)
-                target_valid_on_device = target_valid.to(device)
-                output_on_device = output_cls.to(device)
-
-            if self.__sigmoid:
-                output_on_device = output_on_device.sigmoid()
-
-            discrete_output_on_device = output_on_device.argmax(dim=-1).view(n)
-            discrete_target_on_device = target_on_device.argmax(dim=-1).view(n)
-
-            cls = (discrete_output_on_device.byte() == discrete_target_on_device.byte()).float()
-            fp = (target_valid_on_device * cls).sum()
-            total = target_valid_on_device.sum().float()
-            self.__correct_count += fp
-            self.__data_count += total
-
-    def on_minibatch_end(self, target, output, device=None, **kwargs):
-        self._calc_metric(target, output, device, **kwargs)
-
-    def on_epoch_end(self, epoch, n_epochs, *args, **kwargs):
-        self.__accuracy = self.current()
-
-    def current(self):
-        if self.__data_count > 0:
-            acc = self.__correct_count / self.__data_count
-            to_cpu(acc, use_numpy=True)
-        else:
-            return None
-
-
-class SSBalancedAccuracyMeter(Meter):
-    def __init__(self, name: str = "ssl_balanced_accuracy", sigmoid: bool = False, prefix="",
-                 cond=None, parse_target=None, parse_output=None):
-        super().__init__(name=name, prefix=prefix)
-        self.__sigmoid: bool = sigmoid
-        self.__data_count = 0.0
-        self.__correct_count = 0.0
-        self.__accuracy = None
-        self.__corrects = []
-        self.__preds = []
-        self.__cond = Meter.default_cond if cond is None else cond
-        self.__parse_target = Meter.default_parse_target if parse_target is None else parse_target
-        self.__parse_output = Meter.default_parse_output if parse_output is None else parse_output
-
-    def on_epoch_begin(self, epoch, *args, **kwargs):
-        self.__preds = []
-        self.__corrects = []
-
-    def _calc_metric(self, target, output, device=None, **kwargs):
-        if self.__cond(target, output):
-            target_cls, target_valid = self.__parse_target(target)
-            output_cls, _ = self.__parse_output(output)
-
-            target_cls = to_cpu(target_cls, use_numpy=True)
-            target_valid = to_cpu(target_valid, use_numpy=True)
-            output_cls = to_cpu(output_cls, use_numpy=True)
-
-            mask = target_valid == 1
-
-            target_cls = target_cls[mask, :]
-            output_cls = output_cls[mask, :]
-
-            target_cls_list = np.argmax(target_cls, axis=-1).tolist()
-            output_cls_list = np.argmax(output_cls, axis=-1).tolist()
-
-            self.__corrects += target_cls_list
-            self.__preds += output_cls_list
-
-    def on_minibatch_end(self, target, output, device=None, **kwargs):
-        self._calc_metric(target, output, device, **kwargs)
-
-    def on_epoch_end(self, epoch, n_epochs, *args, **kwargs):
-        self.__accuracy = self.current()
-
-    def current(self):
-        if len(self.__corrects) > 0:
-            return balanced_accuracy_score(y_true=self.__corrects, y_pred=self.__preds)
-        else:
-            return None
-
-
-class SSValidityMeter(Meter):
-    def __init__(self, name: str = "ssl_validity", threshold: float = 0.5, sigmoid: bool = False, prefix="",
-                 cond=None, parse_target=None, parse_output=None):
-        super().__init__(name=name, prefix=prefix)
-        self.__sigmoid: bool = sigmoid
-        self.__threshold = threshold
-        self.__data_count = 0.0
-        self.__correct_count = 0.0
-        self.__accuracy = None
-        self.__cond = Meter.default_cond
-        self.__parse_target = Meter.default_parse_target if parse_target is None else parse_target
-        self.__parse_output = Meter.default_parse_output if parse_output is None else parse_output
-
-    def on_epoch_begin(self, epoch, *args, **kwargs):
-        self.__data_count = 0.0
-        self.__correct_count = 0.0
-
-    def on_minibatch_end(self, target, output, device=None, **kwargs):
-        if self.__cond(target, output):
-            target_valid = self.__parse_target(target)
-            output_valid = self.__parse_output(output)
-
-            n = target_valid.shape[0]
-
-            if device is None:
-                device = output.device
-                target_on_device = target_valid.to(device)
-                output_on_device = output_valid
-            else:
-                target_on_device = target_valid.to(device)
-                output_on_device = output_valid.to(device)
-
-            if self.__sigmoid:
-                output_on_device = output_on_device.sigmoid()
-
-            valid = ((output_on_device > self.__threshold).byte() == target_on_device.byte()).float()
-            fp = valid.sum()
-            self.__correct_count += fp
-            self.__data_count += n
-
-    def on_epoch_end(self, epoch, n_epochs, *args, **kwargs):
-        self.__accuracy = self.current()
-
-    def current(self):
-        if self.__data_count > 0:
-            acc = self.__correct_count / self.__data_count
-            return to_cpu(acc, use_numpy=True)
-        else:
-            return None
-
-
-class BalancedAccuracyMeter(Meter):
-    def __init__(self, name: str = "balanced_categorical_accuracy", prefix="", parse_target=None, parse_output=None,
-                 cond=None, topk=1):
-        super().__init__(name=name, prefix=prefix)
-        self.__data_count = 0.0
-        self.__correct_count = 0.0
-        self.__accuracy = None
-        self.__corrects = []
-        self.__preds = []
-        self.__parse_target = Meter.default_parse_target if parse_target is None else parse_target
-        self.__parse_output = Meter.default_parse_output if parse_output is None else parse_output
-        self.__cond = Meter.default_cond if cond is None else cond
-        self.__topk = topk
-
-    def on_epoch_begin(self, epoch, *args, **kwargs):
-        self.__preds = []
-        self.__corrects = []
-
-    def _calc_metric(self, target, output, device=None, **kwargs):
-        target = to_cpu(target, use_numpy=True)
-        output = to_cpu(output, use_numpy=True)
-        n = target.shape[0]
-        if len(target.shape) == 2:
-            target_cls_list = np.argmax(target, axis=-1).tolist()
-        elif len(target.shape) == 1:
-            target_cls_list = target.tolist()
-        else:
-            raise ValueError(f'Not support {len(target.shape)}-dim target tensor.')
-
-        if len(output.shape) == 2:
-            output_topk = np.argsort(output, axis=-1)[:, -self.__topk:]
-            output_cls_list = []
-            for i in range(output_topk.shape[0]):
-                if target_cls_list[i] in output_topk[i, :]:
-                    output_cls_list.append(target_cls_list[i])
-                else:
-                    output_cls_list.append(output_topk[i, 0])
-        elif len(output.shape) == 1:
-            output_cls_list = output.tolist()
-        else:
-            raise ValueError(f'Not support {len(output.shape)}-dim output tensor.')
-        # output_cls_list = np.argmax(output, axis=-1).tolist()
-
-        self.__corrects += target_cls_list
-        self.__preds += output_cls_list
-
-    def on_minibatch_end(self, target, output, device=None, **kwargs):
-        if self.__cond(target, output):
-            target = self.__parse_target(target)
-            output = self.__parse_output(output)
-            self._calc_metric(target, output, device, **kwargs)
-
-    def on_epoch_end(self, epoch, n_epochs, *args, **kwargs):
-        self.__accuracy = self.current()
-
-    @property
-    def preds(self):
-        return self.__preds
-
-    @property
-    def corrects(self):
-        return self.__corrects
-
-    def current(self):
-        if len(self.__corrects) > 0:
-            return balanced_accuracy_score(y_true=self.__corrects, y_pred=self.__preds)
-        else:
-            return None
-
-
-class AUCAPMeter(Meter):
-    def __init__(self, name: str = "auc_ap", prefix="", parse_target=None, parse_output=None, cond=None,
-                 return_metrics=""):
-        super().__init__(name=name, prefix=prefix)
-        self.__predicts = []
-        self.__corrects = []
-        self.__auc = None
-        self.__ap = None
-
-        self.__parse_target = Meter.default_parse_target if parse_target is None else parse_target
-        self.__parse_output = Meter.default_parse_output if parse_output is None else parse_output
-
-        self.__cond = Meter.default_cond if cond is None else cond
-        self.__return_metrics = return_metrics
-
-    def on_epoch_begin(self, epoch, **kwargs):
-        self.__predicts = []
-        self.__corrects = []
-
-    def on_minibatch_end(self, target, output, **kwargs):
-        if self.__cond(target, output):
-            target_cpu = self.__parse_target(target)
-            output_cpu = self.__parse_output(output)
-
-            if len(output_cpu.shape) == 1:
-                output_cls_list = output_cpu.tolist()
-            else:
-                raise ValueError(
-                    f'Not support {len(output_cpu.shape)}-dim output tensor. Output must probabilities for binary classification.')
-
-            if isinstance(target_cpu, np.ndarray):
-                if len(target_cpu.shape) == 2:
-                    target_cls_list = np.argmax(target_cpu, axis=-1).tolist()
-                elif len(target_cpu.shape) == 1:
-                    target_cls_list = target_cpu.tolist()
-                else:
-                    raise ValueError(f'Not support {len(target_cpu.shape)}-dim target tensor.')
-            elif isinstance(target_cpu, list):
-                target_cls_list = target_cpu
-            else:
-                raise ValueError(f'Not support target type {type(target_cpu)}')
-
-            if target_cls_list and len(output_cls_list) == len(target_cls_list):
-                self.__predicts += output_cls_list
-                self.__corrects += target_cls_list
-
-    def on_epoch_end(self, *args, **kwargs):
-        self.current()
-
-    def current(self):
-        if len(self.__corrects) != len(self.__predicts):
-            raise ValueError("Predicts and corrects must match, but got {} vs {}".format(len(self.__corrects),
-                                                                                         len(self.__predicts)))
-        elif len(self.__corrects) == 0:
-            return None
-        else:
-            if self.__return_metrics.lower() == "auc":
-                try:
-                    self.__auc = roc_auc_score(self.__corrects, self.__predicts)
-                except ValueError:
-                    self.__auc = None
-                ret = self.__auc
-            elif self.__return_metrics.lower() == "ap":
-                try:
-                    self.__ap = average_precision_score(self.__corrects, self.__predicts)
-                except:
-                    self.__ap = None
-                ret = self.__ap
-            else:
-                try:
-                    self.__auc = roc_auc_score(self.__corrects, self.__predicts)
-                    self.__ap = average_precision_score(self.__corrects, self.__predicts)
-                except ValueError:
-                    self.__auc = None
-                    self.__ap = None
-                ret = (self.__auc, self.__ap)
-            return ret
-
-
-class KappaMeter(Meter):
-    def __init__(self, name: str = "kappa", prefix="", weight_type="quadratic",
-                 parse_target=None, parse_output=None, cond=None, topk=1):
-        super().__init__(name=name, prefix=prefix)
-        self.__predicts = []
-        self.__corrects = []
-        self.__kappa = None
-        self.__weight_type = weight_type
-
-        self.__parse_target = Meter.default_parse_target if parse_target is None else parse_target
-        self.__parse_output = Meter.default_parse_output if parse_output is None else parse_output
-        self.__cond = Meter.default_cond if cond is None else cond
-        self.__topk = topk
-
-    def on_epoch_begin(self, epoch, **kwargs):
-        self.__predicts = []
-        self.__corrects = []
-
-    def on_minibatch_end(self, target, output, **kwargs):
-        if self.__cond(target, output):
-            target_cpu = self.__parse_target(target)
-            output_cpu = self.__parse_output(output)
-
-            if len(target_cpu.shape) == 2:
-                target_cls_list = np.argmax(target_cpu, axis=-1).tolist()
-            elif len(target_cpu.shape) == 1:
-                target_cls_list = target_cpu.tolist()
-            else:
-                raise ValueError(f'Not support {len(target_cpu.shape)}-dim target tensor.')
-
-            if len(output_cpu.shape) == 2:
-                output_topk = np.argsort(output_cpu, axis=-1)[:, -self.__topk:]
-                output_cls_list = []
-                for i in range(output_topk.shape[0]):
-                    if target_cls_list[i] in output_topk[i, :]:
-                        output_cls_list.append(target_cls_list[i])
-                    else:
-                        output_cls_list.append(output_topk[i, 0])
-            elif len(output_cpu.shape) == 1:
-                output_cls_list = output_cpu.tolist()
-            else:
-                raise ValueError(f'Not support {len(output_cpu.shape)}-dim output tensor.')
-
-            if target_cls_list and len(output_cls_list) == len(target_cls_list):
-                self.__predicts += output_cls_list
-                self.__corrects += target_cls_list
-
-    def on_epoch_end(self, *args, **kwargs):
-        self.__kappa = self.current()
-
-    def current(self):
-        if len(self.__corrects) != len(self.__predicts):
-            raise ValueError("Predicts and corrects must match, but got {} vs {}".format(len(self.__corrects),
-                                                                                         len(self.__predicts)))
-        elif len(self.__corrects) == 0:
-            return None
-        else:
-            return cohen_kappa_score(self.__corrects, self.__predicts, weights=self.__weight_type)
 
 
 class ConfusionMeter(Meter):
