@@ -97,6 +97,13 @@ class Session(object):
     def add_eval_callbacks(self, cbs):
         self.__val_callbacks += wrap_tuple(cbs)
 
+
+
+    def get_optimizer(self):
+        return self.__optimizer
+
+
+
     @property
     def data_provider(self):
         return self.__data_provider
@@ -109,9 +116,17 @@ class Session(object):
     def optimizer(self):
         return self.__optimizer
 
+    @optimizer.setter
+    def optimizer(self, optim):
+        self.__optimizer = optim
+
     @property
     def model(self):
         return self.__module
+
+    @model.setter
+    def model(self, module):
+        self.__module = module
 
     @staticmethod
     def check_first_minibatch(loader_i, minibatch_i):

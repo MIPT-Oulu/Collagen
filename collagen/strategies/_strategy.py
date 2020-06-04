@@ -163,6 +163,14 @@ class Strategy(object):
         self.__callbacks += self.__default_strategy_callback
 
     @property
+    def sessions(self):
+        return self.__sessions
+
+    @sessions.setter
+    def sessions(self, session):
+        self.__sessions = session
+
+    @property
     def data_provider(self):
         return self.__data_provider
 
