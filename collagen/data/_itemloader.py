@@ -56,7 +56,8 @@ class ItemLoader(object):
         If ``0``, ignores ``timeout`` notion. Must be non-negative. (the default is 0)
     """
 
-    def __init__(self, meta_data: pd.DataFrame or None = None, parse_item_cb: callable or None = None,
+    def __init__(self, meta_data: pd.DataFrame or None = None,
+                 parse_item_cb: callable or None = None, parser_kwargs: dict or None = None,
                  root: str or None = None, batch_size: int = 1,
                  num_workers: int = 0, shuffle: bool = False, pin_memory: bool = False,
                  collate_fn: callable = default_collate, transform: callable or None = None,
@@ -83,6 +84,7 @@ class ItemLoader(object):
         self.batch_size: int = batch_size
         self.__iter_loader = None
         self.parse_item = parse_item_cb
+        self.parser_kwargs = parser_kwargs
 
         self.update_dataset(meta_data)
 
@@ -111,7 +113,7 @@ class ItemLoader(object):
         if self.__meta_data is None:
             self.__dataset = None
         else:
-            self.__dataset = DataFrameDataset(self.__root, meta_data=self.__meta_data,
+            self.__dataset = DataFrameDataset(self.__root, meta_data=self.__meta_data, parser_kwargs=self.parser_kwargs,
                                               parse_item_cb=self.parse_item, transform=self.__transform)
 
         if self.__dataset is None:
