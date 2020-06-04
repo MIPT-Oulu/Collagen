@@ -21,7 +21,7 @@ __all__ = ["ConfusionMatrixVisualizer", "ImageMaskVisualizer", "ImageSamplingVis
 
 class ConfusionMatrixVisualizer(Callback):
     def __init__(self, writer, labels: list or None = None, tag="confusion_matrix", normalize=True, name='cm',
-                 cond=None, parse_class=None, parse_output=None, parse_target=None):
+                 cond=None, parse_class=None, parse_output=None, parse_target=None, dpi=100, figsize=(5, 5)):
         """ConfusionMatrixVisualizer class, which is a callback calculating accuracy after each forwarding step and
         exporting confusion matrix to TensorboardX at the end of each epoch
 
@@ -44,6 +44,8 @@ class ConfusionMatrixVisualizer(Callback):
         self._tag = tag
         self._predicts = []
         self._corrects = []
+        self.dpi = dpi
+        self.figsize = figsize
         self._name = name
         self.__cond = self._default_cond if cond is None else cond
         if parse_target is None or parse_output is None:
@@ -88,11 +90,13 @@ class ConfusionMatrixVisualizer(Callback):
             pred_cls = self.__parse_output(output)
             if target_cls is not None and pred_cls is not None:
                 # decoded_pred_cls = pred_cls.argmax(dim=-1)
-                self._corrects += [self._labels[i] for i in to_cpu(target_cls, use_numpy=True).tolist()]
-                self._predicts += [self._labels[i] for i in to_cpu(pred_cls, use_numpy=True).tolist()]
+                target_cls = to_cpu(target_cls, use_numpy=True)
+                pred_cls = to_cpu(pred_cls, use_numpy=True)
+                self._corrects += [self._labels[int(i)] for i in target_cls]
+                self._predicts += [self._labels[int(i)] for i in pred_cls]
 
     @staticmethod
-    def plot_confusion_matrix(correct_labels, predict_labels, labels, normalize=True):
+    def plot_confusion_matrix(correct_labels, predict_labels, labels, normalize=True, figsize=(5, 5), dpi=100):
         cm = confusion_matrix(correct_labels, predict_labels, labels=labels)
         if normalize:
             cm = cm.astype('float') * 100.0 / cm.sum(axis=1)[:, np.newaxis]
@@ -101,7 +105,7 @@ class ConfusionMatrixVisualizer(Callback):
 
         np.set_printoptions(precision=2)
 
-        fig = figure.Figure(figsize=(5, 5), dpi=230, facecolor='w', edgecolor='k')
+        fig = figure.Figure(figsize=figsize, dpi=dpi, facecolor='w', edgecolor='k')
         ax = fig.add_subplot(1, 1, 1)
         im = ax.imshow(cm, cmap='Oranges')
 
@@ -135,8 +139,8 @@ class ConfusionMatrixVisualizer(Callback):
                                                                                              len(self._corrects)))
         elif len(self._corrects) > 0:
             fig = self.plot_confusion_matrix(np.array(self._corrects), np.array(self._predicts),
-                                             labels=self._labels,
-                                             normalize=self._normalize)
+                                             labels=self._labels, normalize=self._normalize,
+                                             figsize=self.figsize, dpi=self.dpi)
             self._writer.add_figure(self._tag, fig, global_step=self.__epoch)
 
 

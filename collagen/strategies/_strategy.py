@@ -28,6 +28,7 @@ class Strategy(object):
                  callbacks: Tuple[Callback] or Callback or None = None,
                  n_epochs: int or None = 10,
                  n_train_batches: int or None = None,
+                 train_batchs_choice: str = 'max',
                  sessions: Dict[str, Session] or Session = None,
                  distributed=False, use_apex=False):
         """Constructor of Strategy
@@ -92,7 +93,7 @@ class Strategy(object):
         self.__distributed = distributed
         self.__use_apex = use_apex
         for stage in self.__stage_names:
-            self.__num_batches_by_stage[stage] = -1
+            self.__num_batches_by_stage[stage] = None
             self.__data_key_by_stage[stage] = dict()
             self.__num_samples_by_stage[stage] = dict()
             self.__target_key_by_stage[stage] = dict()
@@ -120,7 +121,11 @@ class Strategy(object):
                     data_keys.append(data_loader_names[loader_name]['data_key'])
                     target_keys.append(data_loader_names[loader_name]['target_key'])
 
-                    if self.__num_batches_by_stage[stage] < n_batches:
+                    if self.__num_batches_by_stage[stage] is None:
+                        self.__num_batches_by_stage[stage] = n_batches
+                    elif (train_batchs_choice == 'max' and self.__num_batches_by_stage[stage] < n_batches):
+                        self.__num_batches_by_stage[stage] = n_batches
+                    elif train_batchs_choice == 'min' and self.__num_batches_by_stage[stage] > n_batches:
                         self.__num_batches_by_stage[stage] = n_batches
 
                 self.__data_key_by_stage[stage][model_name] = tuple(data_keys)

@@ -48,7 +48,7 @@ class Session(object):
                  module: nn.Module,
                  optimizer: Optimizer or None,
                  loss: nn.Module,
-                 train_loader_names: str or Tuple[str] or None,
+                 train_loader_names: str or Tuple[str] or None = None,
                  val_loader_names: str or Tuple[str] = None,
                  data_provider: DataProvider = None,
                  train_callbacks: Tuple[Callback] or Callback or None = None,
