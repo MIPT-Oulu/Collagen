@@ -85,12 +85,17 @@ class Normalize(object):
 
 
 class Compose(object):
-    def __init__(self, transforms: list or tuple):
+    def __init__(self, transforms: list or tuple, return_torch=True:
         self.__transforms = transforms
+        self.__return_torch = return_torch
 
     def __call__(self, x):
         for trf in self.__transforms:
-            x = trf(x)
+            # Option to return numpy and not normalize during transforms
+            if str(type(trf)) == '<class \'solt.core._core.Stream\'>':
+                x = trf(x, return_torch=self.__return_torch)
+            else:
+                x = trf(x)
 
         return x
 
