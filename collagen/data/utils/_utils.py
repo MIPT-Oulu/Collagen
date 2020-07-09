@@ -85,7 +85,7 @@ class Normalize(object):
 
 
 class Compose(object):
-    def __init__(self, transforms: list or tuple, return_torch=True:
+    def __init__(self, transforms: list or tuple, return_torch=True):
         self.__transforms = transforms
         self.__return_torch = return_torch
 
