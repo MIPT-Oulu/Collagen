@@ -6,6 +6,7 @@ from textwrap import wrap
 import numpy as np
 from matplotlib import figure
 from sklearn.metrics import confusion_matrix
+from random import randint
 
 from typing import Tuple
 
@@ -16,7 +17,8 @@ from torchvision.utils import make_grid
 from collagen.core import Callback
 from collagen.core.utils import to_cpu
 
-__all__ = ["ConfusionMatrixVisualizer", "ImageMaskVisualizer", "ImageSamplingVisualizer", "FakeImageSamplingVisualizer"]
+__all__ = ["ConfusionMatrixVisualizer", "ImagePairVisualizer", "ImageSamplingVisualizer", "FakeImageSamplingVisualizer",
+           "RandomImageVisualizer"]
 
 
 class ConfusionMatrixVisualizer(Callback):
@@ -273,8 +275,10 @@ class FakeImageSamplingVisualizer(Callback):
         pass
 
 
-class ImageMaskVisualizer(Callback):
+class ImagePairVisualizer(Callback):
     """
+    Visualizes input, target and prediction images from minibatches with best and worst metric values.
+
     Expected behavior:
 
     0. specify the comparator
@@ -282,7 +286,7 @@ class ImageMaskVisualizer(Callback):
     2. tracks the worst and the best minibatches on CPU. If the minibatch metric is < than the best minibatch -> randomly sample image and mask.
     3. Do the same for the worst cases
     4. Visualize: image, and image with mask
-    5. ensure support for binary and multi-class semantica segmentation.
+    5. ensure support for binary and multi-class semantic segmentation.
 
     """
 
@@ -303,15 +307,16 @@ class ImageMaskVisualizer(Callback):
         self.__input_worst = None
         self.__pred_best = None
         self.__pred_worst = None
+        self.__target_best = None
+        self.__target_worst = None
 
     def on_batch_end(self, *args, **kwargs):
         pass
 
-    def on_minibatch_end(self, loss, session, batches_count, input, output, **kwargs):
-        if hasattr(session.loss, 'get_loss_by_name'):
-            metric_value = session.loss.get_loss_by_name(self.name)
-        else:
-            metric_value = loss
+    def on_minibatch_end(self, loss, batches_count, input, output, target, **kwargs):
+
+        metric_value = loss
+
         # Update metric
         if metric_value is not None:
             # No previous metric
@@ -320,17 +325,21 @@ class ImageMaskVisualizer(Callback):
                 self.__max_loss = metric_value
                 self.__input_worst = input.detach()
                 self.__pred_worst = output.detach()
+                self.__target_worst = target.detach()
                 self.__input_best = input.detach()
                 self.__pred_best = output.detach()
+                self.__target_best = target.detach()
             # Best case improved
             elif metric_value < self.__min_loss:
                 self.__min_loss = metric_value
                 self.__input_best = input.detach()
+                self.__target_best = target.detach()
                 self.__pred_best = output.detach()
             # Worst case decreased
             elif metric_value > self.__max_loss:
                 self.__max_loss = metric_value
                 self.__input_worst = input.detach()
+                self.__target_worst = target.detach()
                 self.__pred_worst = output.detach()
 
     def on_epoch_begin(self, *args, **kwargs):
@@ -347,11 +356,127 @@ class ImageMaskVisualizer(Callback):
         self.__summary_writer.add_images(tag='Prediction_best', img_tensor=torch.sigmoid(self.__pred_best),
                                          dataformats='NCHW', global_step=epoch)
 
+        self.__summary_writer.add_images(tag='Target_best', img_tensor=self.__target_best,
+                                         dataformats='NCHW', global_step=epoch)
+
         self.__summary_writer.add_images(tag='Input_worst', dataformats='NCHW', global_step=epoch,
                                          img_tensor=self.undo_transform(self.__input_worst, self.__mean, self.__std))
 
         self.__summary_writer.add_images(tag='Prediction_worst', img_tensor=torch.sigmoid(self.__pred_worst),
                                          dataformats='NCHW', global_step=epoch)
+
+        self.__summary_writer.add_images(tag='Target_worst', img_tensor=self.__target_worst,
+                                         dataformats='NCHW', global_step=epoch)
+
+    @staticmethod
+    def undo_transform(data, mean, std):
+        # img is CxHxW tensor
+        # batch dimension should be absent
+        data = data.clone()
+        if len(data.shape) == 4:
+            for im in range(data.size(0)):
+                for c_ind in range(data.size(1)):
+                    data[im, c_ind] = data[im, c_ind] * std[c_ind] + mean[c_ind]
+        else:
+            for c_ind in range(data.size(0)):
+                data[c_ind] = data[c_ind] * std[c_ind] + mean[c_ind]
+        return data
+
+
+class RandomImageVisualizer(Callback):
+    """
+    Visualizes input, target and prediction images from a random sample of the
+    minibatches with best and worst metric values.
+
+    Expected behavior:
+
+    0. specify the comparator
+    1. tracks the metric
+    2. tracks the worst and the best minibatches on CPU. If the minibatch metric is < than the best minibatch -> randomly sample image and mask.
+    3. Do the same for the worst cases
+    4. Visualize: image, and image with mask
+    5. ensure support for binary and multi-class semantic segmentation.
+
+    """
+
+    def __init__(self, writer, log_dir: str = None, comment: str = '', grid_shape: int = (2, 1),
+                 mean: float = None, std: float = None):
+        super().__init__(ctype="visualizer")
+        self.__log_dir = log_dir
+        self.__comment = comment
+        self.__summary_writer = writer
+        self.__num_batches = 2
+        self.__grid_shape = grid_shape
+        self.__num_images = grid_shape[0] * grid_shape[1]
+        self.__min_loss = None
+        self.__max_loss = None
+        self.__mean = mean
+        self.__std = std
+        self.__input_best = None
+        self.__input_worst = None
+        self.__pred_best = None
+        self.__pred_worst = None
+        self.__target_best = None
+        self.__target_worst = None
+
+    def on_batch_end(self, *args, **kwargs):
+        pass
+
+    def on_minibatch_end(self, loss, batches_count, input, output, target, **kwargs):
+
+        metric_value = loss
+        sample = randint(0, input.shape[0] - 1)
+
+        # Update metric
+        if metric_value is not None:
+            # No previous metric
+            if self.__min_loss is None:
+                self.__min_loss = metric_value
+                self.__max_loss = metric_value
+                self.__input_worst = input[sample].detach()
+                self.__pred_worst = output[sample].detach()
+                self.__target_worst = target[sample].detach()
+                self.__input_best = input[sample].detach()
+                self.__pred_best = output[sample].detach()
+                self.__target_best = target[sample].detach()
+            # Best case improved
+            elif metric_value < self.__min_loss:
+                self.__min_loss = metric_value
+                self.__input_best = input[sample].detach()
+                self.__target_best = target[sample].detach()
+                self.__pred_best = output[sample].detach()
+            # Worst case decreased
+            elif metric_value > self.__max_loss:
+                self.__max_loss = metric_value
+                self.__input_worst = input[sample].detach()
+                self.__target_worst = target[sample].detach()
+                self.__pred_worst = output[sample].detach()
+
+    def on_epoch_begin(self, *args, **kwargs):
+        # Reset the variables for new epoch
+        self.__min_loss, self.__max_loss = None, None
+        self.__input_best, self.__pred_best = None, None
+        self.__input_worst, self.__pred_worst = None, None
+
+    def on_epoch_end(self, epoch, strategy, stage, **kwargs):
+        # Plot images on tensorboard
+        self.__summary_writer.add_images(tag='Input_best', dataformats='CHW', global_step=epoch,
+                                         img_tensor=self.undo_transform(self.__input_best, self.__mean, self.__std))
+
+        self.__summary_writer.add_images(tag='Prediction_best', img_tensor=torch.sigmoid(self.__pred_best),
+                                         dataformats='CHW', global_step=epoch)
+
+        self.__summary_writer.add_images(tag='Target_best', img_tensor=self.__target_best,
+                                         dataformats='CHW', global_step=epoch)
+
+        self.__summary_writer.add_images(tag='Input_worst', dataformats='CHW', global_step=epoch,
+                                         img_tensor=self.undo_transform(self.__input_worst, self.__mean, self.__std))
+
+        self.__summary_writer.add_images(tag='Prediction_worst', img_tensor=torch.sigmoid(self.__pred_worst),
+                                         dataformats='CHW', global_step=epoch)
+
+        self.__summary_writer.add_images(tag='Target_worst', img_tensor=self.__target_worst,
+                                         dataformats='CHW', global_step=epoch)
 
     @staticmethod
     def undo_transform(data, mean, std):
