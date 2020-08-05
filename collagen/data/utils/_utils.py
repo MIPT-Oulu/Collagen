@@ -1,5 +1,8 @@
 import copy
 
+import numpy as np
+from torch import Tensor
+
 __all__ = ["ApplyTransform", "Compose", "Normalize", "cast_tensor"]
 
 
@@ -42,7 +45,10 @@ class ApplyTransform(object):
             return items
 
         if not isinstance(items, (tuple, list)):
-            raise TypeError
+            if isinstance(items, np.ndarray) or isinstance(items, Tensor):
+                items = (items,)
+            else:
+                raise TypeError
 
         idx = set(self.__idx)
         res = []
@@ -106,5 +112,3 @@ def cast_tensor(x, to='float'):
         return x.long()
     else:
         raise NotImplementedError
-
-

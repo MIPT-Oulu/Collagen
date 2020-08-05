@@ -66,8 +66,12 @@ class Strategy(object):
 
         # TODO: Is it necessary to be a set instead of tuple?
         self.__model_names_by_stage = dict()
-        self.__model_names_by_stage['train'] = wrap_tuple(data_sampling_config.train.data_provider.keys())
-        self.__model_names_by_stage['eval'] = wrap_tuple(data_sampling_config.eval.data_provider.keys())
+        self.__model_names = []
+        for stage in self.__stage_names:
+            self.__model_names_by_stage[stage] = wrap_tuple(data_sampling_config[stage].data_provider.keys())
+            self.__model_names += self.__model_names_by_stage[stage]
+        self.__model_names = tuple(set(self.__model_names))
+
         self.__train_starts_at_epoch = strategy_config['train_starts_at_epoch']
         self.__n_epochs = n_epochs
         self.__data_provider = data_provider
@@ -141,7 +145,7 @@ class Strategy(object):
 
         # save the sessions into dictionary according to model stepper name for easy access
         optimizers = dict()
-        for name in self.__model_names_by_stage['train']:
+        for name in self.__model_names:
             self.__sessions[name] = sessions[name]
             if self.__sessions[name].data_provider is None:
                 self.__sessions[name].data_provider = self.__data_provider
