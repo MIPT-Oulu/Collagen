@@ -15,3 +15,12 @@ def get_cifar10(data_folder='.', train=True):
     meta_data = pd.DataFrame(list_rows)
     classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
     return meta_data, classes
+
+
+def get_stl10(data_folder='.', train='train'):
+    _db = datasets.STL10(data_folder, split=train, transform=None, download=True)
+    list_rows = [{"data": _db.data[i, :, :, :], "target": _db.targets[i]} for i in
+                 range(len(_db.targets))]
+    meta_data = pd.DataFrame(list_rows)
+    classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+    return meta_data, classes
