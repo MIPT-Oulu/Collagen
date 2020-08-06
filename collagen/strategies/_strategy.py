@@ -1,212 +1,289 @@
-import torch.nn as nn
-from torch.optim import Optimizer
-from typing import Tuple
+from typing import Tuple, Dict
 import torch
+
+
+try:
+    from torch.optim import Optimizer
+except ImportError:
+    from torch.optim.optimizer import Optimizer
+
 from tqdm import tqdm
-from collagen.core import Trainer, Session, Module
-from collagen.metrics import RunningAverageMeter
-from collagen.callbacks import ProgressbarVisualizer
-from collagen.core.utils import wrap_tuple
+
 from collagen.core import Callback
+from collagen.core import Session
+from collagen.core.utils import wrap_tuple
 from collagen.data import DataProvider
+from collagen.callbacks.logging.loggers import ProgressbarLogger
 
 
 class Strategy(object):
+    """Strategy implements the functionality to deal with multiple sessions and models. A helper yml file
+    is deemed necessary for MultipleModelStrategy to work properly.
     """
-        Implements a part of the training loop by passing the available batches through the model.
-
-        Parameters
-        ----------
-        data_provider : DataProvider
-            Data provider. Controlled outside and samples mini-batches.
-        train_loader_names : str or Tuple[str] or None
-            Name of the training loader, which is a part of DataProvider.
-        val_loader_names : str or Tuple[str] or None
-            Name of the val loader, which is a part of DataProvider.
-        session : Session
-            Session to operate with
-        train_callbacks : Tuple[Callback] or Callback or None
-            Includes both metrics and callbacks. The callbacks can be schedulers,
-            which allow to adjust the session parameters during training (can be useful for implementing super-convergence
-            and stochastic weight averaging). On the other had the callbacks can also be meters batch-wise, which track
-            losses / metrics during training.
-        val_callbacks : Tuple[Callback] or Callback
-            Includes both metrics and callbacks. Validation callbacks can be checkpointers, loggers,
-            learning rate schedulers (E.g. reduce on plateau-like things). On the other hand,
-             the callbacks can also be meters batch-wise, which compute metrics.
-        n_training_batches: int
-            The number of training batches of each epoch. If None, the number of batches will be auto computed
-        """
 
     def __init__(self, data_provider: DataProvider,
-                 train_loader_names: Tuple[str] or str,
-                 val_loader_names: Tuple[str] or str,
                  data_sampling_config: dict,
-                 loss: nn.Module,
-                 model: Module,
-                 optimizer: Optimizer,
-                 n_epochs: int or None = 100,
-                 train_num_samples: Tuple[int] or int or None = None,
-                 val_num_samples: Tuple[int] or int or None = None,
-                 train_callbacks: Tuple[Callback] or Callback = None,
-                 val_callbacks: Tuple[Callback] or Callback = None,
-                 n_training_batches: int or None = None,
-                 device: str or None = "cuda"):
-        self.__data_provider: DataProvider = data_provider
-        self.__loss: nn.Module = loss
-        self.__optimizer: Optimizer = optimizer
-        self.__model: Module = model
+                 device: torch.device,
+                 strategy_config: dict = None,
+                 callbacks: Tuple[Callback] or Callback or None = None,
+                 n_epochs: int or None = 10,
+                 n_train_batches: int or None = None,
+                 train_batchs_choice: str = 'max',
+                 sessions: Dict[str, Session] or Session = None,
+                 distributed=False, use_apex=False):
+        """Constructor of Strategy
+        Parameters
+        ----------
+        data_provider: DataProvider
+            Abstracts the access to all data for all sessions.
+        data_sampling_config: dict
+            Holds the configuration about how the data would be sampled
+        strategy_config: dict
+            Holds training configuration for multi-model-stepper. This is the core of Multi-model Strategy
+        callbacks: Tuple[Callback]
+            callback tuples to be executed inside the strategy main loop
+        n_epochs: int
+            Number of epochs to be trained.
+        n_train_batches: int
+            Number of training batches. Can be figured out from batch size and total data size
+        sessions: Dict[str, Session]
+            Dict of Session objects. Strategy will iterate through this dict by name and execute them with proper
+            callbacks and strategy configuration.
+        Raises
+        -------
+        ValueError:
+            The constructor will raise ValueError if data_provider or data_sampling_config or strategy_config or device
+            is None
 
-        self.__train_num_samples: Tuple[int] or int = train_num_samples
-        self.__val_num_samples: Tuple[int] or int = val_num_samples
+        """
+        if data_provider is None or data_sampling_config is None or strategy_config is None or device is None:
+            raise ValueError('data_provider or data_sampling_config or strategy_config or device cannot be None')
+        # self.__stage names contains the learning stages e.g. 'train' and 'eval'. If you want to do only training but
+        # no validation, go to the strategy.yml, remove 'eval' from 'stage_names'
+        self.__stage_names = wrap_tuple(strategy_config['stage_names'])
+        # self.__train_model_names contains the name of trainable models. A trainable model may contain multiple
+        # NN models
 
-        self.__n_epochs: int = n_epochs
+        # TODO: Is it necessary to be a set instead of tuple?
+        self.__model_names_by_stage = dict()
+        self.__model_names = []
+        for stage in self.__stage_names:
+            self.__model_names_by_stage[stage] = wrap_tuple(data_sampling_config[stage].data_provider.keys())
+            self.__model_names += self.__model_names_by_stage[stage]
+        self.__model_names = tuple(set(self.__model_names))
 
+        self.__train_starts_at_epoch = strategy_config['train_starts_at_epoch']
+        self.__n_epochs = n_epochs
+        self.__data_provider = data_provider
+        self.__callbacks = wrap_tuple(callbacks)
+        # self.__accumulate_grad is retrieved from strategy config yml file. It contains boolean value for each stepper
+        # in the sessionss tuple. This is a mandatory field in the yml file
+        self.__accumulate_grad = strategy_config['accumulate_grad']
+        self.__accumulate_grad_in_iter = strategy_config['accumulate_grad_in_iter']
         self.__data_sampling_config = data_sampling_config
-        self.__train_callbacks: Tuple[Callback] = wrap_tuple(train_callbacks)
-        self.__val_callbacks: Tuple[Callback] = wrap_tuple(val_callbacks)
-        self.__train_loader_names: Tuple[str] = wrap_tuple(train_loader_names)
-        self.__val_loader_names: Tuple[str] = wrap_tuple(val_loader_names)
-        self.__val_callbacks: Tuple[Callback] = wrap_tuple(val_callbacks)
-        self.__train_callbacks: Tuple[Callback] = wrap_tuple(train_callbacks)
 
-        if train_num_samples is None:
-            self.__train_num_samples: Tuple[int] = tuple([1] * len(self.__train_loader_names))
-        else:
-            self.__train_num_samples: Tuple[int] = wrap_tuple(train_num_samples)
+        sessions = wrap_tuple(sessions)
 
-        if val_num_samples is None:
-            self.__val_num_samples: Tuple[int] = tuple([1] * len(self.__val_loader_names))
-        else:
-            self.__val_num_samples: Tuple[int] = wrap_tuple(val_num_samples)
-
-        if len(self.__train_loader_names) != len(self.__train_num_samples) or \
-                len(self.__val_loader_names) != len(self.__val_num_samples):
-            raise ValueError("The number of loaders and the number of sample quantities must be matched. "
-                             "Train ({} vs {}), validation ({} vs {})".format(len(self.__train_loader_names),
-                                                                              len(self.__train_num_samples),
-                                                                              len(self.__val_loader_names),
-                                                                              len(self.__val_num_samples)))
-
-        self.__stage_names = ("train", "eval")
+        # self.__num_samples_by_stage is a dictionary holding the number of batches per stage
         self.__num_samples_by_stage = dict()
+        # self.__data_key_by_stage is a dictionary of dictionary. Key to the first dictionary is the stage name and
+        # key to the embedded dictionary is the trainable model name, the final value is data key to be used retrieving
+        # data from the data_provider
         self.__data_key_by_stage = dict()
+        # self.__target_key_by_stage is similar to __data_key_by_stage, as the name suggests the final value is the
+        # target key to be used to retrieve target value from data_provider
         self.__target_key_by_stage = dict()
         self.__num_batches_by_stage = dict()
+        self.__distributed = distributed
+        self.__use_apex = use_apex
         for stage in self.__stage_names:
-            self.__num_batches_by_stage[stage] = -1
+            self.__num_batches_by_stage[stage] = None
             self.__data_key_by_stage[stage] = dict()
             self.__num_samples_by_stage[stage] = dict()
             self.__target_key_by_stage[stage] = dict()
-            n_samples_dict = dict()
 
-            data_keys = []
-            target_keys = []
-            data_loader_names = self.__data_sampling_config[stage]["data_provider"]
-            for loader_name in data_loader_names:
-                n_samples_dict[loader_name] = data_loader_names[loader_name]["num_samples"]
-                n_batches = len(self.__data_provider.get_loader_by_name(loader_name))
-                data_keys.append(data_loader_names[loader_name]["data_key"])
-                target_keys.append(data_loader_names[loader_name]["target_key"])
-                if self.__num_batches_by_stage[stage] < n_batches:
-                    self.__num_batches_by_stage[stage] = n_batches
+            model_names = self.__model_names_by_stage[stage]
 
-            self.__data_key_by_stage[stage] = tuple(data_keys)
-            self.__target_key_by_stage[stage] = tuple(target_keys)
+            # iterate through each trainable model stepper
+            for model_name in model_names:
+                # n_sample_dict is a local variable of dict type. trainable model name and number of samples for this
+                # stepper are saved as key: value pair.
+                # readers be aware that model_name is the name of the stepper which might contain multiple
+                # NN models
+                n_samples_dict = dict()
+                data_keys = []
+                target_keys = []
+                if model_name in self.__data_sampling_config[stage]['data_provider']:
+                    data_loader_names = self.__data_sampling_config[stage]['data_provider'][model_name]
 
-            self.__num_samples_by_stage[stage] = n_samples_dict
+                else:
+                    continue
 
-        if n_training_batches is not None:
-            self.__num_batches_by_stage['train'] = n_training_batches
+                for loader_name in data_loader_names:
+                    n_samples_dict[loader_name] = data_loader_names[loader_name]['batches_per_iter']
+                    n_batches = len(self.__data_provider.get_loader_by_name(loader_name))
+                    data_keys.append(data_loader_names[loader_name]['data_key'])
+                    target_keys.append(data_loader_names[loader_name]['target_key'])
 
-        self.__use_cuda = torch.cuda.is_available() and device == "cuda"
-        self.__device = torch.device("cuda" if self.__use_cuda and torch.cuda.is_available() else "cpu")
+                    if self.__num_batches_by_stage[stage] is None:
+                        self.__num_batches_by_stage[stage] = n_batches
+                    elif (train_batchs_choice == 'max' and self.__num_batches_by_stage[stage] < n_batches):
+                        self.__num_batches_by_stage[stage] = n_batches
+                    elif train_batchs_choice == 'min' and self.__num_batches_by_stage[stage] > n_batches:
+                        self.__num_batches_by_stage[stage] = n_batches
 
-        self.__model.to(self.__device)
-        self.__loss.to(self.__device)
+                self.__data_key_by_stage[stage][model_name] = tuple(data_keys)
+                self.__target_key_by_stage[stage][model_name] = tuple(target_keys)
 
-        self.__default_callbacks_train = (RunningAverageMeter(prefix='train', name='loss'),
-                                          ProgressbarVisualizer(update_freq=1))
-        self.__default_callbacks_eval = (RunningAverageMeter(prefix='eval', name='loss'),
-                                         ProgressbarVisualizer(update_freq=1),)
+                self.__num_samples_by_stage[stage][model_name] = n_samples_dict
 
-        self.__train_callbacks = self._auto_add_default_callbacks(self.__default_callbacks_train, self.__train_callbacks)
-        self.__val_callbacks = self._auto_add_default_callbacks(self.__default_callbacks_eval, self.__val_callbacks)
+        if n_train_batches is not None and n_train_batches > 0:
+            self.__num_batches_by_stage['train'] = n_train_batches
 
-        self.__session = Session(module=self.__model,
-                                 optimizer=self.__optimizer,
-                                 loss=self.__loss)
+        self.__device = device
+        self.__sessions = dict()
 
-        self.__trainer = Trainer(data_provider=self.__data_provider,
-                                 train_loader_names=self.__train_loader_names,
-                                 val_loader_names=self.__val_loader_names,
-                                 module=self.__model,
-                                 optimizer=self.__optimizer,
-                                 loss=self.__loss,
-                                 train_callbacks=self.__train_callbacks,
-                                 val_callbacks=self.__val_callbacks)
+        # save the sessions into dictionary according to model stepper name for easy access
+        optimizers = dict()
+        for name in self.__model_names:
+            self.__sessions[name] = sessions[name]
+            if self.__sessions[name].data_provider is None:
+                self.__sessions[name].data_provider = self.__data_provider
 
-    def _auto_add_default_callbacks(self, d_cbs, cbs):
-        added_train_cbs = []
-        for d_cb in d_cbs:
-            exist = False
-            for cb in cbs:
-                if cb.ctype==d_cb.ctype and cb.name == d_cb.name:
-                    exist = True
-                    break
-            if not exist:
-                added_train_cbs.append(d_cb)
-        return cbs + tuple(added_train_cbs)
+            if len(sessions) == 1:
+                optimizers = self.__sessions[name].optimizer
+            else:
+                optimizers[name] = self.__sessions[name].optimizer
 
-    def get_callbacks_by_name(self, name, stage):
-        if name == "minibatch" or name == "all":
-            return self.get_callbacks_by_stage(stage)
+        if self.__use_apex:
+            from collagen.parallel._apex import first_gpu_or_cpu_in_use
+            if first_gpu_or_cpu_in_use(self.__device):
+                self.__default_strategy_callback = (ProgressbarLogger(update_freq=1, optimizers=optimizers),)
+            else:
+                self.__default_strategy_callback = ()
         else:
-            raise ValueError("Only support `minibatch` or `all`, but got {}".format(name))
+            self.__default_strategy_callback = (ProgressbarLogger(update_freq=1, optimizers=optimizers),)
 
-    def get_callbacks_by_stage(self, stage):
-        if stage == "train":
-            return self.__train_callbacks
-        elif stage == "eval":
-            return self.__val_callbacks
-        else:
-            raise ValueError("Only support `train` and `eval` stage, but got {}".format(stage))
+        self.__callbacks += self.__default_strategy_callback
+
+    @property
+    def data_provider(self):
+        return self.__data_provider
 
     def _call_callbacks_by_name(self, cb_func_name, **kwargs):
-        for cb in self.get_callbacks_by_stage(kwargs['stage']):
-            getattr(cb, cb_func_name)(strategy=self, **kwargs)
+        """
+        _call_callbacks_by_name is a private function to be called inside the class. This function traverses all the
+        sessions to check if they have the callback function to be called. If the callback is found it is called.
+        Afterwards, it searches the self.__callback, a private variable holding manually provided callbacks, if the
+        provided callback is found here, it is also called.
 
+        Parameters
+        ----------
+        cb_func_name: str
+            name of the call_back_function to be called
+        kwargs: list or tuple
+            argument for the callback function
+        """
+
+        for model_name in self.__model_names_by_stage[kwargs['stage']]:
+            for cb in getattr(self.__sessions[model_name], f'get_callbacks_by_stage')(kwargs['stage']):
+                if hasattr(cb, cb_func_name):
+                    getattr(cb, cb_func_name)(strategy=self, **kwargs)
+        for cb in self.__callbacks:
+            if hasattr(cb, cb_func_name):
+                getattr(cb, cb_func_name)(strategy=self, **kwargs)
+
+    def get_callbacks_by_name(self, name, stage):
+        """
+        get_callbacks_by_name is a public function which only retrieves some callback but does not call it
+        Parameter
+        ---------
+        name: str
+            name of the sessions where the callback function would be searched
+        stage: str
+            name of the learning stage where the call back function name would be searched.
+        """
+        if name in self.__model_names_by_stage[stage]:
+            return self.__sessions[name].get_callbacks_by_stage(stage)
+        else:
+            if name == 'minibatch':
+                cbs = ()
+                for name in self.__model_names_by_stage[stage]:
+                    cbs += self.__sessions[name].get_callbacks_by_stage(stage)
+                return cbs
+            elif name == 'batch':
+                return self.__callbacks
+            else:  # return all
+                cbs = ()
+                for name in self.__model_names_by_stage[stage]:
+                    cbs += self.__sessions[name].get_callbacks_by_stage(stage)
+                return cbs + self.__callbacks
+
+    # the great and famous run function
     def run(self):
+        """ run function runs the strategy, the epoch iteration is done here. Inside each epoch, for each trainable
+         model data is sampled and each trainable model is run with the sampled data.
+        """
         for epoch in range(self.__n_epochs):
-            for stage in ['train', 'eval']:
+            self.__data_provider.set_epoch(epoch)
+            for stage in self.__stage_names:
 
-                self._call_callbacks_by_name('on_epoch_begin', epoch=epoch, stage=stage,
-                                             n_epochs=self.__num_batches_by_stage[stage], trainer=self.__trainer)
-                progress_bar = tqdm(range(self.__num_batches_by_stage[stage]),
-                                    total=self.__num_batches_by_stage[stage],
-                                    desc=f'Epoch [{epoch}] | {stage}::')
+                model_names = self.__model_names_by_stage[stage]
+                self._call_callbacks_by_name(cb_func_name='on_epoch_begin', epoch=epoch, stage=stage,
+                                             n_epochs=self.__n_epochs)
+                if not self.__use_apex or (self.__use_apex and first_gpu_or_cpu_in_use(self.__device)):
+                    model_names = [_name for _name in model_names if self.__train_starts_at_epoch[_name] <= epoch]
+                    model_names_str = "-".join(model_names)
+                    progress_bar = tqdm(range(self.__num_batches_by_stage[stage]), total=self.__num_batches_by_stage[stage],
+                                        desc=f'Epoch [{epoch}][{stage}]::[{model_names_str}]')
+                else:
+                    progress_bar = range(self.__num_batches_by_stage[stage])
                 for batch_i in progress_bar:
-                    self._call_callbacks_by_name('on_sample_begin', epoch=epoch, stage=stage, batch_i=batch_i,
-                                                 progress_bar=progress_bar, trainer=self.__trainer)
-                    self.__data_provider.sample(**self.__num_samples_by_stage[stage])
-                    self._call_callbacks_by_name('on_sample_end', epoch=epoch, stage=stage, batch_i=batch_i,
-                                                 progress_bar=progress_bar, trainer=self.__trainer)
-                    self._call_callbacks_by_name('on_batch_begin',
+                    self._call_callbacks_by_name(cb_func_name='on_batch_begin',
                                                  progress_bar=progress_bar,
                                                  epoch=epoch,
                                                  n_epochs=self.__n_epochs,
                                                  stage=stage,
                                                  batch_i=batch_i,
-                                                 trainer=self.__trainer)
+                                                 n_batches=self.__num_batches_by_stage[stage])
 
-                    getattr(self.__trainer, stage)(data_key=self.__data_key_by_stage[stage], target_key=self.__target_key_by_stage[stage])
+                    # for scalability data sampling needs to be done every iteration
+                    for model_name in model_names:
+                        if self.__train_starts_at_epoch[model_name] > epoch and stage == "train":
+                            continue
 
-                    self._call_callbacks_by_name('on_batch_end',
+                        self._call_callbacks_by_name(cb_func_name='on_sample_begin',
+                                                     progress_bar=progress_bar,
+                                                     epoch=epoch,
+                                                     n_epochs=self.__n_epochs,
+                                                     stage=stage,
+                                                     batch_i=batch_i,
+                                                     n_batches=self.__num_batches_by_stage[stage])
+                        # sample data for current trainable model
+                        self.__data_provider.sample(**self.__num_samples_by_stage[stage][model_name])
+
+                        self._call_callbacks_by_name(cb_func_name='on_sample_end',
+                                                     progress_bar=progress_bar,
+                                                     epoch=epoch,
+                                                     n_epochs=self.__n_epochs,
+                                                     stage=stage,
+                                                     batch_i=batch_i,
+                                                     n_batches=self.__num_batches_by_stage[stage])
+                        # get callable function from current model depending on the stage
+                        getattr(self.__sessions[model_name], stage)(data_key=
+                                                                    self.__data_key_by_stage[stage][model_name],
+                                                                    target_key=
+                                                                    self.__target_key_by_stage[stage][model_name],
+                                                                    accumulate_grad=self.__accumulate_grad[model_name],
+                                                                    accumulate_grad_in_iter=self.__accumulate_grad_in_iter[model_name])
+
+                    self._call_callbacks_by_name(cb_func_name='on_batch_end',
                                                  progress_bar=progress_bar,
                                                  epoch=epoch,
                                                  n_epochs=self.__n_epochs,
                                                  stage=stage,
                                                  batch_i=batch_i,
-                                                 trainer=self.__trainer)
-                self._call_callbacks_by_name('on_epoch_end', epoch=epoch, stage=stage,
-                                             n_epochs=self.__num_batches_by_stage[stage], trainer=self.__trainer)
+                                                 n_batches=self.__num_batches_by_stage[stage])
+
+                self._call_callbacks_by_name(cb_func_name='on_epoch_end', epoch=epoch, n_epochs=self.__n_epochs,
+                                             stage=stage, n_batches=self.__num_batches_by_stage[stage])

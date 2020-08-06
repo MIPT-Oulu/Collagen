@@ -1,0 +1,34 @@
+train:
+  data_provider:
+    S:
+      all_train:
+        cate: MixMatchSampler
+        num_samples: 1
+        data_key:
+          - "x_mix"
+          - "u_mix"
+        target_key:
+          - "name"
+          - "target_mix_x"
+          - "target_mix_u"
+          - "target_x"
+
+eval:
+  data_provider:
+    S:
+      labeled_eval_st:
+        cate: ItemLoader
+        num_samples: 1
+        data_key: "data"
+        target_key:
+          - "target"
+          - "name"
+
+    T:
+      labeled_eval_te:
+        cate: ItemLoader
+        num_samples: 1
+        data_key: "data"
+        target_key:
+          - "target"
+          - "name"

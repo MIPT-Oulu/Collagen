@@ -1,24 +1,26 @@
 import yaml
-from torch import optim
 from tensorboardX import SummaryWriter
+from torch import optim
 
-from collagen.core import Trainer
-from collagen.data import SSFoldSplit
-from collagen.data.utils import get_cifar10, get_mnist
-from collagen.data.data_provider import mt_data_provider
-from collagen.core.utils import auto_detect_device
-from collagen.strategies import DualModelStrategy
-from collagen.logging import MeterLogging, EpochLRLogging
-from collagen.callbacks.lr_scheduler import SingleRampUpDownScheduler, CycleRampUpDownScheduler
-from collagen.losses.ssl import MTLoss
-from collagen.callbacks.visualizer import ProgressbarVisualizer
-from collagen.metrics import RunningAverageMeter, AccuracyMeter, KappaMeter
-from collagen.callbacks.swa import UpdateSWA
 from collagen.core import Callback
+from collagen.core import Trainer
+from collagen.core.utils import auto_detect_device
+from collagen.data import SSFoldSplit
+from collagen.data.data_provider import mt_data_provider
+from collagen.data.utils.datasets import get_cifar10, get_mnist
 
-from examples.swa.utils import init_args, parse_item, init_transforms, parse_target, parse_class
-from examples.swa.utils import SSConfusionMatrixVisualizer, cond_accuracy_meter
+from collagen.losses.ssl import MTLoss
+from collagen.strategies import DualModelStrategy
 from examples.swa.networks import Model01
+
+from collagen.callbacks import CycleRampUpDownScheduler
+from collagen.callbacks import UpdateSWA
+from collagen.callbacks import ProgressbarLogger
+from collagen.callbacks import ScalarMeterLogger, EpochLRLogger
+from collagen.callbacks import RunningAverageMeter, AccuracyMeter, KappaMeter
+
+from examples.swa.utils import SSConfusionMatrixVisualizer, cond_accuracy_meter
+from examples.swa.utils import init_args, parse_item, init_transforms, parse_target, parse_class
 
 device = auto_detect_device()
 
@@ -78,24 +80,26 @@ if __name__ == "__main__":
                                      parse_item=parse_item, bs=args.bs, num_threads=args.num_threads,
                                      output_type='logits')
     # Setting up the callbacks
-    stra_cbs = (MeterLogging(writer=summary_writer), ProgressbarVisualizer())
+    stra_cbs = (ScalarMeterLogger(writer=summary_writer), ProgressbarLogger())
 
     # Trainers
-    st_train_cbs = (CycleRampUpDownScheduler(optimizer=st_optim, initial_lr=args.initial_lr, lr_rampup=args.lr_rampup,
-                                             lr=args.lr, lr_rampdown_epochs=args.lr_rampdown_epochs,
-                                             start_cycle_epoch=args.start_cycle_epoch, cycle_interval=args.cycle_interval,
+    st_train_cbs = (CycleRampUpDownScheduler(optimizer=st_optim, initial_lr=args.initial_lr, rampup_epochs=args.lr_rampup,
+                                             lr=args.lr, rampdown_epochs=args.lr_rampdown_epochs,
+                                             start_cycle_epoch=args.start_cycle_epoch,
+                                             cycle_interval=args.cycle_interval,
                                              cycle_rampdown_epochs=args.cycle_rampdown_epochs),
-                    # SingleRampUpDownScheduler(optimizer=st_optim, initial_lr=args.initial_lr, lr_rampup=args.lr_rampup,
-                    #                           lr=args.lr, lr_rampdown_epochs=args.lr_rampdown_epochs),
+                    # SingleRampUpDownScheduler(optimizer=st_optim, initial_lr=args.initial_lr, rampup_epochs=args.rampup_epochs,
+                    #                           lr=args.lr, rampdown_epochs=args.rampdown_epochs),
                     RunningAverageMeter(prefix='train/S', name='loss_cls'),
                     RunningAverageMeter(prefix='train/S', name='loss_s_t_cons'),
                     RunningAverageMeter(prefix='train/S', name='loss_aug_cons'),
                     AccuracyMeter(prefix="train/S", name="acc", parse_target=parse_target, cond=cond_accuracy_meter),
                     KappaMeter(prefix='train/S', name='kappa', parse_target=parse_class, parse_output=parse_class,
                                cond=cond_accuracy_meter),
-                    SSConfusionMatrixVisualizer(writer=summary_writer, cond=cond_accuracy_meter, parse_class=parse_class,
+                    SSConfusionMatrixVisualizer(writer=summary_writer, cond=cond_accuracy_meter,
+                                                parse_class=parse_class,
                                                 labels=[str(i) for i in range(10)], tag="train/S/confusion_matrix"),
-                    EpochLRLogging(writer=summary_writer, optimizers=st_optim, names='MT', tag="train/S/LR"))
+                    EpochLRLogger(writer=summary_writer, optimizers=st_optim, names='MT', tag="train/S/LR"))
 
     st_eval_cbs = (RunningAverageMeter(prefix='eval/S', name='loss_cls'),
                    RunningAverageMeter(prefix='eval/S', name='loss_s_t_cons'),
@@ -107,7 +111,8 @@ if __name__ == "__main__":
                                                labels=[str(i) for i in range(10)], tag="eval/S/confusion_matrix"))
 
     te_train_cbs = (SetTeacherTrain(te_network), UpdateSWA(swa_model=te_network, student_model=st_network,
-                    start_cycle_epoch=args.start_cycle_epoch, cycle_interval=args.cycle_interval))
+                                                           start_cycle_epoch=args.start_cycle_epoch,
+                                                           cycle_interval=args.cycle_interval))
 
     te_eval_cbs = (RunningAverageMeter(prefix='eval/T', name='loss_cls'),
                    AccuracyMeter(prefix="eval/T", name="acc", parse_target=parse_target, cond=cond_accuracy_meter),
@@ -129,8 +134,9 @@ if __name__ == "__main__":
                          train_callbacks=te_train_cbs, val_callbacks=te_eval_cbs)
 
     # Strategy
-    swa_strategy = DualModelStrategy(data_provider=data_provider, data_sampling_config=sampling_config, model_names=("S", "T"),
-                                    m0_trainer=st_trainer, m1_trainer=te_trainer, n_epochs=args.n_epochs,
-                                    n_training_batches=args.n_training_batches, callbacks=stra_cbs, device=args.device)
+    swa_strategy = DualModelStrategy(data_provider=data_provider, data_sampling_config=sampling_config,
+                                     model_names=("S", "T"),
+                                     m0_trainer=st_trainer, m1_trainer=te_trainer, n_epochs=args.n_epochs,
+                                     n_training_batches=args.n_training_batches, callbacks=stra_cbs, device=device)
 
     swa_strategy.run()

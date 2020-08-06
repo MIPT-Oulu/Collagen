@@ -15,12 +15,15 @@ class DataProvider(object):
         self.__state_dict = {}
 
         for itemloader_name in self.__loaders:
+            # Auto set name for itemloader
+            if not self.__loaders[itemloader_name].name or self.__loaders[itemloader_name].name is None:
+                self.__loaders[itemloader_name].name = itemloader_name
             itemloader_len = len(self.__loaders[itemloader_name])
             self.__state_dict[itemloader_name] = {"total": itemloader_len,
-                                          "samples": None,
-                                          "num_sampled": 0,
-                                          "num_left": itemloader_len,
-                                          "num_loops": 0}
+                                                  "samples": None,
+                                                  "num_sampled": 0,
+                                                  "num_left": itemloader_len,
+                                                  "num_loops": 0}
 
     def sample(self, **kwargs):
         """ Samples :attr:__loaders with specified number of data
@@ -51,7 +54,7 @@ class DataProvider(object):
 
         return list_samples
 
-    def __sample(self, itemloader_name : str, k : int):
+    def __sample(self, itemloader_name: str, k: int):
         """Gets `k` samples from the itemloader specified by `itemloader_name`.
 
         Parameters
@@ -72,7 +75,8 @@ class DataProvider(object):
         self.__state_dict[itemloader_name]["samples"] = samples
 
         # Update state_dict
-        if self.__state_dict[itemloader_name]["num_sampled"] + num_samples > self.__state_dict[itemloader_name]["total"]:
+        if self.__state_dict[itemloader_name]["num_sampled"] + num_samples > self.__state_dict[itemloader_name][
+            "total"]:
             self.__state_dict[itemloader_name]["num_loops"] += 1
             self.__state_dict[itemloader_name]["num_sampled"] = num_samples
             self.__state_dict[itemloader_name]["num_left"] = self.__state_dict[itemloader_name]["total"] - num_samples
@@ -94,6 +98,9 @@ class DataProvider(object):
         gc.collect()
         self.__state_dict = {}
 
+    def get_loader_names(self):
+        return [name for name in self.__loaders]
+
     def get_loader_by_name(self, name):
         if name in self.__loaders:
             return self.__loaders[name]
@@ -101,3 +108,7 @@ class DataProvider(object):
             return tuple([self.__loaders[s] for s in name])
         else:
             raise ValueError("`{}` not found in list of loader names".format(name))
+
+    def set_epoch(self, epoch):
+        for loader in self.__loaders:
+            self.__loaders[loader].set_epoch(epoch)

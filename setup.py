@@ -5,8 +5,10 @@
 
 from setuptools import setup, find_packages
 
-
-requirements = ('numpy', 'opencv-python', 'solt', 'torch', 'tqdm', 'scikit-learn', 'pandas')
+requirements = ('numpy', 'opencv-python', 'solt', 'pyyaml',
+                'torch>=1.3', 'tqdm', 'scikit-learn', 'tensorboard', 'dill', 'matplotlib',
+                'pandas', 'pretrainedmodels', 'pillow==6.1',
+                'segmentation-models-pytorch')
 
 setup_requirements = ()
 
@@ -15,8 +17,8 @@ test_requirements = ('pytest',)
 description = """Deep Learning framework for reproducible science. From Finland with love."""
 
 setup(
-    author="Hoang Nguyen, Egor Panfilov, Aleksei Tiulpin",
-    author_email='huy.nguyen@oulu.fi, egor.panfilov@oulu.fi, aleksei.tiulpin@oulu.fi,',
+    author="Hoang Nguyen, Abu Mohammed Raisuddin, Aleksei Tiulpin",
+    author_email='huy.nguyen@oulu.fi, abu.raisuddin@oulu.fi, aleksei.tiulpin@oulu.fi,',
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Science/Research',

@@ -1,0 +1,14 @@
+train:
+  data_provider:
+    mnist_train:
+      object: ItemLoader
+      num_samples: 1
+      data_key: "data"
+      target_key: "target"
+eval:
+  data_provider:
+    mnist_eval:
+      object: ItemLoader
+      num_samples: 1
+      data_key: "data"
+      target_key: "target"

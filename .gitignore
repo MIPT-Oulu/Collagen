@@ -5,6 +5,8 @@ __pycache__/
 .idea/
 # C extensions
 *.so
+.DS_Store
+
 
 examples/minist_classification/data/
 .pytest_cache/
@@ -117,3 +119,4 @@ venv.bak/
 *.png
 *.csv
 *.pt
+/doc/build/

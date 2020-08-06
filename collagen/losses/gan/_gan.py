@@ -1,5 +1,8 @@
 from torch import Tensor
+
 from collagen.core import Module
+
+__all__ = ["GeneratorLoss"]
 
 
 class GeneratorLoss(Module):

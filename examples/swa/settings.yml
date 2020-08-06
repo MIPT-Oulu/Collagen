@@ -2,7 +2,7 @@ train:
   data_provider:
     S:
       unlabeled_train_st:
-        cate: AugmentedGroupSampler
+        object: AugmentedGroupSampler
         num_samples: 1
         data_key: "data"
         target_key:
@@ -10,7 +10,7 @@ train:
           - "name"
 
       labeled_train_st:
-        cate: AugmentedGroupSampler
+        object: AugmentedGroupSampler
         num_samples: 1
         data_key: "data"
         target_key:
@@ -19,7 +19,7 @@ train:
           - "name"
 
       unlabeled_train_te:
-        cate: AugmentedGroupSampler
+        object: AugmentedGroupSampler
         num_samples: 1
         data_key: "data"
         target_key:
@@ -27,7 +27,7 @@ train:
           - "name"
 
       labeled_train_te:
-        cate: AugmentedGroupSampler
+        object: AugmentedGroupSampler
         num_samples: 1
         data_key: "data"
         target_key:
@@ -39,7 +39,7 @@ eval:
   data_provider:
     S:
       unlabeled_eval_st:
-        cate: AugmentedGroupSampler
+        object: AugmentedGroupSampler
         num_samples: 1
         data_key: "data"
         target_key:
@@ -47,7 +47,7 @@ eval:
           - "name"
 
       labeled_eval_st:
-        cate: AugmentedGroupSampler
+        object: AugmentedGroupSampler
         num_samples: 1
         data_key: "data"
         target_key:
@@ -56,7 +56,7 @@ eval:
           - "name"
     T:
       labeled_eval_te:
-        cate: ItemLoader
+        object: ItemLoader
         num_samples: 1
         data_key: "data"
         target_key:
