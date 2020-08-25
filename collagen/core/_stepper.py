@@ -61,7 +61,7 @@ class Stepper(object):
         self.__loss: torch.nn.Module = new_loss
 
     def _check_single_element_tuple(self, x):
-        return hasattr(x, "__len__") and len(x) == 1
+        return (isinstance(x, list) or isinstance(x, tuple)) and len(x) == 1
 
     def optimizer_params(self, param_name):
         """Returns the value of optimizer parameter for every group of trainable parameters.
