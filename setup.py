@@ -7,7 +7,7 @@ from setuptools import setup, find_packages
 
 requirements = ('numpy', 'opencv-python', 'solt==0.1.8', 'pyyaml',
                 'torch>=1.3.1', 'tqdm', 'scikit-learn', 'tensorboard', 'dill', 'matplotlib',
-                'pandas', 'pretrainedmodels', 'pillow==6.1',
+                'pandas', 'pretrainedmodels', 'pillow==8.2.0',
                 'segmentation-models-pytorch')
 
 setup_requirements = ()
