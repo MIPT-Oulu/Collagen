@@ -1,7 +1,7 @@
 pytest==3.6.4
 pytest-flake8==1.0.2
 ipykernel==4.8.2
-codecov==2.0.15
+codecov==2.0.16
 pytest-pep8==1.0.6
 pytest-cov==2.6.0
 sphinx==1.8.0
