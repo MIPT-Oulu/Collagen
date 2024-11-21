@@ -5,7 +5,9 @@ from textwrap import wrap
 
 import numpy as np
 from matplotlib import figure
+import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix
+from scipy.ndimage import zoom
 from random import randint
 
 from typing import Tuple
@@ -291,7 +293,7 @@ class ImagePairVisualizer(Callback):
     """
 
     def __init__(self, writer, log_dir: str = None, comment: str = '', grid_shape: int = (2, 1),
-                 mean: float = None, std: float = None):
+                 mean: float = None, std: float = None, sigmoid = False, scale = (0, 1), plot_interp = False):
         super().__init__(ctype="visualizer")
         self.__log_dir = log_dir
         self.__comment = comment
@@ -303,121 +305,19 @@ class ImagePairVisualizer(Callback):
         self.__max_loss = None
         self.__mean = mean
         self.__std = std
+        self.__imagenet_mean = (0.485, 0.456, 0.406)
+        self.__imagenet_std = (0.229, 0.224, 0.225)
         self.__input_best = None
         self.__input_worst = None
         self.__pred_best = None
         self.__pred_worst = None
         self.__target_best = None
         self.__target_worst = None
-
-    def on_batch_end(self, *args, **kwargs):
-        pass
-
-    def on_minibatch_end(self, loss, batches_count, input, output, target, **kwargs):
-
-        metric_value = loss
-
-        # Update metric
-        if metric_value is not None:
-            # No previous metric
-            if self.__min_loss is None:
-                self.__min_loss = metric_value
-                self.__max_loss = metric_value
-                self.__input_worst = input.detach()
-                self.__pred_worst = output.detach()
-                self.__target_worst = target.detach()
-                self.__input_best = input.detach()
-                self.__pred_best = output.detach()
-                self.__target_best = target.detach()
-            # Best case improved
-            elif metric_value < self.__min_loss:
-                self.__min_loss = metric_value
-                self.__input_best = input.detach()
-                self.__target_best = target.detach()
-                self.__pred_best = output.detach()
-            # Worst case decreased
-            elif metric_value > self.__max_loss:
-                self.__max_loss = metric_value
-                self.__input_worst = input.detach()
-                self.__target_worst = target.detach()
-                self.__pred_worst = output.detach()
-
-    def on_epoch_begin(self, *args, **kwargs):
-        # Reset the variables for new epoch
-        self.__min_loss, self.__max_loss = None, None
-        self.__input_best, self.__pred_best = None, None
-        self.__input_worst, self.__pred_worst = None, None
-
-    def on_epoch_end(self, epoch, strategy, stage, **kwargs):
-        # Plot images on tensorboard
-        self.__summary_writer.add_images(tag='Input_best', dataformats='NCHW', global_step=epoch,
-                                         img_tensor=self.undo_transform(self.__input_best, self.__mean, self.__std))
-
-        self.__summary_writer.add_images(tag='Prediction_best', img_tensor=torch.sigmoid(self.__pred_best),
-                                         dataformats='NCHW', global_step=epoch)
-
-        self.__summary_writer.add_images(tag='Target_best', img_tensor=self.__target_best,
-                                         dataformats='NCHW', global_step=epoch)
-
-        self.__summary_writer.add_images(tag='Input_worst', dataformats='NCHW', global_step=epoch,
-                                         img_tensor=self.undo_transform(self.__input_worst, self.__mean, self.__std))
-
-        self.__summary_writer.add_images(tag='Prediction_worst', img_tensor=torch.sigmoid(self.__pred_worst),
-                                         dataformats='NCHW', global_step=epoch)
-
-        self.__summary_writer.add_images(tag='Target_worst', img_tensor=self.__target_worst,
-                                         dataformats='NCHW', global_step=epoch)
-
-    @staticmethod
-    def undo_transform(data, mean, std):
-        # img is CxHxW tensor
-        # batch dimension should be absent
-        data = data.clone()
-        if len(data.shape) == 4:
-            for im in range(data.size(0)):
-                for c_ind in range(data.size(1)):
-                    data[im, c_ind] = data[im, c_ind] * std[c_ind] + mean[c_ind]
-        else:
-            for c_ind in range(data.size(0)):
-                data[c_ind] = data[c_ind] * std[c_ind] + mean[c_ind]
-        return data
-
-
-class RandomImageVisualizer(Callback):
-    """
-    Visualizes input, target and prediction images from a random sample of the
-    minibatches with best and worst metric values.
-
-    Expected behavior:
-
-    0. specify the comparator
-    1. tracks the metric
-    2. tracks the worst and the best minibatches on CPU. If the minibatch metric is < than the best minibatch -> randomly sample image and mask.
-    3. Do the same for the worst cases
-    4. Visualize: image, and image with mask
-    5. ensure support for binary and multi-class semantic segmentation.
-
-    """
-
-    def __init__(self, writer, log_dir: str = None, comment: str = '', grid_shape: int = (2, 1),
-                 mean: float = None, std: float = None):
-        super().__init__(ctype="visualizer")
-        self.__log_dir = log_dir
-        self.__comment = comment
-        self.__summary_writer = writer
-        self.__num_batches = 2
-        self.__grid_shape = grid_shape
-        self.__num_images = grid_shape[0] * grid_shape[1]
-        self.__min_loss = None
-        self.__max_loss = None
-        self.__mean = mean
-        self.__std = std
-        self.__input_best = None
-        self.__input_worst = None
-        self.__pred_best = None
-        self.__pred_worst = None
-        self.__target_best = None
-        self.__target_worst = None
+        self.__figure_size = (10, 5)
+        self.__scale = scale
+        self.__dpi = 80
+        self.__sigmoid = sigmoid
+        self.__plot_interp = plot_interp
 
     def on_batch_end(self, *args, **kwargs):
         pass
@@ -458,23 +358,260 @@ class RandomImageVisualizer(Callback):
         self.__input_best, self.__pred_best = None, None
         self.__input_worst, self.__pred_worst = None, None
 
-    def on_epoch_end(self, epoch, strategy, stage, **kwargs):
+    def on_epoch_end(self, epoch, n_epochs, stage, **kwargs):
+        # Skip all but every 5th epoch
+        #if (epoch + 1) % 5 > 0:
+        #    return
+
+        # Use consistent scale in the last half of epochs
+        if epoch < n_epochs / 2:
+            self.__scale == None
+        else:
+            self.__scale == (0, 1)
+
+        # Best minibatch
+        
+        # Check for 3D data
+        if len(self.__input_best.shape) == 4:
+            slice = self.__input_best.shape[-1] // 2
+            slice_output = self.__pred_best.shape[-1] // 2
+            self.__input_best = self.__input_best[:, :, :, slice]
+            self.__pred_best = self.__pred_best[:, :, :, slice_output]
+            self.__target_best = self.__target_best[:, :, :, slice_output]
+            self.__input_worst = self.__input_worst[:, :, :, slice]
+            self.__pred_worst = self.__pred_worst[:, :, :, slice_output]
+            self.__target_worst = self.__target_worst[:, :, :, slice_output]
+
+        # Move images to CPU
+        #input = self.undo_transform(self.__input_best, self.__mean, self.__std)[0, :, :]
+        input = self.__input_best[0, :, :]
+        target = self.__target_best[0, :, :]
+        if self.__sigmoid:
+            pred = torch.sigmoid(self.__pred_best).cpu()[0, :, :]
+        else:
+            #pred = self.undo_transform(self.__pred_best, self.__imagenet_mean, self.__imagenet_std).cpu()
+            #pred = self.transform(pred, self.__mean, self.__std)[0, :, :]
+            pred = self.__pred_best.cpu()[0, :, :]
+
+        # Plot the figure and add to Tensorboard
+        #fig = self.plot_figure(input, pred, target, figure_size=self.__figure_size, dpi=self.__dpi,
+        #                       scale=self.__scale)
+        fig = self.plot_interp(input, pred, target, figure_size=self.__figure_size, dpi=self.__dpi,
+                               scale=self.__scale)
+        self.__summary_writer.add_figure(tag='Best minibatch', figure=fig, global_step=epoch)
+
+        # Worst minibatch
+
+        # Move images to CPU
+        #input = self.undo_transform(self.__input_worst, self.__mean, self.__std)[0, :, :]
+        input = self.__input_worst[0, :, :]
+        target = self.__target_worst[0, :, :]
+        if self.__sigmoid:
+            pred = torch.sigmoid(self.__pred_worst).cpu()[0, :, :]
+        else:
+            pred = self.__pred_worst.cpu()[0, :, :]
+
+        # Plot the figure and add to Tensorboard
+        # fig = self.plot_figure(input, pred, target, figure_size=self.__figure_size, dpi=self.__dpi,
+        #                       scale=self.__scale)
+        fig = self.plot_interp(input, pred, target, figure_size=self.__figure_size, dpi=self.__dpi,
+                               scale=self.__scale)
+        self.__summary_writer.add_figure(tag='Worst minibatch', figure=fig, global_step=epoch)
+
+    @staticmethod
+    def undo_transform(data, mean, std):
+        # img is CxHxW tensor
+        # batch dimension should be absent
+        data = data.clone()
+        if len(data.shape) == 4:
+            for im in range(data.size(0)):
+                for c_ind in range(data.size(1)):
+                    data[im, c_ind] = data[im, c_ind] * std[c_ind] + mean[c_ind]
+        else:
+            for c_ind in range(data.size(0)):
+                data[c_ind] = data[c_ind] * std[c_ind] + mean[c_ind]
+        return data
+
+    @staticmethod
+    def transform(data, mean, std):
+        # img is CxHxW tensor
+        # batch dimension should be absent
+        data = data.clone()
+        if len(data.shape) == 4:
+            for im in range(data.size(0)):
+                for c_ind in range(data.size(1)):
+                    data[im, c_ind] = (data[im, c_ind] - mean[c_ind]) / std[c_ind]
+        else:
+            for c_ind in range(data.size(0)):
+                data[c_ind] = (data[c_ind] - mean[c_ind]) / std[c_ind]
+        return data
+
+    @staticmethod
+    def plot_figure(input, pred, target, figure_size=(10, 5), dpi=80, scale=(0, 1)):
+        fig = figure.Figure(figsize=figure_size, dpi=dpi, facecolor='w', edgecolor='k')
+        ax1 = fig.add_subplot(131)
+        if scale is not None:
+            im1 = ax1.imshow(input, cmap='gray', vmin=0, vmax=1)
+        else:
+            im1 = ax1.imshow(input, cmap='gray')
+        cbar1 = fig.colorbar(im1, orientation='horizontal')
+        cbar1.solids.set_edgecolor('face')
+        ax1.title.set_text('Input')
+        ax2 = fig.add_subplot(132)
+        if scale is not None:
+            im2 = ax2.imshow(pred, cmap='gray', vmin=0, vmax=1)
+        else:
+            im2 = ax2.imshow(pred, cmap='gray')
+        cbar2 = fig.colorbar(im2, orientation='horizontal')
+        cbar2.solids.set_edgecolor('face')
+        ax2.title.set_text('Prediction')
+        ax3 = fig.add_subplot(133)
+        if scale is not None:
+            im3 = ax3.imshow(target, cmap='gray', vmin=0, vmax=1)
+        else:
+            im3 = ax3.imshow(target, cmap='gray')
+        cbar3 = fig.colorbar(im3, orientation='horizontal')
+        cbar3.solids.set_edgecolor('face')
+        ax3.title.set_text('Target')
+        return fig
+
+    @staticmethod
+    def plot_interp(input, pred, target, figure_size=(10, 5), dpi=80, scale=(0, 1)):
+        fig = figure.Figure(figsize=figure_size, dpi=dpi, facecolor='w', edgecolor='k')
+        ax1 = fig.add_subplot(221)
+        if scale is not None:
+            im1 = ax1.imshow(input, cmap='gray', vmin=0, vmax=1)
+        else:
+            im1 = ax1.imshow(input, cmap='gray')
+        #cbar1 = fig.colorbar(im1, orientation='horizontal')
+        #cbar1.solids.set_edgecolor('face')
+        ax1.title.set_text('Input')
+        ax2 = fig.add_subplot(222)
+        if scale is not None:
+            im2 = ax2.imshow(zoom(input, zoom=4), cmap='gray', vmin=0, vmax=1)
+        else:
+            im2 = ax2.imshow(zoom(input, zoom=4), cmap='gray')
+        #cbar2 = fig.colorbar(im2, orientation='horizontal')
+        #cbar2.solids.set_edgecolor('face')
+        ax2.title.set_text('Baseline (Tricubic interpolation)')
+        ax3 = fig.add_subplot(223)
+        if scale is not None:
+            im3 = ax3.imshow(pred, cmap='gray', vmin=0, vmax=1)
+        else:
+            im3 = ax3.imshow(pred, cmap='gray')
+        cbar3 = fig.colorbar(im3, orientation='horizontal')
+        cbar3.solids.set_edgecolor('face')
+        ax3.title.set_text('Prediction')
+        ax4 = fig.add_subplot(224)
+        if scale is not None:
+            im4 = ax4.imshow(target, cmap='gray', vmin=0, vmax=1)
+        else:
+            im4 = ax4.imshow(target, cmap='gray')
+        cbar4 = fig.colorbar(im4, orientation='horizontal')
+        cbar4.solids.set_edgecolor('face')
+        ax4.title.set_text('Target')
+        return fig
+
+class RandomImageVisualizer(Callback):
+    """
+    Visualizes input, target and prediction images from a random sample of the
+    minibatches with best and worst metric values.
+
+    Expected behavior:
+
+    0. specify the comparator
+    1. tracks the metric
+    2. tracks the worst and the best minibatches on CPU. If the minibatch metric is < than the best minibatch -> randomly sample image and mask.
+    3. Do the same for the worst cases
+    4. Visualize: image, and image with mask
+    5. ensure support for binary and multi-class semantic segmentation.
+
+    """
+
+    def __init__(self, writer, log_dir: str = None, comment: str = '', grid_shape: int = (2, 1),
+                 mean: float = None, std: float = None, sigmoid = False):
+        super().__init__(ctype="visualizer")
+        self.__log_dir = log_dir
+        self.__comment = comment
+        self.__summary_writer = writer
+        self.__num_batches = 2
+        self.__grid_shape = grid_shape
+        self.__num_images = grid_shape[0] * grid_shape[1]
+        self.__min_loss = None
+        self.__max_loss = None
+        self.__mean = mean
+        self.__std = std
+        self.__input_best = None
+        self.__input_worst = None
+        self.__pred_best = None
+        self.__pred_worst = None
+        self.__target_best = None
+        self.__target_worst = None
+        self.__sigmoid = sigmoid
+
+    def on_batch_end(self, *args, **kwargs):
+        pass
+
+    def on_minibatch_end(self, loss, batches_count, input, output, target, **kwargs):
+
+        metric_value = loss
+        sample = randint(0, input.shape[0] - 1)
+
+        # Update metric
+        if metric_value is not None:
+            # No previous metric
+            if self.__min_loss is None:
+                self.__min_loss = metric_value
+                self.__max_loss = metric_value
+                self.__input_worst = input[sample].detach()
+                self.__pred_worst = output[sample].detach()
+                self.__target_worst = target[sample].detach()
+                self.__input_best = input[sample].detach()
+                self.__pred_best = output[sample].detach()
+                self.__target_best = target[sample].detach()
+            # Best case improved
+            elif metric_value < self.__min_loss:
+                self.__min_loss = metric_value
+                self.__input_best = input[sample].detach()
+                self.__target_best = target[sample].detach()
+                self.__pred_best = output[sample].detach()
+            # Worst case decreased
+            elif metric_value > self.__max_loss:
+                self.__max_loss = metric_value
+                self.__input_worst = input[sample].detach()
+                self.__target_worst = target[sample].detach()
+                self.__pred_worst = output[sample].detach()
+
+    def on_epoch_begin(self, *args, **kwargs):
+        # Reset the variables for new epoch
+        self.__min_loss, self.__max_loss = None, None
+        self.__input_best, self.__pred_best = None, None
+        self.__input_worst, self.__pred_worst = None, None
+
+    def on_epoch_end(self, epoch, stage, **kwargs):
         # Plot images on tensorboard
+
+        # Input
         self.__summary_writer.add_images(tag='Input_best', dataformats='CHW', global_step=epoch,
                                          img_tensor=self.undo_transform(self.__input_best, self.__mean, self.__std))
-
-        self.__summary_writer.add_images(tag='Prediction_best', img_tensor=torch.sigmoid(self.__pred_best),
-                                         dataformats='CHW', global_step=epoch)
-
-        self.__summary_writer.add_images(tag='Target_best', img_tensor=self.__target_best,
-                                         dataformats='CHW', global_step=epoch)
-
         self.__summary_writer.add_images(tag='Input_worst', dataformats='CHW', global_step=epoch,
                                          img_tensor=self.undo_transform(self.__input_worst, self.__mean, self.__std))
 
-        self.__summary_writer.add_images(tag='Prediction_worst', img_tensor=torch.sigmoid(self.__pred_worst),
-                                         dataformats='CHW', global_step=epoch)
+        # Prediction
+        if self.__sigmoid:
+            self.__summary_writer.add_images(tag='Prediction_best', img_tensor=torch.sigmoid(self.__pred_best),
+                                             dataformats='CHW', global_step=epoch)
+            self.__summary_writer.add_images(tag='Prediction_worst', img_tensor=torch.sigmoid(self.__pred_worst),
+                                             dataformats='CHW', global_step=epoch)
+        else:
+            self.__summary_writer.add_images(tag='Prediction_best', img_tensor=self.__pred_best,
+                                             dataformats='CHW', global_step=epoch)
+            self.__summary_writer.add_images(tag='Prediction_worst', img_tensor=self.__pred_worst,
+                                             dataformats='CHW', global_step=epoch)
 
+        # Target
+        self.__summary_writer.add_images(tag='Target_best', img_tensor=self.__target_best,
+                                         dataformats='CHW', global_step=epoch)
         self.__summary_writer.add_images(tag='Target_worst', img_tensor=self.__target_worst,
                                          dataformats='CHW', global_step=epoch)
 
