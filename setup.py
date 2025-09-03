@@ -37,7 +37,7 @@ setup(
     include_package_data=True,
     keywords='data augmentations, deeep learning',
     name='collagen',
-    packages=find_packages(include=['collagen']),
+    packages=find_packages(where='.', include=['collagen', 'collagen.*']),
     setup_requires=setup_requirements,
     test_suite='tests',
     tests_require=test_requirements,
